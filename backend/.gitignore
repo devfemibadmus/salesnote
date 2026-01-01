@@ -1,0 +1,19 @@
+# Environment
+.env
+z.py
+backups
+firebase-adminsdk.json
+
+# Build artifacts
+**/target/
+**/build/
+**/dist/
+
+# Logs
+*.log
+uploads
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+__pycache__/
