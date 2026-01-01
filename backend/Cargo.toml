@@ -1,0 +1,51 @@
+[package]
+name = "salesnote_backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4"
+actix-multipart = "0.6"
+actix-files = "0.6"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
+
+# Storage + migrations
+sqlx = { version = "0.7", features = ["runtime-tokio", "postgres", "macros", "chrono", "migrate"] }
+
+# Auth (JWT)
+jsonwebtoken = "9"
+
+# Password hashing
+argon2 = "0.5"
+rand = "0.8"
+sha2 = "0.10"
+hex = "0.4"
+
+# Config
+config = "0.14"
+
+# Env
+dotenvy = "0.15"
+
+# Multipart + mime
+futures-util = "0.3.31"
+mime = "0.3"
+image = { version = "0.25", default-features = true }
+
+# Email worker
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "builder", "tokio1-native-tls"] }
+reqwest = { version = "0.12", features = ["json"] }
+dashmap = "5"
+once_cell = "1"
+redis = { version = "0.25", features = ["tokio-comp"] }
+tokio-cron-scheduler = "0.10"
+
+[dev-dependencies]
+reqwest = { version = "0.12", features = ["json"] }
