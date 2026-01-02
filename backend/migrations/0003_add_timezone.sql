@@ -1,0 +1,4 @@
+-- 0003_add_timezone.sql
+
+ALTER TABLE shops
+  ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'UTC';
