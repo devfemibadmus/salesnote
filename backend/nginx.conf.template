@@ -1,0 +1,6 @@
+upstream salesnote_api {
+{{UPSTREAM_SERVERS}}
+    keepalive 64;
+}
+
+{{SSL_BLOCK}}
