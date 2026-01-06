@@ -1,0 +1,16 @@
+[Unit]
+Description=Salesnote API instance %i
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=/home/salesnote/.env
+Environment=SALESNOTE__BIND=0.0.0.0:%i
+WorkingDirectory=/home/salesnote
+ExecStart=/home/salesnote/api
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
