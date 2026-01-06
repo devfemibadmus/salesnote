@@ -1,0 +1,15 @@
+[Unit]
+Description=Salesnote Worker
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=/home/salesnote/worker/.env
+WorkingDirectory=/home/salesnote/worker
+ExecStart=/home/salesnote/worker/worker
+Restart=always
+RestartSec=3
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
