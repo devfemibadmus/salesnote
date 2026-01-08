@@ -1,0 +1,278 @@
+use actix_web::web::ReqData;
+use actix_web::{http::StatusCode, web, HttpRequest, Responder};
+use chrono::{DateTime, Utc};
+use serde::Deserialize;
+
+use crate::api::handlers::auth;
+use crate::api::handlers::auth::require_active_session;
+use crate::api::middlewares::auth::AuthDeviceId;
+use crate::api::response::{json_created, json_empty, json_error, json_ok};
+use crate::api::state::AppState;
+use crate::models::{
+    AuthorizedSaleDeletePayload, AuthorizedSaleDeleteResult, AuthorizedSaleGetPayload,
+    AuthorizedSaleGetResult, AuthorizedSaleListPayload, AuthorizedSaleListResult,
+    AuthorizedSaleUpdatePayload, AuthorizedSaleUpdateResult, IdPayload, Sale, SaleCreatePayload,
+    SaleInput, SaleUpdateInput, Signature,
+};
+
+#[derive(Debug, Deserialize)]
+pub struct SalesListQuery {
+    pub page: Option<i64>,
+    pub per_page: Option<i64>,
+    pub include_items: Option<bool>,
+}
+
+pub async fn list_sales(
+    state: web::Data<AppState>,
+    req: HttpRequest,
+    shop_id: ReqData<i64>,
+    device_id: ReqData<AuthDeviceId>,
+    query: web::Query<SalesListQuery>,
+) -> impl Responder {
+    // keep header validation for consistency; DB auth is embedded in SQL below.
+    if auth::auth_claims(req.headers(), &state.jwt_secret).is_err() {
+        return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
+    }
+
+    let page_value = query.page.unwrap_or(1).max(1);
+    let per_page_value = query.per_page.unwrap_or(50).clamp(1, 200);
+    let include_items = query.include_items.unwrap_or(false);
+
+    match Sale::list_authorized_paged(
+        &state.pool,
+        &AuthorizedSaleListPayload {
+            shop_id: *shop_id,
+            device_id: (*device_id).0,
+            page: page_value,
+            per_page: per_page_value,
+            include_items,
+        },
+    )
+    .await
+    {
+        Ok(AuthorizedSaleListResult::Unauthorized) => {
+            json_error(StatusCode::UNAUTHORIZED, "unauthorized")
+        }
+        Ok(AuthorizedSaleListResult::Sales(sales)) => json_ok(sales),
+        Err(e) => {
+            tracing::error!("list sales error: {}", e);
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
+        }
+    }
+}
+
+pub async fn create_sale(
+    state: web::Data<AppState>,
+    req: HttpRequest,
+    shop_id: ReqData<i64>,
+    payload: web::Json<SaleInput>,
+) -> impl Responder {
+    if let Err(resp) = require_active_session(&state, &req, *shop_id).await {
+        return resp;
+    }
+
+    if payload.items.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "items required");
+    }
+    if payload.customer_name.trim().is_empty() || payload.customer_contact.trim().is_empty() {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "customer name and contact are required",
+        );
+    }
+
+    let input = payload.into_inner();
+    let custom_created_at = if let Some(created_at) = input.created_at.as_ref() {
+        match DateTime::parse_from_rfc3339(created_at) {
+            Ok(dt) => Some(dt.with_timezone(&Utc)),
+            Err(_) => {
+                return json_error(
+                    StatusCode::BAD_REQUEST,
+                    "created_at must be RFC3339 (example: 2026-02-08T12:30:00Z)",
+                )
+            }
+        }
+    } else {
+        None
+    };
+
+    let signature = match Signature::get(
+        &state.pool,
+        &IdPayload {
+            id: input.signature_id,
+        },
+    )
+    .await
+    {
+        Ok(Some(sig)) => sig,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "signature not found"),
+        Err(e) => {
+            tracing::error!("get signature error: {}", e);
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            );
+        }
+    };
+    if signature.shop_id != *shop_id {
+        return json_error(StatusCode::FORBIDDEN, "shop mismatch");
+    }
+
+    match Sale::create(
+        &state.pool,
+        &SaleCreatePayload {
+            shop_id: *shop_id,
+            input,
+            created_at: custom_created_at,
+        },
+    )
+    .await
+    {
+        Ok(sale) => json_created(sale),
+        Err(e) => {
+            tracing::error!("create sale error: {}", e);
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
+        }
+    }
+}
+
+pub async fn update_sale(
+    state: web::Data<AppState>,
+    req: HttpRequest,
+    shop_id: ReqData<i64>,
+    device_id: ReqData<AuthDeviceId>,
+    sale_id: web::Path<i64>,
+    payload: web::Json<SaleUpdateInput>,
+) -> impl Responder {
+    if auth::auth_claims(req.headers(), &state.jwt_secret).is_err() {
+        return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
+    }
+
+    let input = payload.into_inner();
+    if let Some(items) = &input.items {
+        if items.is_empty() {
+            return json_error(StatusCode::BAD_REQUEST, "items required");
+        }
+    }
+    if let Some(customer_name) = &input.customer_name {
+        if customer_name.trim().is_empty() {
+            return json_error(StatusCode::BAD_REQUEST, "customer name cannot be empty");
+        }
+    }
+    if let Some(customer_contact) = &input.customer_contact {
+        if customer_contact.trim().is_empty() {
+            return json_error(StatusCode::BAD_REQUEST, "customer contact cannot be empty");
+        }
+    }
+    match Sale::update_authorized(
+        &state.pool,
+        &AuthorizedSaleUpdatePayload {
+            shop_id: *shop_id,
+            device_id: (*device_id).0,
+            sale_id: *sale_id,
+            input,
+        },
+    )
+    .await
+    {
+        Ok(AuthorizedSaleUpdateResult::Unauthorized) => {
+            json_error(StatusCode::UNAUTHORIZED, "unauthorized")
+        }
+        Ok(AuthorizedSaleUpdateResult::NotFound) => json_error(StatusCode::NOT_FOUND, "not found"),
+        Ok(AuthorizedSaleUpdateResult::WindowExpired) => {
+            json_error(StatusCode::FORBIDDEN, "edit window expired")
+        }
+        Ok(AuthorizedSaleUpdateResult::SignatureNotFound) => {
+            json_error(StatusCode::NOT_FOUND, "signature not found")
+        }
+        Ok(AuthorizedSaleUpdateResult::Updated(sale)) => json_ok(sale),
+        Err(e) => {
+            tracing::error!("update sale error: {}", e);
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
+        }
+    }
+}
+
+pub async fn get_sale(
+    state: web::Data<AppState>,
+    req: HttpRequest,
+    shop_id: ReqData<i64>,
+    device_id: ReqData<AuthDeviceId>,
+    sale_id: web::Path<i64>,
+) -> impl Responder {
+    if auth::auth_claims(req.headers(), &state.jwt_secret).is_err() {
+        return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
+    }
+
+    match Sale::get_authorized(
+        &state.pool,
+        &AuthorizedSaleGetPayload {
+            shop_id: *shop_id,
+            device_id: (*device_id).0,
+            sale_id: *sale_id,
+        },
+    )
+    .await
+    {
+        Ok(AuthorizedSaleGetResult::Unauthorized) => {
+            json_error(StatusCode::UNAUTHORIZED, "unauthorized")
+        }
+        Ok(AuthorizedSaleGetResult::NotFound) => json_error(StatusCode::NOT_FOUND, "not found"),
+        Ok(AuthorizedSaleGetResult::Sale(sale)) => json_ok(sale),
+        Err(e) => {
+            tracing::error!("get sale error: {}", e);
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
+        }
+    }
+}
+
+pub async fn delete_sale(
+    state: web::Data<AppState>,
+    req: HttpRequest,
+    shop_id: ReqData<i64>,
+    device_id: ReqData<AuthDeviceId>,
+    sale_id: web::Path<i64>,
+) -> impl Responder {
+    if auth::auth_claims(req.headers(), &state.jwt_secret).is_err() {
+        return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
+    }
+
+    match Sale::delete_authorized(
+        &state.pool,
+        &AuthorizedSaleDeletePayload {
+            shop_id: *shop_id,
+            device_id: (*device_id).0,
+            sale_id: *sale_id,
+        },
+    )
+    .await
+    {
+        Ok(AuthorizedSaleDeleteResult::Unauthorized) => {
+            json_error(StatusCode::UNAUTHORIZED, "unauthorized")
+        }
+        Ok(AuthorizedSaleDeleteResult::NotFound) => json_error(StatusCode::NOT_FOUND, "not found"),
+        Ok(AuthorizedSaleDeleteResult::WindowExpired) => {
+            json_error(StatusCode::FORBIDDEN, "delete window expired")
+        }
+        Ok(AuthorizedSaleDeleteResult::Deleted) => json_empty(),
+        Err(e) => {
+            tracing::error!("delete sale error: {}", e);
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
+        }
+    }
+}
