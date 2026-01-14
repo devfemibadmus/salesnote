@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome to Salesnote</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #f4f7fb;
+        font-family: "Inter", Arial, sans-serif;
+        color: #1b1f24;
+      }
+      .container {
+        width: 100%;
+        padding: 32px 12px;
+      }
+      .card {
+        width: 100%;
+        max-width: 360px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+        overflow: hidden;
+      }
+      .card-inner {
+        padding: 24px 22px 18px;
+        text-align: center;
+      }
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 700;
+        color: #1b1f24;
+        font-size: 18px;
+        margin-bottom: 14px;
+      }
+      .brand-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: #1c7cff;
+        color: #ffffff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .banner {
+        height: 110px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #f4c464 0%, #d8a647 100%);
+        margin-bottom: 16px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 12px 0 8px;
+        color: #111827;
+      }
+      p {
+        font-size: 14px;
+        line-height: 1.5;
+        color: #6b7280;
+        margin: 0 0 16px;
+      }
+      .button {
+        display: inline-block;
+        padding: 12px 20px;
+        background: #1c7cff;
+        color: #ffffff !important;
+        text-decoration: none;
+        border-radius: 10px;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .divider {
+        height: 1px;
+        background: #eef2f6;
+        margin: 18px 0 12px;
+      }
+      .footer {
+        text-align: center;
+        color: #9ca3af;
+        font-size: 11px;
+        line-height: 1.5;
+      }
+      .footer a {
+        color: #1c7cff;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <div class="card-inner">
+          <div class="brand">
+            <span class="brand-badge">S</span>
+            Salesnote
+          </div>
+          <div class="banner"></div>
+          <h1>Welcome to Salesnote, {{SHOP_NAME}}!</h1>
+          <p>
+            We are excited to help you manage your sales and generate
+            e-receipts effortlessly. Your account is ready, and you can start
+            recording sales right away.
+          </p>
+          <a class="button" href="{{DASHBOARD_URL}}">Go to Dashboard</a>
+          <div class="divider"></div>
+          <p style="margin-bottom:0;">Happy selling,<br /><strong>The Salesnote Team</strong></p>
+        </div>
+        <div class="footer" style="padding: 0 22px 18px;">
+          You're receiving this because you signed up for Salesnote.
+          <br />
+          © {{YEAR}} Salesnote Inc. 123 Business Ave, Suite 100.
+          <br />
+          <a href="#">Help Center</a> · <a href="#">Unsubscribe</a>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
