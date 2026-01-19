@@ -1,0 +1,94 @@
+# @format
+
+name: Salesnote Worker Deploy
+
+on:
+    push:
+        branches:
+            - worker
+    workflow_dispatch:
+        inputs:
+            deploy_to_worker:
+                description: "Deploy to worker server"
+                required: true
+                default: "true"
+                type: boolean
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+
+            - name: Setup Rust
+              uses: actions-rs/toolchain@v1
+              with:
+                  toolchain: stable
+                  override: true
+
+            - name: Cache dependencies
+              uses: actions/cache@v3
+              with:
+                  path: |
+                      ~/.cargo/registry
+                      ~/.cargo/git
+                      target
+                  key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+            - name: Run tests
+              run: cargo test
+              working-directory: backend
+
+            - name: Build worker binary
+              run: cargo build --release --bin worker
+              working-directory: backend
+
+            - name: Stop worker service before upload
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.WORKER_SSH_HOST }}
+                  username: ${{ secrets.WORKER_SSH_USER }}
+                  key: ${{ secrets.WORKER_SSH_KEY }}
+                  script: |
+                      sudo systemctl stop salesnoteworker || true
+                      mkdir -p /home/salesnote/worker
+
+            - name: Upload worker binary
+              uses: appleboy/scp-action@master
+              with:
+                  host: ${{ secrets.WORKER_SSH_HOST }}
+                  username: ${{ secrets.WORKER_SSH_USER }}
+                  key: ${{ secrets.WORKER_SSH_KEY }}
+                  source: "backend/target/release/worker"
+                  target: "/home/salesnote/worker/"
+                  overwrite: true
+
+            - name: Upload worker assets
+              uses: appleboy/scp-action@master
+              with:
+                  host: ${{ secrets.WORKER_SSH_HOST }}
+                  username: ${{ secrets.WORKER_SSH_USER }}
+                  key: ${{ secrets.WORKER_SSH_KEY }}
+                  source: |
+                      backend/.env
+                      backend/firebase-adminsdk.json
+                      backend/salesnoteworker.service
+                  target: "/home/salesnote/worker/"
+                  overwrite: true
+
+            - name: Register and start worker
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.WORKER_SSH_HOST }}
+                  username: ${{ secrets.WORKER_SSH_USER }}
+                  key: ${{ secrets.WORKER_SSH_KEY }}
+                  script: |
+                      chmod +x "/home/salesnote/worker/worker"
+                      if [ ! -f /etc/systemd/system/salesnoteworker.service ]; then
+                        sudo cp /home/salesnote/worker/salesnoteworker.service /etc/systemd/system/salesnoteworker.service
+                        sudo systemctl daemon-reload
+                        sudo systemctl enable salesnoteworker
+                      fi
+                      sudo systemctl restart salesnoteworker
+                      echo "Worker deployment complete!"
