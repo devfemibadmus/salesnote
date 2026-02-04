@@ -1,0 +1,320 @@
+import 'dart:async';
+
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../../app/config.dart';
+import '../../app/routes.dart';
+import '../../data/models.dart';
+import '../../services/api_client.dart';
+import '../../services/currency.dart';
+import '../../services/local_cache.dart';
+import '../../services/notification.dart';
+import '../../services/token_store.dart';
+import '../../widgets/app_bottom_nav.dart';
+
+part 'states.dart';
+part 'widgets.dart';
+
+String _homeCurrencySymbol = ' ';
+String _homeCurrencyLocale = 'en_US';
+
+String _homeFormatAmount(num amount, {int decimalDigits = 2}) {
+  return NumberFormat.currency(
+    locale: _homeCurrencyLocale,
+    symbol: _homeCurrencySymbol,
+    decimalDigits: decimalDigits,
+  ).format(amount);
+}
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  final _api = ApiClient(TokenStore());
+  bool _loading = true;
+  String? _error;
+  ShopProfile? _shop;
+  AnalyticsSummary? _analytics;
+  List<Sale> _sales = [];
+  int _trendTab = 0;
+
+  void _syncHomeCurrencyFormatter() {
+    final ctx = CurrencyService.resolveContext();
+    _homeCurrencyLocale = ctx.locale;
+    _homeCurrencySymbol = ctx.symbol;
+  }
+
+  void _goTo(String route, {bool reset = false}) {
+    _api.cancelInFlight();
+    if (!mounted) return;
+    if (reset) {
+      Navigator.pushNamedAndRemoveUntil(context, route, (_) => false);
+      return;
+    }
+    Navigator.pushNamed(context, route);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _syncHomeCurrencyFormatter();
+    WidgetsBinding.instance.addObserver(this);
+    _loadHomeFromCacheOrApi();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _setupNotifications());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+
+    // Force lightweight rebuild on resume so locale/region currency formatting
+    // re-runs even when no API refresh is triggered.
+    _syncHomeCurrencyFormatter();
+    setState(() {
+      if (_shop != null) {
+        _shop = _mergeShopWithSettingsCache(_shop!);
+      }
+    });
+  }
+
+  Future<void> _loadHomeFromCacheOrApi() async {
+    final cached = LocalCache.loadHomeSummary();
+    if (cached != null) {
+      try {
+        final data = HomeSummary.fromJson(cached);
+        final mergedShop = _mergeShopWithSettingsCache(data.shop);
+        if (!mounted) return;
+        setState(() {
+          _shop = mergedShop;
+          _analytics = data.analytics;
+          _sales = data.recentSales;
+          _error = null;
+          _loading = false;
+        });
+        return;
+      } catch (_) {}
+    }
+    await _loadHome();
+  }
+
+  Future<void> _loadHome({bool refresh = false}) async {
+    final hasCurrentUi = _shop != null && _analytics != null;
+    if (refresh && hasCurrentUi) {
+      if (!mounted) return;
+    } else {
+      if (!mounted) return;
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final data = await _api.getHomeSummary();
+      final mergedShop = _mergeShopWithSettingsCache(data.shop);
+      if (!mounted) return;
+      setState(() {
+        _shop = mergedShop;
+        _analytics = data.analytics;
+        _sales = data.recentSales;
+        _error = null;
+      });
+      await LocalCache.saveHomeSummary(
+        HomeSummary(
+          shop: mergedShop,
+          analytics: data.analytics,
+          recentSales: data.recentSales,
+        ).toJson(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException
+          ? e.message
+          : 'Unable to load dashboard.';
+
+      // Keep current home UI during pull-to-refresh failures.
+      if (refresh && hasCurrentUi) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      } else {
+        setState(() => _error = message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _setupNotifications() async {
+    try {
+      final optedOut = await LocalCache.isNotificationOptedOut();
+      if (optedOut) return;
+
+      await NotificationService.init();
+      final status = await NotificationService.getPermissionStatus();
+      if (_isGranted(status)) {
+        await LocalCache.setNotificationPromptCooldown(0);
+        await _subscribeFcm();
+        return;
+      } else {
+        await _unsubscribeFcm();
+      }
+      final cooldown = await LocalCache.getNotificationPromptCooldown();
+      if (cooldown > 0) {
+        await LocalCache.setNotificationPromptCooldown(cooldown - 1);
+        return;
+      }
+      if (!mounted) return;
+      final allow = await NotificationService.showPermissionPrompt(context);
+      if (!allow || !mounted) {
+        await LocalCache.setNotificationPromptCooldown(2);
+        return;
+      }
+
+      // Immediate permission flow after user explicitly taps "Allow".
+      var permissionStatus = await NotificationService.getPermissionStatus();
+      if (!_isGranted(permissionStatus)) {
+        permissionStatus = await NotificationService.requestPermission();
+      }
+
+      if (_isGranted(permissionStatus)) {
+        await LocalCache.setNotificationPromptCooldown(0);
+        await _subscribeFcm();
+      } else {
+        await _unsubscribeFcm();
+        await LocalCache.setNotificationPromptCooldown(2);
+      }
+    } catch (_) {}
+  }
+
+  bool _isGranted(AuthorizationStatus status) =>
+      status == AuthorizationStatus.authorized ||
+      status == AuthorizationStatus.provisional;
+
+  Future<void> _subscribeFcm() async {
+    for (var i = 0; i < 3; i++) {
+      final token = await NotificationService.getDeviceToken();
+      if (token != null && token.trim().isNotEmpty) {
+        await _api.subscribeFcm(token);
+        await _updateSettingsPushCache(true);
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 450));
+    }
+  }
+
+  Future<void> _unsubscribeFcm() async {
+    await _api.unsubscribeFcm();
+    await _updateSettingsPushCache(false);
+  }
+
+  Future<void> _updateSettingsPushCache(bool enabled) async {
+    final raw = LocalCache.loadSettingsSummary();
+    if (raw == null) return;
+    try {
+      final settings = SettingsSummary.fromJson(raw);
+      final updated = SettingsSummary(
+        shop: settings.shop,
+        devices: settings.devices,
+        currentDevicePushEnabled: enabled,
+      );
+      await LocalCache.saveSettingsSummary(updated.toJson());
+    } catch (_) {}
+  }
+
+  bool get _isEmpty {
+    final a = _analytics;
+    if (a == null) return true;
+    return _sales.isEmpty &&
+        a.daily.isEmpty &&
+        a.weekly.isEmpty &&
+        a.monthly.isEmpty;
+  }
+
+  ShopProfile _mergeShopWithSettingsCache(ShopProfile homeShop) {
+    final settingsCached = LocalCache.loadSettingsSummary();
+    if (settingsCached == null) return homeShop;
+    try {
+      final settings = SettingsSummary.fromJson(settingsCached);
+      final settingsShop = settings.shop;
+      return ShopProfile(
+        id: homeShop.id,
+        name: settingsShop.name.trim().isEmpty ? homeShop.name : settingsShop.name,
+        phone: homeShop.phone,
+        email: homeShop.email,
+        address: homeShop.address,
+        logoUrl: (settingsShop.logoUrl ?? '').trim().isEmpty
+            ? homeShop.logoUrl
+            : settingsShop.logoUrl,
+        timezone: homeShop.timezone,
+        createdAt: homeShop.createdAt,
+      );
+    } catch (_) {
+      return homeShop;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _api.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget body;
+    if (_loading) {
+      body = const _LoadingState();
+    } else if (_error != null) {
+      body = _ErrorState(
+        message: _error!,
+        onRetry: _loadHome,
+        onNotification: () => _goTo(AppRoutes.notification),
+      );
+    } else if (_isEmpty) {
+      body = _EmptyState(
+        onCreateSale: () => _goTo(AppRoutes.newSale),
+        onNotification: () => _goTo(AppRoutes.notification),
+      );
+    } else {
+      body = _MainState(
+        shop: _shop!,
+        analytics: _analytics!,
+        sales: _sales,
+        trendTab: _trendTab,
+        onTabChanged: (i) => setState(() => _trendTab = i),
+        onSettings: () => _goTo(AppRoutes.shop, reset: true),
+        onNotification: () => _goTo(AppRoutes.notification),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: () => _loadHome(refresh: true),
+          child: body,
+        ),
+      ),
+      bottomNavigationBar: AppBottomNav(
+        activeTab: AppBottomTab.home,
+        onHome: () {},
+        onSales: () => _goTo(AppRoutes.sales, reset: true),
+        onAdd: () => _goTo(AppRoutes.newSale),
+        onItems: () => _goTo(AppRoutes.items, reset: true),
+        onSettings: () => _goTo(AppRoutes.shop, reset: true),
+      ),
+    );
+  }
+}
