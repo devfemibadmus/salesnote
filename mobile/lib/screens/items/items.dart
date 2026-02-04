@@ -1,0 +1,295 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../../app/routes.dart';
+import '../../data/models.dart';
+import '../../services/api_client.dart';
+import '../../services/currency.dart';
+import '../../services/local_cache.dart';
+import '../../services/token_store.dart';
+import '../../widgets/app_bottom_nav.dart';
+
+part 'states.dart';
+part 'widgets.dart';
+
+class ItemsScreen extends StatefulWidget {
+  const ItemsScreen({super.key});
+
+  @override
+  State<ItemsScreen> createState() => _ItemsScreenState();
+}
+
+class _ItemsScreenState extends State<ItemsScreen> {
+  final ApiClient _api = ApiClient(TokenStore());
+  final TextEditingController _searchController = TextEditingController();
+  static const int _perPage = 20;
+
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  String? _error;
+  List<Sale> _sales = [];
+  String _query = '';
+  int _page = 1;
+  late final String _currencySymbol;
+  late final String _currencyLocale;
+
+  void _goTo(String route, {bool reset = false}) {
+    _api.cancelInFlight();
+    if (!mounted) return;
+    if (reset) {
+      Navigator.pushNamedAndRemoveUntil(context, route, (_) => false);
+      return;
+    }
+    Navigator.pushNamed(context, route);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final ctx = CurrencyService.resolveContext();
+    _currencyLocale = ctx.locale;
+    _currencySymbol = ctx.symbol;
+    _searchController.addListener(_onSearchChanged);
+    _loadItemsFromCacheOrApi();
+  }
+
+  String _formatAmount(num amount, {int decimalDigits = 2}) {
+    return NumberFormat.currency(
+      locale: _currencyLocale,
+      symbol: _currencySymbol,
+      decimalDigits: decimalDigits,
+    ).format(amount);
+  }
+
+  Future<void> _loadItemsFromCacheOrApi() async {
+    final cached = LocalCache.loadSalesPage(includeItems: true);
+    if (cached != null) {
+      try {
+        final salesRaw = (cached['sales'] as List).cast<dynamic>();
+        final sales = salesRaw.map((e) => Sale.fromJson(e)).toList();
+        if (!mounted) return;
+        setState(() {
+          _sales = sales;
+          _page = (cached['page'] as num?)?.toInt() ?? 1;
+          _hasMore = cached['has_more'] == true;
+          _error = null;
+          _loading = false;
+        });
+        return;
+      } catch (_) {}
+    }
+    await _loadItems();
+  }
+
+  @override
+  void dispose() {
+    _api.dispose();
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final next = _searchController.text.trim();
+    if (next == _query) return;
+    setState(() => _query = next);
+  }
+
+  Future<void> _loadItems() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final sales = await _api.listSales(
+        page: 1,
+        perPage: _perPage,
+        includeItems: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sales = sales;
+        _page = 1;
+        _hasMore = sales.length == _perPage;
+      });
+      await LocalCache.saveSalesPage(
+        includeItems: true,
+        sales: sales.map((e) => e.toJson()).toList(),
+        page: _page,
+        hasMore: _hasMore,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e is ApiException ? e.message : 'Unable to load items.';
+        _sales = <Sale>[];
+        _hasMore = false;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _refreshItems() async {
+    try {
+      final sales = await _api.listSales(
+        page: 1,
+        perPage: _perPage,
+        includeItems: true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sales = sales;
+        _page = 1;
+        _hasMore = sales.length == _perPage;
+      });
+      await LocalCache.saveSalesPage(
+        includeItems: true,
+        sales: sales.map((e) => e.toJson()).toList(),
+        page: _page,
+        hasMore: _hasMore,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException
+          ? e.message
+          : 'Unable to refresh items.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore || _loading) return;
+    setState(() => _loadingMore = true);
+    try {
+      final nextPage = _page + 1;
+      final next = await _api.listSales(
+        page: nextPage,
+        perPage: _perPage,
+        includeItems: true,
+      );
+      if (!mounted) return;
+      final existingIds = _sales.map((sale) => sale.id).toSet();
+      final deduped = next
+          .where((sale) => !existingIds.contains(sale.id))
+          .toList();
+      setState(() {
+        _sales = [..._sales, ...deduped];
+        _page = nextPage;
+        _hasMore = next.length == _perPage;
+      });
+      await LocalCache.saveSalesPage(
+        includeItems: true,
+        sales: _sales.map((e) => e.toJson()).toList(),
+        page: _page,
+        hasMore: _hasMore,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException
+          ? e.message
+          : 'Unable to load more items.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) {
+        setState(() => _loadingMore = false);
+      }
+    }
+  }
+
+  List<_ItemRow> get _itemRows {
+    final byNameAndPrice = <String, _ItemRow>{};
+    for (final sale in _sales) {
+      for (final item in sale.items) {
+        final raw = item.productName.trim();
+        final name = raw.isEmpty ? 'Unnamed item' : raw;
+        final unitPrice = item.unitPrice;
+        final key = '$name|${unitPrice.toStringAsFixed(2)}';
+        final existing = byNameAndPrice[key];
+        if (existing == null) {
+          byNameAndPrice[key] = _ItemRow(
+            name: name,
+            unitPrice: unitPrice,
+            quantity: item.quantity,
+            total: item.lineTotal,
+          );
+        } else {
+          byNameAndPrice[key] = _ItemRow(
+            name: existing.name,
+            unitPrice: existing.unitPrice,
+            quantity: existing.quantity + item.quantity,
+            total: existing.total + item.lineTotal,
+          );
+        }
+      }
+    }
+
+    var rows = byNameAndPrice.values.toList();
+    if (_query.isNotEmpty) {
+      final q = _query.toLowerCase();
+      rows = rows.where((row) => row.name.toLowerCase().contains(q)).toList();
+    }
+    rows.sort((a, b) => b.quantity.compareTo(a.quantity));
+    return rows;
+  }
+
+  bool get _isDataEmpty => !_loading && _sales.isEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget body;
+    if (_loading) {
+      body = const _ItemsLoadingState();
+    } else if (_isDataEmpty) {
+      body = _ItemsEmptyState(
+        message: _error,
+        onAddSale: () => _goTo(AppRoutes.newSale),
+      );
+    } else {
+      body = _ItemsMainState(
+        queryController: _searchController,
+        rows: _itemRows,
+        formatAmount: _formatAmount,
+        loadingMore: _loadingMore,
+        hasMore: _hasMore,
+        onLoadMore: _loadMore,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      body: SafeArea(
+        child: RefreshIndicator(onRefresh: _refreshItems, child: body),
+      ),
+      bottomNavigationBar: AppBottomNav(
+        activeTab: AppBottomTab.items,
+        onHome: () => _goTo(AppRoutes.home, reset: true),
+        onSales: () => _goTo(AppRoutes.sales, reset: true),
+        onAdd: () => _goTo(AppRoutes.newSale),
+        onItems: () {},
+        onSettings: () => _goTo(AppRoutes.shop, reset: true),
+      ),
+    );
+  }
+}
+
+class _ItemRow {
+  const _ItemRow({
+    required this.name,
+    required this.unitPrice,
+    required this.quantity,
+    required this.total,
+  });
+
+  final String name;
+  final double unitPrice;
+  final double quantity;
+  final double total;
+}
