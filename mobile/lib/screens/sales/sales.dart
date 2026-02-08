@@ -1,0 +1,368 @@
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../../app/routes.dart';
+import '../../data/models.dart';
+import '../preview/preview.dart';
+import '../../services/api_client.dart';
+import '../../services/currency.dart';
+import '../../services/local_cache.dart';
+import '../../services/token_store.dart';
+import '../../widgets/app_bottom_nav.dart';
+
+part 'states.dart';
+part 'widgets.dart';
+
+class SalesScreen extends StatefulWidget {
+  const SalesScreen({super.key});
+
+  @override
+  State<SalesScreen> createState() => _SalesScreenState();
+}
+
+class _SalesScreenState extends State<SalesScreen> {
+  final ApiClient _api = ApiClient(TokenStore());
+  final TextEditingController _searchController = TextEditingController();
+  static const int _perPage = 20;
+  late final String _salesCurrencySymbol;
+  late final String _salesLocale;
+
+  bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  String? _error;
+  List<Sale> _sales = [];
+  String _query = '';
+  int _page = 1;
+  bool _openingPreview = false;
+
+  void _goTo(String route, {bool reset = false}) {
+    _api.cancelInFlight();
+    if (!mounted) return;
+    if (reset) {
+      Navigator.pushNamedAndRemoveUntil(context, route, (_) => false);
+      return;
+    }
+    Navigator.pushNamed(context, route);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final ctx = CurrencyService.resolveContext();
+    _salesLocale = ctx.locale;
+    _salesCurrencySymbol = ctx.symbol;
+    _searchController.addListener(_onSearchChanged);
+    _loadSalesFromCacheOrApi();
+  }
+
+  String _formatSalesAmount(num amount) {
+    return NumberFormat.currency(
+      locale: _salesLocale,
+      symbol: _salesCurrencySymbol,
+      decimalDigits: 2,
+    ).format(amount);
+  }
+
+  Future<void> _loadSalesFromCacheOrApi() async {
+    final cached = LocalCache.loadSalesPage(includeItems: false);
+    if (cached != null) {
+      try {
+        final salesRaw = (cached['sales'] as List).cast<dynamic>();
+        final sales = salesRaw.map((e) => Sale.fromJson(e)).toList();
+        if (!mounted) return;
+        setState(() {
+          _sales = sales;
+          _page = (cached['page'] as num?)?.toInt() ?? 1;
+          _hasMore = cached['has_more'] == true;
+          _error = null;
+          _loading = false;
+        });
+        return;
+      } catch (_) {}
+    }
+    await _loadSales();
+  }
+
+  @override
+  void dispose() {
+    _api.dispose();
+    _searchController.removeListener(_onSearchChanged);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final next = _searchController.text.trim();
+    if (next == _query) return;
+    setState(() => _query = next);
+  }
+
+  Future<void> _loadSales() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final sales = await _api.listSales(
+        page: 1,
+        perPage: _perPage,
+        includeItems: false,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sales = sales;
+        _page = 1;
+        _hasMore = sales.length == _perPage;
+      });
+      await LocalCache.saveSalesPage(
+        includeItems: false,
+        sales: sales.map((e) => e.toJson()).toList(),
+        page: _page,
+        hasMore: _hasMore,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e is ApiException
+            ? e.message
+            : 'Unable to load sales history.';
+        _sales = <Sale>[];
+        _hasMore = false;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _refreshSales() async {
+    try {
+      final sales = await _api.listSales(
+        page: 1,
+        perPage: _perPage,
+        includeItems: false,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sales = sales;
+        _page = 1;
+        _hasMore = sales.length == _perPage;
+      });
+      await LocalCache.saveSalesPage(
+        includeItems: false,
+        sales: sales.map((e) => e.toJson()).toList(),
+        page: _page,
+        hasMore: _hasMore,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException
+          ? e.message
+          : 'Unable to refresh sales.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _loadMoreSales() async {
+    if (_loadingMore || !_hasMore || _loading) return;
+    setState(() => _loadingMore = true);
+    try {
+      final nextPage = _page + 1;
+      final next = await _api.listSales(
+        page: nextPage,
+        perPage: _perPage,
+        includeItems: false,
+      );
+      if (!mounted) return;
+      final existingIds = _sales.map((sale) => sale.id).toSet();
+      final deduped = next
+          .where((sale) => !existingIds.contains(sale.id))
+          .toList();
+      setState(() {
+        _sales = [..._sales, ...deduped];
+        _page = nextPage;
+        _hasMore = next.length == _perPage;
+      });
+      await LocalCache.saveSalesPage(
+        includeItems: false,
+        sales: _sales.map((e) => e.toJson()).toList(),
+        page: _page,
+        hasMore: _hasMore,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException
+          ? e.message
+          : 'Unable to load more sales.';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) {
+        setState(() => _loadingMore = false);
+      }
+    }
+  }
+
+  List<Sale> get _filteredSales {
+    if (_query.isEmpty) return _sales;
+    final normalized = _query.toLowerCase();
+    return _sales.where((sale) {
+      final customer = (sale.customerName ?? '').toLowerCase();
+      final idText = sale.id.toLowerCase();
+      return customer.contains(normalized) || idText.contains(normalized);
+    }).toList();
+  }
+
+  bool get _isDataEmpty => !_loading && _sales.isEmpty;
+
+  Future<void> _openSalePreview(Sale sale) async {
+    if (_openingPreview) return;
+    setState(() => _openingPreview = true);
+    try {
+      final loadingRoute = MaterialPageRoute<void>(
+        builder: (_) => const SalePreviewLoadingScreen(),
+      );
+      if (mounted) {
+        Navigator.of(context).push(loadingRoute);
+      }
+
+      Sale? saleDetail;
+      final cachedPreview = LocalCache.loadSalePreview(sale.id);
+      if (cachedPreview != null) {
+        try {
+          saleDetail = Sale.fromJson(cachedPreview);
+        } catch (_) {}
+      }
+
+      if (saleDetail == null && mounted) {
+        try {
+          saleDetail = await _api.getSale(sale.id);
+          await LocalCache.saveSalePreview(sale.id, saleDetail.toJson());
+        } catch (e) {
+          if (loadingRoute.isActive && mounted) {
+            Navigator.of(context).pop();
+          }
+          if (mounted) {
+            final message = e is ApiException
+                ? e.message
+                : 'Unable to open sale preview.';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(message)),
+            );
+          }
+          return;
+        }
+      }
+
+      if (!mounted) return;
+
+      if (!loadingRoute.isActive) {
+        return;
+      }
+
+      final settingsRaw = LocalCache.loadSettingsSummary();
+      ShopProfile? shop;
+      List<SignatureItem> signatures = const <SignatureItem>[];
+      if (settingsRaw != null) {
+        try {
+          final settings = SettingsSummary.fromJson(settingsRaw);
+          shop = settings.shop;
+        } catch (_) {}
+      }
+      final cachedSignatures = LocalCache.loadSignatures();
+      if (cachedSignatures.isNotEmpty) {
+        try {
+          signatures = cachedSignatures.map(SignatureItem.fromJson).toList();
+        } catch (_) {}
+      }
+      final detail = saleDetail ?? sale;
+      SignatureItem? signature;
+      for (final sig in signatures) {
+        if (sig.id == detail.signatureId) {
+          signature = sig;
+          break;
+        }
+      }
+
+      final previewItems = detail.items
+          .map(
+            (item) => PreviewSaleItem(
+              productName: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            ),
+          )
+          .toList();
+      final total = detail.total;
+      final createdAtText = detail.createdAt;
+      final createdAt = DateTime.tryParse(createdAtText)?.toLocal();
+
+      final previewRoute = MaterialPageRoute<void>(
+        builder: (_) => SalePreviewScreen(
+          isCreatedSale: true,
+          shop: shop,
+          signature: signature,
+          customerName: detail.customerName ?? '',
+          customerContact: detail.customerContact ?? '',
+          items: previewItems,
+          total: total,
+          receiptNumber: '#REC-${sale.id}',
+          createdAt: createdAt,
+        ),
+      );
+
+      if (loadingRoute.isActive) {
+        await Navigator.of(context).pushReplacement(previewRoute);
+      } else {
+        await Navigator.of(context).push(previewRoute);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _openingPreview = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget body;
+    if (_loading) {
+      body = const _SalesLoadingState();
+    } else if (_isDataEmpty) {
+      body = _SalesEmptyState(
+        message: _error,
+        onAddSale: () => _goTo(AppRoutes.newSale),
+      );
+    } else {
+      body = _SalesMainState(
+        queryController: _searchController,
+        sales: _filteredSales,
+        loadingMore: _loadingMore,
+        hasMore: _hasMore,
+        formatAmount: _formatSalesAmount,
+        onLoadMore: _loadMoreSales,
+        onOpenSale: _openSalePreview,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF3F4F6),
+      body: SafeArea(
+        child: RefreshIndicator(onRefresh: _refreshSales, child: body),
+      ),
+      bottomNavigationBar: AppBottomNav(
+        activeTab: AppBottomTab.sales,
+        onHome: () => _goTo(AppRoutes.home, reset: true),
+        onSales: () {},
+        onAdd: () => _goTo(AppRoutes.newSale),
+        onItems: () => _goTo(AppRoutes.items, reset: true),
+        onSettings: () => _goTo(AppRoutes.shop, reset: true),
+      ),
+    );
+  }
+}
