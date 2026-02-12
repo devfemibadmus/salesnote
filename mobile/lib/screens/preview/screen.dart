@@ -180,26 +180,6 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                         ),
                         const SizedBox(height: 18),
                         const Divider(color: Color(0xFFE5ECF6), height: 1),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _LabelValue(
-                                label: 'RECEIPT NO.',
-                                value: receiptNo,
-                              ),
-                            ),
-                            Expanded(
-                              child: _LabelValue(
-                                label: 'DATE & TIME',
-                                value: dateText,
-                                alignEnd: true,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        const Divider(color: Color(0xFFE5ECF6), height: 1),
                         const SizedBox(height: 12),
                         Row(
                           children: const [
@@ -287,6 +267,28 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 10),
+                        Center(
+                          child: Text(
+                            dateText,
+                            style: const TextStyle(
+                              color: Color(0xFF8A9AB3),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Center(
+                          child: Text(
+                            receiptNo,
+                            style: const TextStyle(
+                              color: Color(0xFF8A9AB3),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 8),
                       ],
@@ -383,23 +385,42 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
             ),
           ),
           Expanded(
-            child: Text(
-              item.productName,
-              style: const TextStyle(
-                color: Color(0xFF0E1930),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.productName,
+                  style: const TextStyle(
+                    color: Color(0xFF0E1930),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Unit: ${_formatAmount(item.unitPrice)}',
+                  style: const TextStyle(
+                    color: Color(0xFF8A9AB3),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            _formatAmount(item.lineTotal),
-            style: const TextStyle(
-              color: Color(0xFF0E1930),
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                _formatAmount(item.lineTotal),
+                style: const TextStyle(
+                  color: Color(0xFF0E1930),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ],
       ),

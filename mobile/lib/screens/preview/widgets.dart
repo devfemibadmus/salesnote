@@ -1,45 +1,5 @@
 part of 'preview.dart';
 
-class _LabelValue extends StatelessWidget {
-  const _LabelValue({
-    required this.label,
-    required this.value,
-    this.alignEnd = false,
-  });
-
-  final String label;
-  final String value;
-  final bool alignEnd;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF8A9AB3),
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          textAlign: alignEnd ? TextAlign.right : TextAlign.left,
-          style: const TextStyle(
-            color: Color(0xFF0E1930),
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _AmountRow extends StatelessWidget {
   const _AmountRow({
     required this.title,
