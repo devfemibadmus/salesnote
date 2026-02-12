@@ -8,8 +8,9 @@ import '../../app/config.dart';
 import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../../services/api_client.dart';
+import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
-import '../../services/local_cache.dart';
+import '../../services/cache/local.dart';
 import '../../services/notification.dart';
 import '../../services/token_store.dart';
 import '../../widgets/app_bottom_nav.dart';
@@ -84,23 +85,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadHomeFromCacheOrApi() async {
-    final cached = LocalCache.loadHomeSummary();
-    if (cached != null) {
-      try {
-        final data = HomeSummary.fromJson(cached);
-        final mergedShop = _mergeShopWithSettingsCache(data.shop);
-        if (!mounted) return;
-        setState(() {
-          _shop = mergedShop;
-          _analytics = data.analytics;
-          _sales = data.recentSales;
-          _error = null;
-          _loading = false;
-        });
-        return;
-      } catch (_) {}
+    final data = await CacheLoader.loadOrFetchHomeSummary(_api);
+    if (data == null) {
+      await _loadHome();
+      return;
     }
-    await _loadHome();
+
+    final mergedShop = _mergeShopWithSettingsCache(data.shop);
+    if (!mounted) return;
+    setState(() {
+      _shop = mergedShop;
+      _analytics = data.analytics;
+      _sales = data.recentSales;
+      _error = null;
+      _loading = false;
+    });
   }
 
   Future<void> _loadHome({bool refresh = false}) async {
@@ -116,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     try {
-      final data = await _api.getHomeSummary();
+      final data = await CacheLoader.fetchAndCacheHomeSummary(_api);
       final mergedShop = _mergeShopWithSettingsCache(data.shop);
       if (!mounted) return;
       setState(() {
@@ -125,12 +124,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _sales = data.recentSales;
         _error = null;
       });
-      await LocalCache.saveHomeSummary(
+      await CacheLoader.saveHomeSummaryCache(
         HomeSummary(
           shop: mergedShop,
           analytics: data.analytics,
           recentSales: data.recentSales,
-        ).toJson(),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -219,17 +218,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _updateSettingsPushCache(bool enabled) async {
-    final raw = LocalCache.loadSettingsSummary();
-    if (raw == null) return;
-    try {
-      final settings = SettingsSummary.fromJson(raw);
-      final updated = SettingsSummary(
-        shop: settings.shop,
-        devices: settings.devices,
-        currentDevicePushEnabled: enabled,
-      );
-      await LocalCache.saveSettingsSummary(updated.toJson());
-    } catch (_) {}
+    final settings = CacheLoader.loadSettingsSummaryCache();
+    if (settings == null) return;
+    final updated = SettingsSummary(
+      shop: settings.shop,
+      devices: settings.devices,
+      currentDevicePushEnabled: enabled,
+    );
+    await CacheLoader.saveSettingsSummaryCache(updated);
   }
 
   bool get _isEmpty {
@@ -242,26 +238,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   ShopProfile _mergeShopWithSettingsCache(ShopProfile homeShop) {
-    final settingsCached = LocalCache.loadSettingsSummary();
-    if (settingsCached == null) return homeShop;
-    try {
-      final settings = SettingsSummary.fromJson(settingsCached);
-      final settingsShop = settings.shop;
-      return ShopProfile(
-        id: homeShop.id,
-        name: settingsShop.name.trim().isEmpty ? homeShop.name : settingsShop.name,
-        phone: homeShop.phone,
-        email: homeShop.email,
-        address: homeShop.address,
-        logoUrl: (settingsShop.logoUrl ?? '').trim().isEmpty
-            ? homeShop.logoUrl
-            : settingsShop.logoUrl,
-        timezone: homeShop.timezone,
-        createdAt: homeShop.createdAt,
-      );
-    } catch (_) {
-      return homeShop;
-    }
+    final settings = CacheLoader.loadSettingsSummaryCache();
+    if (settings == null) return homeShop;
+    final settingsShop = settings.shop;
+    return ShopProfile(
+      id: homeShop.id,
+      name: settingsShop.name.trim().isEmpty
+          ? homeShop.name
+          : settingsShop.name,
+      phone: homeShop.phone,
+      email: homeShop.email,
+      address: homeShop.address,
+      logoUrl: (settingsShop.logoUrl ?? '').trim().isEmpty
+          ? homeShop.logoUrl
+          : settingsShop.logoUrl,
+      timezone: homeShop.timezone,
+      createdAt: homeShop.createdAt,
+    );
   }
 
   @override
