@@ -5,8 +5,8 @@ import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../preview/preview.dart';
 import '../../services/api_client.dart';
+import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
-import '../../services/local_cache.dart';
 import '../../services/token_store.dart';
 import '../../widgets/app_bottom_nav.dart';
 
@@ -65,21 +65,21 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   Future<void> _loadSalesFromCacheOrApi() async {
-    final cached = LocalCache.loadSalesPage(includeItems: false);
+    final cached = await CacheLoader.loadOrFetchSalesPage(
+      _api,
+      includeItems: false,
+      perPage: _perPage,
+    );
     if (cached != null) {
-      try {
-        final salesRaw = (cached['sales'] as List).cast<dynamic>();
-        final sales = salesRaw.map((e) => Sale.fromJson(e)).toList();
-        if (!mounted) return;
-        setState(() {
-          _sales = sales;
-          _page = (cached['page'] as num?)?.toInt() ?? 1;
-          _hasMore = cached['has_more'] == true;
-          _error = null;
-          _loading = false;
-        });
-        return;
-      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        _sales = cached.sales;
+        _page = cached.page;
+        _hasMore = cached.hasMore;
+        _error = null;
+        _loading = false;
+      });
+      return;
     }
     await _loadSales();
   }
@@ -104,23 +104,18 @@ class _SalesScreenState extends State<SalesScreen> {
       _error = null;
     });
     try {
-      final sales = await _api.listSales(
+      final loaded = await CacheLoader.fetchAndCacheSalesPage(
+        _api,
+        includeItems: false,
         page: 1,
         perPage: _perPage,
-        includeItems: false,
       );
       if (!mounted) return;
       setState(() {
-        _sales = sales;
-        _page = 1;
-        _hasMore = sales.length == _perPage;
+        _sales = loaded.sales;
+        _page = loaded.page;
+        _hasMore = loaded.hasMore;
       });
-      await LocalCache.saveSalesPage(
-        includeItems: false,
-        sales: sales.map((e) => e.toJson()).toList(),
-        page: _page,
-        hasMore: _hasMore,
-      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -139,23 +134,18 @@ class _SalesScreenState extends State<SalesScreen> {
 
   Future<void> _refreshSales() async {
     try {
-      final sales = await _api.listSales(
+      final loaded = await CacheLoader.fetchAndCacheSalesPage(
+        _api,
+        includeItems: false,
         page: 1,
         perPage: _perPage,
-        includeItems: false,
       );
       if (!mounted) return;
       setState(() {
-        _sales = sales;
-        _page = 1;
-        _hasMore = sales.length == _perPage;
+        _sales = loaded.sales;
+        _page = loaded.page;
+        _hasMore = loaded.hasMore;
       });
-      await LocalCache.saveSalesPage(
-        includeItems: false,
-        sales: sales.map((e) => e.toJson()).toList(),
-        page: _page,
-        hasMore: _hasMore,
-      );
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException
@@ -172,11 +162,13 @@ class _SalesScreenState extends State<SalesScreen> {
     setState(() => _loadingMore = true);
     try {
       final nextPage = _page + 1;
-      final next = await _api.listSales(
+      final loaded = await CacheLoader.fetchAndCacheSalesPage(
+        _api,
+        includeItems: false,
         page: nextPage,
         perPage: _perPage,
-        includeItems: false,
       );
+      final next = loaded.sales;
       if (!mounted) return;
       final existingIds = _sales.map((sale) => sale.id).toSet();
       final deduped = next
@@ -187,11 +179,9 @@ class _SalesScreenState extends State<SalesScreen> {
         _page = nextPage;
         _hasMore = next.length == _perPage;
       });
-      await LocalCache.saveSalesPage(
+      await CacheLoader.saveSalesPageCache(
         includeItems: false,
-        sales: _sales.map((e) => e.toJson()).toList(),
-        page: _page,
-        hasMore: _hasMore,
+        data: CachedSalesPage(sales: _sales, page: _page, hasMore: _hasMore),
       );
     } catch (e) {
       if (!mounted) return;
@@ -231,32 +221,20 @@ class _SalesScreenState extends State<SalesScreen> {
         Navigator.of(context).push(loadingRoute);
       }
 
-      Sale? saleDetail;
-      final cachedPreview = LocalCache.loadSalePreview(sale.id);
-      if (cachedPreview != null) {
-        try {
-          saleDetail = Sale.fromJson(cachedPreview);
-        } catch (_) {}
-      }
-
-      if (saleDetail == null && mounted) {
-        try {
-          saleDetail = await _api.getSale(sale.id);
-          await LocalCache.saveSalePreview(sale.id, saleDetail.toJson());
-        } catch (e) {
-          if (loadingRoute.isActive && mounted) {
-            Navigator.of(context).pop();
-          }
-          if (mounted) {
-            final message = e is ApiException
-                ? e.message
-                : 'Unable to open sale preview.';
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(message)),
-            );
-          }
-          return;
+      final saleDetail = await CacheLoader.loadOrFetchSalePreview(
+        _api,
+        sale.id,
+      );
+      if (saleDetail == null) {
+        if (loadingRoute.isActive && mounted) {
+          Navigator.of(context).pop();
         }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to open sale preview.')),
+          );
+        }
+        return;
       }
 
       if (!mounted) return;
@@ -265,22 +243,12 @@ class _SalesScreenState extends State<SalesScreen> {
         return;
       }
 
-      final settingsRaw = LocalCache.loadSettingsSummary();
-      ShopProfile? shop;
-      List<SignatureItem> signatures = const <SignatureItem>[];
-      if (settingsRaw != null) {
-        try {
-          final settings = SettingsSummary.fromJson(settingsRaw);
-          shop = settings.shop;
-        } catch (_) {}
-      }
-      final cachedSignatures = LocalCache.loadSignatures();
-      if (cachedSignatures.isNotEmpty) {
-        try {
-          signatures = cachedSignatures.map(SignatureItem.fromJson).toList();
-        } catch (_) {}
-      }
-      final detail = saleDetail ?? sale;
+      final settings = await CacheLoader.loadOrFetchSettingsSummary(_api);
+      final signatures = await CacheLoader.loadOrFetchSignatures(_api);
+      if (!mounted) return;
+
+      final shop = settings?.shop;
+      final detail = saleDetail;
       SignatureItem? signature;
       for (final sig in signatures) {
         if (sig.id == detail.signatureId) {
