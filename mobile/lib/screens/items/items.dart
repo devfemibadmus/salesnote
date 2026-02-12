@@ -4,8 +4,8 @@ import 'package:intl/intl.dart';
 import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../../services/api_client.dart';
+import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
-import '../../services/local_cache.dart';
 import '../../services/token_store.dart';
 import '../../widgets/app_bottom_nav.dart';
 
@@ -63,21 +63,21 @@ class _ItemsScreenState extends State<ItemsScreen> {
   }
 
   Future<void> _loadItemsFromCacheOrApi() async {
-    final cached = LocalCache.loadSalesPage(includeItems: true);
+    final cached = await CacheLoader.loadOrFetchSalesPage(
+      _api,
+      includeItems: true,
+      perPage: _perPage,
+    );
     if (cached != null) {
-      try {
-        final salesRaw = (cached['sales'] as List).cast<dynamic>();
-        final sales = salesRaw.map((e) => Sale.fromJson(e)).toList();
-        if (!mounted) return;
-        setState(() {
-          _sales = sales;
-          _page = (cached['page'] as num?)?.toInt() ?? 1;
-          _hasMore = cached['has_more'] == true;
-          _error = null;
-          _loading = false;
-        });
-        return;
-      } catch (_) {}
+      if (!mounted) return;
+      setState(() {
+        _sales = cached.sales;
+        _page = cached.page;
+        _hasMore = cached.hasMore;
+        _error = null;
+        _loading = false;
+      });
+      return;
     }
     await _loadItems();
   }
@@ -102,23 +102,18 @@ class _ItemsScreenState extends State<ItemsScreen> {
       _error = null;
     });
     try {
-      final sales = await _api.listSales(
+      final loaded = await CacheLoader.fetchAndCacheSalesPage(
+        _api,
+        includeItems: true,
         page: 1,
         perPage: _perPage,
-        includeItems: true,
       );
       if (!mounted) return;
       setState(() {
-        _sales = sales;
-        _page = 1;
-        _hasMore = sales.length == _perPage;
+        _sales = loaded.sales;
+        _page = loaded.page;
+        _hasMore = loaded.hasMore;
       });
-      await LocalCache.saveSalesPage(
-        includeItems: true,
-        sales: sales.map((e) => e.toJson()).toList(),
-        page: _page,
-        hasMore: _hasMore,
-      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -135,23 +130,18 @@ class _ItemsScreenState extends State<ItemsScreen> {
 
   Future<void> _refreshItems() async {
     try {
-      final sales = await _api.listSales(
+      final loaded = await CacheLoader.fetchAndCacheSalesPage(
+        _api,
+        includeItems: true,
         page: 1,
         perPage: _perPage,
-        includeItems: true,
       );
       if (!mounted) return;
       setState(() {
-        _sales = sales;
-        _page = 1;
-        _hasMore = sales.length == _perPage;
+        _sales = loaded.sales;
+        _page = loaded.page;
+        _hasMore = loaded.hasMore;
       });
-      await LocalCache.saveSalesPage(
-        includeItems: true,
-        sales: sales.map((e) => e.toJson()).toList(),
-        page: _page,
-        hasMore: _hasMore,
-      );
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException
@@ -168,11 +158,13 @@ class _ItemsScreenState extends State<ItemsScreen> {
     setState(() => _loadingMore = true);
     try {
       final nextPage = _page + 1;
-      final next = await _api.listSales(
+      final loaded = await CacheLoader.fetchAndCacheSalesPage(
+        _api,
+        includeItems: true,
         page: nextPage,
         perPage: _perPage,
-        includeItems: true,
       );
+      final next = loaded.sales;
       if (!mounted) return;
       final existingIds = _sales.map((sale) => sale.id).toSet();
       final deduped = next
@@ -183,11 +175,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
         _page = nextPage;
         _hasMore = next.length == _perPage;
       });
-      await LocalCache.saveSalesPage(
+      await CacheLoader.saveSalesPageCache(
         includeItems: true,
-        sales: _sales.map((e) => e.toJson()).toList(),
-        page: _page,
-        hasMore: _hasMore,
+        data: CachedSalesPage(sales: _sales, page: _page, hasMore: _hasMore),
       );
     } catch (e) {
       if (!mounted) return;
