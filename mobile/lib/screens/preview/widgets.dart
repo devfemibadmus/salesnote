@@ -1,5 +1,68 @@
 part of 'preview.dart';
 
+class _ReceiptWatermark extends StatelessWidget {
+  const _ReceiptWatermark({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: CustomPaint(
+        painter: _ReceiptWatermarkPainter(text),
+      ),
+    );
+  }
+}
+
+class _ReceiptWatermarkPainter extends CustomPainter {
+  _ReceiptWatermarkPainter(this.text);
+
+  final String text;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const color = Color(0xFF2D4F7D);
+    final style = TextStyle(
+      color: color.withValues(alpha: 0.06),
+      fontSize: 24,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.6,
+    );
+
+    final textPainter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: ui.TextDirection.ltr,
+    )..layout();
+
+    final textWidth = textPainter.width;
+    final textHeight = textPainter.height;
+    if (textWidth == 0 || textHeight == 0) return;
+
+    final spacingX = textWidth + 56;
+    final spacingY = textHeight + 46;
+
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    canvas.translate(size.width / 2, size.height / 2);
+    canvas.rotate(-0.35);
+    canvas.translate(-size.width / 2, -size.height / 2);
+
+    for (double y = -textHeight; y < size.height + textHeight; y += spacingY) {
+      for (double x = -textWidth; x < size.width + textWidth; x += spacingX) {
+        textPainter.paint(canvas, Offset(x, y));
+      }
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _ReceiptWatermarkPainter oldDelegate) {
+    return oldDelegate.text != text;
+  }
+}
+
 class _AmountRow extends StatelessWidget {
   const _AmountRow({
     required this.title,
@@ -69,9 +132,8 @@ class _PreviewShopAvatar extends StatelessWidget {
   }
 
   Widget _fallbackAvatar() {
-    final initial = (shop?.name ?? 'S').trim().isNotEmpty
-        ? (shop!.name.trim()[0]).toUpperCase()
-        : 'S';
+    final name = (shop?.name ?? '').trim();
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'S';
     return Container(
       width: 74,
       height: 74,
@@ -102,10 +164,58 @@ class _PreviewSignature extends StatelessWidget {
     final url = raw.trim().isEmpty ? '' : MediaService.resolveSrc(raw);
     if (url.isNotEmpty) {
       return Center(
-        child: Image.network(
-          url,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Transform.translate(
+              offset: const Offset(1.6, 0),
+              child: Opacity(
+                opacity: 0.95,
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  color: const Color(0xFF111111),
+                  colorBlendMode: BlendMode.srcATop,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const SizedBox.shrink(),
+                ),
+              ),
+            ),
+            Transform.translate(
+              offset: const Offset(1.0, 0),
+              child: Opacity(
+                opacity: 0.85,
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  color: const Color(0xFF111111),
+                  colorBlendMode: BlendMode.srcATop,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const SizedBox.shrink(),
+                ),
+              ),
+            ),
+            Transform.translate(
+              offset: const Offset(0.4, 0),
+              child: Opacity(
+                opacity: 0.65,
+                child: Image.network(
+                  url,
+                  fit: BoxFit.contain,
+                  color: const Color(0xFF111111),
+                  colorBlendMode: BlendMode.srcATop,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const SizedBox.shrink(),
+                ),
+              ),
+            ),
+            Image.network(
+              url,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) =>
+                  const SizedBox.shrink(),
+            ),
+          ],
         ),
       );
     }
