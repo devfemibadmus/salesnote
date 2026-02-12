@@ -8,7 +8,8 @@ import 'package:flutter/services.dart';
 import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../../services/api_client.dart';
-import '../../services/local_cache.dart';
+import '../../services/cache/loader.dart';
+import '../../services/cache/local.dart';
 import '../../services/notification.dart';
 import '../../services/phone.dart';
 import '../../services/region.dart';
@@ -57,27 +58,21 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   Future<void> _loadSettingsFromCacheOrApi() async {
-    final cached = LocalCache.loadSettingsSummary();
-    final cachedSignatures = LocalCache.loadSignatures();
-    if (cached != null) {
-      try {
-        final settings = SettingsSummary.fromJson(cached);
-        final signatures = cachedSignatures
-            .map(SignatureItem.fromJson)
-            .toList();
-        final packageInfo = await PackageInfo.fromPlatform();
-        if (!mounted) return;
-        setState(() {
-          _shop = settings.shop;
-          _devices = settings.devices;
-          _signatures = signatures;
-          _pushEnabled = settings.currentDevicePushEnabled;
-          _appVersion = packageInfo.version;
-          _loading = false;
-          _error = null;
-        });
-        return;
-      } catch (_) {}
+    final settings = await CacheLoader.loadOrFetchSettingsSummary(_api);
+    final signatures = await CacheLoader.loadOrFetchSignatures(_api);
+    if (settings != null) {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() {
+        _shop = settings.shop;
+        _devices = settings.devices;
+        _signatures = signatures;
+        _pushEnabled = settings.currentDevicePushEnabled;
+        _appVersion = packageInfo.version;
+        _loading = false;
+        _error = null;
+      });
+      return;
     }
     await _loadSettings();
   }
@@ -89,8 +84,8 @@ class _ShopScreenState extends State<ShopScreen> {
     });
     try {
       final results = await Future.wait([
-        _api.getSettingsSummary(),
-        _api.listSignatures(),
+        CacheLoader.fetchAndCacheSettingsSummary(_api),
+        CacheLoader.fetchAndCacheSignatures(_api),
         PackageInfo.fromPlatform(),
       ]);
       if (!mounted) return;
@@ -104,10 +99,6 @@ class _ShopScreenState extends State<ShopScreen> {
         _pushEnabled = settings.currentDevicePushEnabled;
         _appVersion = packageInfo.version;
       });
-      await LocalCache.saveSettingsSummary(settings.toJson());
-      await LocalCache.saveSignatures(
-        signatures.map((e) => e.toJson()).toList(),
-      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -121,8 +112,8 @@ class _ShopScreenState extends State<ShopScreen> {
   Future<void> _refreshSettings() async {
     try {
       final results = await Future.wait([
-        _api.getSettingsSummary(),
-        _api.listSignatures(),
+        CacheLoader.fetchAndCacheSettingsSummary(_api),
+        CacheLoader.fetchAndCacheSignatures(_api),
         PackageInfo.fromPlatform(),
       ]);
       if (!mounted) return;
@@ -136,10 +127,6 @@ class _ShopScreenState extends State<ShopScreen> {
         _pushEnabled = settings.currentDevicePushEnabled;
         _appVersion = packageInfo.version;
       });
-      await LocalCache.saveSettingsSummary(settings.toJson());
-      await LocalCache.saveSignatures(
-        signatures.map((e) => e.toJson()).toList(),
-      );
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException
@@ -188,7 +175,8 @@ class _ShopScreenState extends State<ShopScreen> {
 
     final status = await NotificationService.requestPermission();
     if (!mounted) return;
-    final granted = status == AuthorizationStatus.authorized ||
+    final granted =
+        status == AuthorizationStatus.authorized ||
         status == AuthorizationStatus.provisional;
     if (!granted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -206,9 +194,7 @@ class _ShopScreenState extends State<ShopScreen> {
       if (!subscribed) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'Unable to get device token. Please try again.',
-            ),
+            content: Text('Unable to get device token. Please try again.'),
           ),
         );
         return;
@@ -224,7 +210,9 @@ class _ShopScreenState extends State<ShopScreen> {
       final message = e is ApiException
           ? e.message
           : 'Unable to update notification setting.';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -232,19 +220,17 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Future<void> _saveSettingsCache() async {
     if (_shop == null) return;
-    await LocalCache.saveSettingsSummary(
+    await CacheLoader.saveSettingsSummaryCache(
       SettingsSummary(
         shop: _shop!,
         devices: _devices,
         currentDevicePushEnabled: _pushEnabled,
-      ).toJson(),
+      ),
     );
   }
 
   Future<void> _saveSignaturesCache() async {
-    await LocalCache.saveSignatures(
-      _signatures.map((e) => e.toJson()).toList(),
-    );
+    await CacheLoader.saveSignaturesCache(_signatures);
   }
 
   Future<bool> _subscribeCurrentDeviceFcm() async {
@@ -476,7 +462,9 @@ class _ShopScreenState extends State<ShopScreen> {
       builder: (_) {
         String? errorText;
 
-        Future<void> validate(void Function(void Function()) setLocalState) async {
+        Future<void> validate(
+          void Function(void Function()) setLocalState,
+        ) async {
           final value = controller.text.trim();
           if (value.isEmpty) {
             setLocalState(() => errorText = 'Phone number is required.');
@@ -518,7 +506,10 @@ class _ShopScreenState extends State<ShopScreen> {
                         );
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
@@ -526,7 +517,10 @@ class _ShopScreenState extends State<ShopScreen> {
                         ),
                         child: Row(
                           children: [
-                            Text(selectedCountry.flagEmoji, style: const TextStyle(fontSize: 18)),
+                            Text(
+                              selectedCountry.flagEmoji,
+                              style: const TextStyle(fontSize: 18),
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               '+${selectedCountry.phoneCode}',
@@ -546,7 +540,9 @@ class _ShopScreenState extends State<ShopScreen> {
                       child: TextField(
                         controller: controller,
                         keyboardType: TextInputType.phone,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
                         autofocus: true,
                         decoration: InputDecoration(
                           hintText: '8104156984',
@@ -574,7 +570,9 @@ class _ShopScreenState extends State<ShopScreen> {
                     countryPhoneCode: selectedCountry.phoneCode,
                   );
                   if (e164 == null) {
-                    setLocalState(() => errorText = 'Enter a valid phone number.');
+                    setLocalState(
+                      () => errorText = 'Enter a valid phone number.',
+                    );
                     return;
                   }
                   if (!context.mounted) return;
@@ -782,12 +780,12 @@ class _ShopScreenState extends State<ShopScreen> {
       final updated = await _api.updateShop(input);
       if (!mounted) return;
       setState(() => _shop = updated);
-      await LocalCache.saveSettingsSummary(
+      await CacheLoader.saveSettingsSummaryCache(
         SettingsSummary(
           shop: updated,
           devices: _devices,
           currentDevicePushEnabled: _pushEnabled,
-        ).toJson(),
+        ),
       );
       if (!mounted) return;
       ScaffoldMessenger.of(
