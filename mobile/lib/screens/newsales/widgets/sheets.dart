@@ -5,11 +5,13 @@ class _AddItemSheet extends StatefulWidget {
     required this.api,
     required this.currencySymbol,
     required this.formatAmount,
+    this.initialItem,
   });
 
   final ApiClient api;
   final String currencySymbol;
   final String Function(num amount, {int decimalDigits}) formatAmount;
+  final _DraftSaleItem? initialItem;
 
   @override
   State<_AddItemSheet> createState() => _AddItemSheetState();
@@ -28,6 +30,12 @@ class _AddItemSheetState extends State<_AddItemSheet> {
   @override
   void initState() {
     super.initState();
+    final initial = widget.initialItem;
+    if (initial != null) {
+      _itemNameController.text = initial.productName;
+      _unitPriceController.text = initial.unitPrice.toStringAsFixed(2);
+      _qty = initial.quantity.clamp(1, 9999).toDouble();
+    }
     _itemNameController.addListener(_onItemNameChanged);
     _loadItemSuggestions();
   }
@@ -294,6 +302,9 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                                 () =>
                                     _qty = (_qty + 1).clamp(1, 9999).toDouble(),
                               ),
+                              onSetQuantity: (value) => setState(
+                                () => _qty = value.clamp(1, 9999).toDouble(),
+                              ),
                             ),
                           ],
                         ),
@@ -416,9 +427,11 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                         elevation: 7,
                         shadowColor: const Color(0x331677E6),
                       ),
-                      child: const Text(
-                        '🛒  Add to Sale',
-                        style: TextStyle(
+                      child: Text(
+                        widget.initialItem == null
+                            ? 'Add to Sale'
+                            : 'Update Item',
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                         ),

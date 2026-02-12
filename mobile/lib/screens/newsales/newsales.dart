@@ -812,7 +812,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     });
   }
 
-  Future<void> _openAddItemSheet() async {
+  Future<void> _openAddItemSheet({int? editIndex}) async {
+    final initialItem = editIndex != null ? _items[editIndex] : null;
     final result = await showModalBottomSheet<_DraftSaleItem>(
       context: context,
       isScrollControlled: true,
@@ -824,12 +825,17 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         api: _api,
         currencySymbol: _currencySymbol,
         formatAmount: _formatAmount,
+        initialItem: initialItem,
       ),
     );
 
     if (result == null) return;
     setState(() {
-      _items.add(result);
+      if (editIndex != null) {
+        _items[editIndex] = result;
+      } else {
+        _items.add(result);
+      }
     });
     await _saveDraft();
   }
@@ -880,6 +886,15 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   void _changeQuantity(int index, double delta) {
     final current = _items[index];
     final nextQty = (current.quantity + delta).clamp(1, 9999).toDouble();
+    setState(() {
+      _items[index] = current.copyWith(quantity: nextQty);
+    });
+    unawaited(_saveDraft());
+  }
+
+  void _setQuantity(int index, double value) {
+    final current = _items[index];
+    final nextQty = value.clamp(1, 9999).toDouble();
     setState(() {
       _items[index] = current.copyWith(quantity: nextQty);
     });
@@ -985,8 +1000,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
               unawaited(_saveDraft());
             },
             onAddItem: _openAddItemSheet,
+            onEdit: (index) => _openAddItemSheet(editIndex: index),
             onIncrement: (index) => _changeQuantity(index, 1),
             onDecrement: (index) => _changeQuantity(index, -1),
+            onSetQuantity: _setQuantity,
             onDelete: _removeItem,
             onSubmit: _openPreview,
             formatAmount: _formatAmount,

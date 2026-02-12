@@ -335,7 +335,9 @@ class _NewSaleItemsStep extends StatelessWidget {
     required this.onAddItem,
     required this.onIncrement,
     required this.onDecrement,
+    required this.onSetQuantity,
     required this.onDelete,
+    required this.onEdit,
     required this.onSubmit,
     required this.formatAmount,
   });
@@ -354,7 +356,9 @@ class _NewSaleItemsStep extends StatelessWidget {
   final Future<void> Function() onAddItem;
   final ValueChanged<int> onIncrement;
   final ValueChanged<int> onDecrement;
+  final void Function(int index, double value) onSetQuantity;
   final ValueChanged<int> onDelete;
+  final ValueChanged<int> onEdit;
   final VoidCallback onSubmit;
   final String Function(num amount, {int decimalDigits}) formatAmount;
 
@@ -460,7 +464,9 @@ class _NewSaleItemsStep extends StatelessWidget {
                       formatAmount: formatAmount,
                       onMinus: () => onDecrement(index),
                       onPlus: () => onIncrement(index),
+                      onSetQuantity: (value) => onSetQuantity(index, value),
                       onDelete: () => onDelete(index),
+                      onTap: () => onEdit(index),
                     ),
                   );
                 }),
