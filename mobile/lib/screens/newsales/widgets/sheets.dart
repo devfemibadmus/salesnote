@@ -103,7 +103,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
   Future<void> _loadItemSuggestions() async {
     var hasAnyCachedSuggestions = false;
 
-    final cached = LocalCache.loadItemSuggestions();
+    final cached = CacheLoader.loadItemSuggestionsCache();
     if (cached.isNotEmpty) {
       hasAnyCachedSuggestions = true;
       _itemSuggestionsCache
@@ -114,9 +114,9 @@ class _AddItemSheetState extends State<_AddItemSheet> {
       return;
     }
 
-    final cachedItemsPage = LocalCache.loadSalesPage(includeItems: true);
+    final cachedItemsPage = CacheLoader.loadSalesPageCache(includeItems: true);
     if (cachedItemsPage != null) {
-      final names = _extractItemNamesFromSalesPage(cachedItemsPage);
+      final names = _extractItemNamesFromSales(cachedItemsPage.sales);
       if (names.isNotEmpty) {
         hasAnyCachedSuggestions = true;
         _itemSuggestionsCache
@@ -124,7 +124,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
           ..addAll(names);
         _rebuildVisibleSuggestions();
         if (mounted) setState(() {});
-        await LocalCache.saveItemSuggestions(_itemSuggestionsCache);
+        await CacheLoader.saveItemSuggestionsCache(_itemSuggestionsCache);
       }
     }
 
@@ -133,17 +133,11 @@ class _AddItemSheetState extends State<_AddItemSheet> {
     }
   }
 
-  List<String> _extractItemNamesFromSalesPage(Map<String, dynamic> page) {
-    final sales = (page['sales'] as List<dynamic>? ?? const <dynamic>[]);
+  List<String> _extractItemNamesFromSales(List<Sale> sales) {
     final names = <String>[];
     for (final sale in sales) {
-      final map = sale as Map<String, dynamic>;
-      final items = (map['items'] as List<dynamic>? ?? const <dynamic>[]);
-      for (final item in items) {
-        final productName =
-            ((item as Map<String, dynamic>)['product_name'] ?? '')
-                .toString()
-                .trim();
+      for (final item in sale.items) {
+        final productName = item.productName.trim();
         if (productName.isNotEmpty) names.add(productName);
       }
     }
@@ -169,11 +163,13 @@ class _AddItemSheetState extends State<_AddItemSheet> {
 
   Future<void> _fetchSuggestionsInBackground() async {
     try {
-      final sales = await widget.api.listSales(
+      final loaded = await CacheLoader.fetchAndCacheSalesPage(
+        widget.api,
+        includeItems: true,
         page: 1,
         perPage: 100,
-        includeItems: true,
       );
+      final sales = loaded.sales;
       final names = <String>{};
       for (final sale in sales) {
         for (final item in sale.items) {
@@ -189,13 +185,8 @@ class _AddItemSheetState extends State<_AddItemSheet> {
         ..addAll(names);
       _rebuildVisibleSuggestions();
       if (mounted) setState(() {});
-      await LocalCache.saveItemSuggestions(_itemSuggestionsCache);
-      await LocalCache.saveSalesPage(
-        includeItems: true,
-        sales: sales.map((e) => e.toJson()).toList(),
-        page: 1,
-        hasMore: sales.length == 100,
-      );
+      await CacheLoader.saveItemSuggestionsCache(_itemSuggestionsCache);
+      await CacheLoader.saveSalesPageCache(includeItems: true, data: loaded);
     } catch (_) {}
   }
 
@@ -212,7 +203,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
     _itemSuggestionsCache.insert(0, normalized);
     _rebuildVisibleSuggestions();
     if (mounted) setState(() {});
-    await LocalCache.saveItemSuggestions(_itemSuggestionsCache);
+    await CacheLoader.saveItemSuggestionsCache(_itemSuggestionsCache);
   }
 
   @override
