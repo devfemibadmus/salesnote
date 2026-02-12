@@ -10,8 +10,9 @@ import 'package:intl/intl.dart';
 import '../../data/models.dart';
 import '../preview/preview.dart';
 import '../../services/api_client.dart';
+import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
-import '../../services/local_cache.dart';
+import '../../services/cache/local.dart';
 import '../../services/media.dart';
 import '../../services/phone.dart';
 import '../../services/region.dart';
@@ -149,29 +150,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
   Future<void> _loadSignaturesInternal() async {
     setState(() => _loadingSignatures = true);
-    final cached = LocalCache.loadSignatures();
-    if (cached.isNotEmpty) {
-      try {
-        final cachedSignatures = cached.map(SignatureItem.fromJson).toList();
-        if (mounted) {
-          setState(() {
-            _signatures
-              ..clear()
-              ..addAll(cachedSignatures);
-            _selectedSignatureId ??= cachedSignatures.isNotEmpty
-                ? cachedSignatures.first.id
-                : null;
-            _loadingSignatures = false;
-          });
-        }
-        return;
-      } catch (_) {
-        // Fallback to API only when cached data is invalid.
-      }
-    }
-
     try {
-      final signatures = await _api.listSignatures();
+      final signatures = await CacheLoader.loadOrFetchSignatures(_api);
       if (!mounted) return;
       setState(() {
         _signatures
@@ -181,9 +161,6 @@ class _NewSaleScreenState extends State<NewSaleScreen>
             ? signatures.first.id
             : null;
       });
-      await LocalCache.saveSignatures(
-        signatures.map((e) => e.toJson()).toList(),
-      );
     } catch (e) {
       if (!mounted) return;
       _showSnackBar(
@@ -672,70 +649,65 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   }
 
   Future<void> _updateLocalCachesAfterSaleCreate(Sale createdSale) async {
-    final salesCache = LocalCache.loadSalesPage(includeItems: false);
+    final salesCache = CacheLoader.loadSalesPageCache(includeItems: false);
     if (salesCache != null) {
       try {
-        final raw = (salesCache['sales'] as List<dynamic>? ?? const <dynamic>[]);
-        final cachedSales = raw.map((e) => Sale.fromJson(e)).toList();
+        final cachedSales = salesCache.sales;
         final deduped = <Sale>[
           createdSale,
           ...cachedSales.where((s) => s.id != createdSale.id),
         ];
-        await LocalCache.saveSalesPage(
+        await CacheLoader.saveSalesPageCache(
           includeItems: false,
-          sales: deduped.map((e) => e.toJson()).toList(),
-          page: (salesCache['page'] as num?)?.toInt() ?? 1,
-          hasMore: salesCache['has_more'] == true,
+          data: CachedSalesPage(
+            sales: deduped,
+            page: salesCache.page,
+            hasMore: salesCache.hasMore,
+          ),
         );
       } catch (_) {}
     }
 
-    final itemsCache = LocalCache.loadSalesPage(includeItems: true);
+    final itemsCache = CacheLoader.loadSalesPageCache(includeItems: true);
     if (itemsCache != null) {
       try {
-        final raw = (itemsCache['sales'] as List<dynamic>? ?? const <dynamic>[]);
-        final cachedSales = raw.map((e) => Sale.fromJson(e)).toList();
+        final cachedSales = itemsCache.sales;
         final deduped = <Sale>[
           createdSale,
           ...cachedSales.where((s) => s.id != createdSale.id),
         ];
-        await LocalCache.saveSalesPage(
+        await CacheLoader.saveSalesPageCache(
           includeItems: true,
-          sales: deduped.map((e) => e.toJson()).toList(),
-          page: (itemsCache['page'] as num?)?.toInt() ?? 1,
-          hasMore: itemsCache['has_more'] == true,
+          data: CachedSalesPage(
+            sales: deduped,
+            page: itemsCache.page,
+            hasMore: itemsCache.hasMore,
+          ),
         );
       } catch (_) {}
     }
 
-    await LocalCache.saveSalePreview(createdSale.id, createdSale.toJson());
+    await CacheLoader.saveSalePreviewCache(createdSale);
 
-    final suggested = LocalCache.loadItemSuggestions();
+    final suggested = CacheLoader.loadItemSuggestionsCache();
     final merged = <String>{...suggested};
     for (final item in createdSale.items) {
       final name = item.productName.trim();
       if (name.isNotEmpty) merged.add(name);
     }
-    await LocalCache.saveItemSuggestions(merged.toList());
+    await CacheLoader.saveItemSuggestionsCache(merged.toList());
   }
 
   Future<void> _refreshHomeSummaryCacheAfterSaleCreate() async {
     try {
-      final home = await _api.getHomeSummary();
-      await LocalCache.saveHomeSummary(home.toJson());
+      await CacheLoader.fetchAndCacheHomeSummary(_api);
     } catch (_) {
       // Ignore refresh failure; local optimistic caches are already updated.
     }
   }
 
   ShopProfile? _previewShop() {
-    final raw = LocalCache.loadSettingsSummary();
-    if (raw == null) return null;
-    try {
-      return SettingsSummary.fromJson(raw).shop;
-    } catch (_) {
-      return null;
-    }
+    return CacheLoader.loadSettingsSummaryCache()?.shop;
   }
 
   Future<void> _openPreview() async {
@@ -901,9 +873,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _signatures.insert(0, created);
       _selectedSignatureId = created.id;
     });
-    await LocalCache.saveSignatures(
-      _signatures.map((e) => e.toJson()).toList(),
-    );
+    await CacheLoader.saveSignaturesCache(_signatures);
     await _saveDraft();
   }
 
