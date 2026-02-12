@@ -9,7 +9,7 @@ import 'screens/auth/auth.dart';
 import 'screens/home/home.dart';
 import 'screens/splash.dart';
 import 'screens/onboarding/onboarding.dart';
-import 'services/local_cache.dart';
+import 'services/cache/local.dart';
 import 'services/token_store.dart';
 
 Future<void> main() async {
