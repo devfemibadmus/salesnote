@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Onboarding - Quick E-Receipts</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#007AFF",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer base {
+            body {
+                @apply font-display antialiased text-slate-900 bg-white;
+                min-height: 100dvh;
+            }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="flex flex-col h-screen overflow-hidden">
+<div class="flex-1 flex flex-col items-center justify-center p-8 bg-slate-50/50">
+<div class="relative w-full max-w-[280px] aspect-square bg-white rounded-[40px] shadow-2xl shadow-blue-100 flex items-center justify-center overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-br from-blue-50 to-white"></div>
+<div class="relative flex flex-col items-center gap-6">
+<div class="w-32 h-48 bg-white border-2 border-slate-100 rounded-xl shadow-lg p-3 flex flex-col gap-2 relative">
+<div class="w-full h-2 bg-slate-100 rounded"></div>
+<div class="w-3/4 h-2 bg-slate-100 rounded"></div>
+<div class="mt-4 flex flex-col gap-1">
+<div class="w-full h-1 bg-slate-50 rounded"></div>
+<div class="w-full h-1 bg-slate-50 rounded"></div>
+<div class="w-full h-1 bg-slate-50 rounded"></div>
+</div>
+<div class="absolute -right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white shadow-lg">
+<span class="material-symbols-outlined text-2xl">send</span>
+</div>
+</div>
+<div class="w-16 h-4 bg-slate-200 rounded-full opacity-30"></div>
+</div>
+<div class="absolute top-4 left-4">
+<span class="material-symbols-outlined text-primary/20 text-4xl">receipt_long</span>
+</div>
+</div>
+</div>
+<div class="px-8 pt-10 pb-12 flex flex-col h-[40%] bg-white">
+<div class="flex-1">
+<h1 class="text-[32px] font-bold text-slate-900 leading-tight mb-4">
+                Quick E-Receipts
+            </h1>
+<p class="text-slate-500 text-lg leading-relaxed">
+                Generate and share receipts instantly. No paper, no ink, no waste. Full history at your fingertips.
+            </p>
+</div>
+<div class="flex gap-2 mb-10">
+<div class="h-2 w-6 bg-primary rounded-full"></div>
+<div class="h-2 w-2 bg-slate-200 rounded-full"></div>
+<div class="h-2 w-2 bg-slate-200 rounded-full"></div>
+</div>
+<div class="flex items-center justify-between">
+<button class="text-slate-400 font-semibold text-lg hover:text-slate-600 transition-colors">
+                Skip
+            </button>
+<button class="bg-primary text-white px-10 py-4 rounded-[20px] font-bold text-lg shadow-lg shadow-blue-200 active:scale-95 transition-transform flex items-center gap-2">
+                Next
+                <span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+<div class="h-2 w-32 bg-slate-100 rounded-full mx-auto mb-2"></div>
+
+</body></html>

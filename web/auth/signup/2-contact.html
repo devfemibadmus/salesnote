@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Simple Create Account - Step 2</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#ffffff",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.875rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .ios-safe-bottom {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        input:focus {
+            outline: none !important;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark min-h-screen flex flex-col font-display">
+<header class="sticky top-0 z-10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md">
+<div class="flex items-center justify-between px-4 h-14">
+<button class="flex items-center text-primary font-medium transition-opacity active:opacity-50">
+<span class="material-symbols-outlined text-[28px]">chevron_left</span>
+<span class="text-[17px]">Back</span>
+</button>
+<div class="flex-1"></div>
+</div>
+</header>
+<main class="flex-1 flex flex-col px-6 pt-4 max-w-md mx-auto w-full">
+<div class="flex w-full flex-row items-center justify-start gap-2 mb-8">
+<div class="h-1.5 w-1.5 rounded-full bg-gray-200 dark:bg-gray-800"></div>
+<div class="h-1.5 w-6 rounded-full bg-primary"></div>
+<div class="h-1.5 w-1.5 rounded-full bg-gray-200 dark:bg-gray-800"></div>
+</div>
+<div class="mb-10">
+<h1 class="text-[#0d141b] dark:text-white tracking-tight text-3xl font-bold">Contact Details</h1>
+</div>
+<div class="space-y-8">
+<div class="flex flex-col w-full">
+<label class="flex flex-col w-full">
+<p class="text-gray-500 dark:text-gray-400 text-sm font-medium leading-none pb-3 px-1 uppercase tracking-wider">Phone</p>
+<div class="relative flex items-center">
+<div class="absolute left-0 flex items-center pointer-events-none text-[#0d141b] dark:text-white font-medium pl-4 border-r border-gray-200 dark:border-gray-800 pr-3">
+<span class="text-[17px]">+234</span>
+</div>
+<input class="form-input flex w-full rounded-xl text-[#0d141b] dark:text-white border-none bg-gray-100 dark:bg-gray-900 focus:ring-2 focus:ring-primary/20 h-[56px] pl-[84px] pr-4 text-[17px] font-normal" placeholder="800 000 0000" type="tel"/>
+</div>
+</label>
+</div>
+<div class="flex flex-col w-full">
+<label class="flex flex-col w-full">
+<p class="text-gray-500 dark:text-gray-400 text-sm font-medium leading-none pb-3 px-1 uppercase tracking-wider">Email</p>
+<div class="relative flex items-center">
+<input class="form-input flex w-full rounded-xl text-[#0d141b] dark:text-white border-none bg-gray-100 dark:bg-gray-900 focus:ring-2 focus:ring-primary/20 h-[56px] px-4 text-[17px] font-normal" placeholder="name@email.com" type="email"/>
+</div>
+</label>
+</div>
+</div>
+</main>
+<footer class="p-6 ios-safe-bottom bg-background-light dark:bg-background-dark">
+<div class="max-w-md mx-auto space-y-4">
+<button class="w-full bg-primary active:scale-[0.98] transition-transform text-white font-semibold py-4 px-6 rounded-2xl text-[17px] flex items-center justify-center">
+<span>Continue</span>
+</button>
+<p class="text-center text-gray-400 text-xs font-medium uppercase tracking-widest">Step 2 of 3</p>
+</div>
+</footer>
+
+</body></html>

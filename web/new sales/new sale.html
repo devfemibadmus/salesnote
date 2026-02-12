@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Salesnote - New Sale</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body { min-height: 100dvh; }
+        .signature-card.active {
+            @apply border-primary bg-primary/5 ring-1 ring-primary;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+<header class="sticky top-0 z-30 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-800/50 px-4 pt-4 pb-4">
+<div class="flex items-center justify-between">
+<h1 class="text-xl font-bold text-slate-900 dark:text-white">New Sale</h1>
+<button class="p-2 -mr-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined text-slate-500 dark:text-slate-400">close</span>
+</button>
+</div>
+</header>
+<main class="px-5 py-6 space-y-8 pb-32">
+<div class="flex gap-2">
+<div class="h-1.5 flex-1 bg-primary rounded-full"></div>
+<div class="h-1.5 flex-1 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+<div class="h-1.5 flex-1 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+</div>
+<section class="space-y-6">
+<div>
+<label class="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2 px-1">Customer Details</label>
+<div class="space-y-4">
+<div>
+<input class="w-full bg-white dark:bg-slate-800 border-none rounded-xl py-4 px-4 text-lg font-medium focus:ring-2 focus:ring-primary/20 placeholder:text-slate-400 dark:placeholder:text-slate-600 shadow-sm transition-all" placeholder="Customer Name" type="text"/>
+</div>
+<div>
+<input class="w-full bg-white dark:bg-slate-800 border-none rounded-xl py-4 px-4 text-base focus:ring-2 focus:ring-primary/20 placeholder:text-slate-400 dark:placeholder:text-slate-600 shadow-sm transition-all" placeholder="Optional Contact (Email or Phone)" type="text"/>
+</div>
+</div>
+</div>
+</section>
+<section>
+<div class="flex items-center justify-between mb-4 px-1">
+<label class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Select Signature</label>
+<button class="text-primary text-xs font-bold uppercase tracking-wider">+ New</button>
+</div>
+<div class="flex gap-3 overflow-x-auto no-scrollbar -mx-5 px-5 pb-2">
+<div class="signature-card active flex-shrink-0 w-32 h-20 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center p-2 relative">
+<div class="absolute top-1.5 right-1.5 size-4 bg-primary rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined text-[10px] text-white font-bold">check</span>
+</div>
+<img alt="Signature 1" class="max-h-full opacity-80 dark:invert" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFd2ERIjAmQVIbY7gTgGUNPgmfW8xA3ZQmFyr1TFvACM-r56VHH36lQk4ZG_N2RSahM0BzmTlYVDmTSEeo1-DGZyQ0QHr0ER9ohXJ3fg5Jduf59w_eurh2oXJc7P6mfp13d6FRyp5c06hJMNtAxOK-pPxEWhPWpn_FRtsAxFmLENAajyABJfqx71Go-ofGlcR1MhyEW39pfWW3vd_WqJigw3dlImCh1KyBz6pojhnRIfoxiyvSGtE2q1L6dRTbkhL0Rj6ytYhhNd8"/>
+</div>
+<div class="signature-card flex-shrink-0 w-32 h-20 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center p-2">
+<img alt="Signature 2" class="max-h-full opacity-80 dark:invert" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOvfPwnrLEOrC1SXkfR4VgrdxhWcJc4OrtzVRaWTULySD3zkMZ8CRjNla6KGyxrcKKDttsotMvf7j_zyf2jU6DE65LmMa4RyRxSSCwjfb-rdglPr4XJbNQXM8Vk1ymn3K_zZCszLkYkoNlH1sAcBVAvQP_D2ZExyG7g2GO7OpYk4FkgQdFT6PRDGA8ZV74SvdXQGsLSUSgUwT0QV87oRA7BdE9O4Fq18bHr2KW_9k4sAzwZButO1GcYv4mVW4xCtAyiBd6KMRLC7I"/>
+</div>
+<div class="signature-card flex-shrink-0 w-32 h-20 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center p-2">
+<img alt="Signature 3" class="max-h-full opacity-80 dark:invert" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9oJBFs2JUZSr4WOuirxdzLTy3vWVSyg62jU0rSnwfiCxyVg7GJN364KyO8ptu92wiMR4yjIKfXCEOBTXR0uwa2CkdMK4LI0dba485CiRu51b9WPXjyLXgvw5Jm0U6y7a7Jzr6JY1Hy_tFuFY5kXWw6W4n72vWBFa2Jrq3uBPzLbW0Vpgil9RLH5cV0VO-mXnZHCbkFRf8Ic6A1QMMZ2BG9G4l_mx1uCkJQrA_wcFgzg0wWCouMxS4I2a3_M4FZdltCHqgI8wU6bE"/>
+</div>
+<div class="signature-card flex-shrink-0 w-32 h-20 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl flex items-center justify-center p-2">
+<img alt="Signature 4" class="max-h-full opacity-80 dark:invert" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSgcsHydsGDIpbxmG378bX602Y-yAwYzA58jPATFiNB1ZPt3oFfWAfIkY0FkcQJ1Cd-fAXOLX4DS_WfQDojTSVySUU4rLlSMHTNUf1qOywbk10rlkhnDCmRTa4v8L9A8ofUzcQHb49QfvhdWvhFXSemAczGy5Saw-Pqs54bMBGVN2Ld_pqzwKQOuOMT7CSesysANEeR9O-dDYuhy8n4mpuGS3W2crAGziQZ1jxiNne0B1shHLHbaQR5cDuEAMCKACBxbShNQZRRaU"/>
+</div>
+</div>
+</section>
+</main>
+<footer class="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-4 pb-8 z-50">
+<div class="flex items-center justify-between max-w-md mx-auto">
+<div class="flex flex-col">
+<span class="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">Total Amount</span>
+<span class="text-xl font-bold text-slate-900 dark:text-white">₦0.00</span>
+</div>
+<button class="bg-primary text-white font-bold px-8 py-3.5 rounded-xl shadow-lg shadow-primary/30 flex items-center gap-2 active:scale-95 transition-transform">
+<span>Add Items</span>
+<span class="material-symbols-outlined text-sm">arrow_forward_ios</span>
+</button>
+</div>
+</footer>
+
+</body></html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Salesnote Splash Screen</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#007AFF",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+<style type="text/tailwindcss">
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-custom {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+<style>
+        body {
+            min-height: 100dvh;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-display antialiased bg-primary">
+<div class="relative flex h-screen w-full flex-col items-center justify-between bg-primary p-6 overflow-hidden">
+<div class="h-10"></div>
+<div class="flex flex-col items-center gap-4">
+<div class="w-24 h-24 flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[72px]" data-icon="receipt_long">receipt_long</span>
+</div>
+<h1 class="text-white tracking-tight text-[40px] font-bold leading-none">
+                Salesnote
+            </h1>
+</div>
+<div class="w-full max-w-xs flex flex-col items-center gap-10 pb-12">
+<div class="flex flex-col items-center">
+<div class="w-7 h-7 border-[3px] border-white/20 border-t-white rounded-full animate-spin-custom"></div>
+</div>
+<div class="flex flex-col items-center">
+<p class="text-white text-[15px] font-medium tracking-wide">
+                    Simple sales &amp; e-receipts
+                </p>
+</div>
+</div>
+</div>
+
+</body></html>

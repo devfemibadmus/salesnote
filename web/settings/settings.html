@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Shop Settings - Salesnote</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 antialiased overflow-x-hidden">
+<!-- Top App Bar -->
+<header class="sticky top-0 z-50 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+<div class="flex items-center justify-between px-4 h-14">
+<button class="text-primary flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_back_ios</span>
+</button>
+<h1 class="text-lg font-semibold tracking-tight">Settings</h1>
+<div class="w-10"></div> <!-- Spacer for centering -->
+</div>
+</header>
+<main class="max-w-md mx-auto pb-32">
+<!-- Shop Profile Section -->
+<section class="mt-6">
+<h3 class="px-4 mb-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Shop Profile</h3>
+<div class="bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+<div class="flex items-center justify-between px-4 py-3">
+<div>
+<p class="text-[15px] font-medium">Shop Name</p>
+<p class="text-xs text-slate-500">Official business name</p>
+</div>
+<span class="text-slate-400 text-[15px]">Salesnote Pro</span>
+</div>
+<div class="flex items-center justify-between px-4 py-3">
+<div>
+<p class="text-[15px] font-medium">Phone</p>
+<p class="text-xs text-slate-500">Primary contact</p>
+</div>
+<span class="text-slate-400 text-[15px]">+1 234 567 890</span>
+</div>
+<div class="flex items-center justify-between px-4 py-3">
+<div>
+<p class="text-[15px] font-medium">Email</p>
+<p class="text-xs text-slate-500">Account recovery</p>
+</div>
+<span class="text-slate-400 text-[15px]">owner@salesnote.com</span>
+</div>
+<div class="flex items-center justify-between px-4 py-3">
+<div>
+<p class="text-[15px] font-medium">Address</p>
+</div>
+<span class="text-slate-400 text-[15px]">123 Commerce St</span>
+</div>
+<div class="flex items-center justify-between px-4 py-3">
+<div>
+<p class="text-[15px] font-medium">Timezone</p>
+</div>
+<span class="text-slate-400 text-[15px]">UTC -5 (EST)</span>
+</div>
+</div>
+</section>
+<!-- Security Section -->
+<section class="mt-8">
+<h3 class="px-4 mb-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Security</h3>
+<div class="bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800">
+<button class="flex items-center justify-between w-full px-4 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<span class="text-[15px] font-medium">Change Password</span>
+<span class="material-symbols-outlined text-slate-300">chevron_right</span>
+</button>
+</div>
+<div class="px-4 py-3">
+<p class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Logged-in Devices</p>
+</div>
+<div class="bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+<div class="flex items-center justify-between px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
+<span class="material-symbols-outlined">smartphone</span>
+</div>
+<div>
+<p class="text-[14px] font-medium">iPhone 15 Pro</p>
+<p class="text-[11px] text-slate-400">iOS 17.4 • New York, USA</p>
+</div>
+</div>
+<button class="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 p-2 rounded-full transition-colors">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+</button>
+</div>
+<div class="flex items-center justify-between px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300">
+<span class="material-symbols-outlined">laptop_mac</span>
+</div>
+<div>
+<p class="text-[14px] font-medium">MacBook Pro M2</p>
+<p class="text-[11px] text-slate-400">macOS 14.2 • San Francisco, USA</p>
+</div>
+</div>
+<button class="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 p-2 rounded-full transition-colors">
+<span class="material-symbols-outlined text-[20px]">logout</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Notifications Section -->
+<section class="mt-8">
+<h3 class="px-4 mb-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Notifications</h3>
+<div class="bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800">
+<div class="flex items-center justify-between px-4 py-4">
+<span class="text-[15px] font-medium">Push Notifications</span>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+</label>
+</div>
+</div>
+</section>
+<!-- App Info Section -->
+<section class="mt-8">
+<h3 class="px-4 mb-2 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">App Info</h3>
+<div class="bg-white dark:bg-slate-900 border-y border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800 text-[15px]">
+<button class="flex items-center justify-between w-full px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+<span class="font-medium">Privacy Policy</span>
+<span class="material-symbols-outlined text-slate-300">chevron_right</span>
+</button>
+<button class="flex items-center justify-between w-full px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+<span class="font-medium">Terms of Service</span>
+<span class="material-symbols-outlined text-slate-300">chevron_right</span>
+</button>
+<button class="flex items-center justify-between w-full px-4 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+<span class="font-medium text-primary">Contact Support</span>
+<span class="material-symbols-outlined text-slate-300">chevron_right</span>
+</button>
+<div class="flex items-center justify-between px-4 py-3.5">
+<span class="font-medium">App Version</span>
+<span class="text-slate-400">2.4.0</span>
+</div>
+<div class="flex items-center justify-between px-4 py-3.5">
+<span class="font-medium">Build Number</span>
+<span class="text-slate-400">102</span>
+</div>
+</div>
+</section>
+<!-- Logout Button -->
+<div class="px-4 mt-10">
+<button class="w-full bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-500 font-bold py-4 rounded-xl flex items-center justify-center gap-2 border border-red-100 dark:border-red-900/40 active:scale-[0.98] transition-all">
+<span class="material-symbols-outlined">logout</span>
+                Logout
+            </button>
+<p class="text-center text-slate-400 text-xs mt-6 pb-12">© 2024 Salesnote Inc. All rights reserved.</p>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-background-dark/90 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 pt-2 pb-8 px-6 flex justify-between items-center z-50">
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-[10px] font-medium">Home</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="text-[10px] font-medium">Sales</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-slate-400">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="text-[10px] font-medium">Inventory</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="text-[10px] font-bold">Profile</span>
+</button>
+</nav>
+</body></html>
