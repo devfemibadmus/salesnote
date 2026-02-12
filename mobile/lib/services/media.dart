@@ -1,5 +1,5 @@
 import '../app/config.dart';
-import 'local_cache.dart';
+import 'cache/local.dart';
 
 class MediaService {
   static String resolveSrc(String src, {bool withCacheBust = true}) {
