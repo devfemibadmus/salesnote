@@ -93,17 +93,19 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     final receiptNo =
         widget.receiptNumber ?? '#REC-${timestamp.millisecondsSinceEpoch % 1000000}';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF3F4F6),
-      body: SafeArea(
-        child: Column(
+    return PopScope(
+      canPop: !_busy,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF3F4F6),
+        body: SafeArea(
+          child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 16, 8),
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: _busy ? null : () => Navigator.of(context).pop(),
                     icon: const Icon(
                       Icons.arrow_back_ios_new_rounded,
                       color: Color(0xFF46566E),
@@ -360,6 +362,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );

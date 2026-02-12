@@ -655,7 +655,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
             .toList(),
       );
 
-      await _api.createSale(input);
+      final createdSale = await _api.createSale(input);
+      await _updateLocalCachesAfterSaleCreate(createdSale);
+      await _refreshHomeSummaryCacheAfterSaleCreate();
       await _clearActiveDraftAfterSubmit();
       if (!mounted) return false;
       _showSnackBar('Sale created successfully.');
@@ -666,6 +668,63 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       return false;
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _updateLocalCachesAfterSaleCreate(Sale createdSale) async {
+    final salesCache = LocalCache.loadSalesPage(includeItems: false);
+    if (salesCache != null) {
+      try {
+        final raw = (salesCache['sales'] as List<dynamic>? ?? const <dynamic>[]);
+        final cachedSales = raw.map((e) => Sale.fromJson(e)).toList();
+        final deduped = <Sale>[
+          createdSale,
+          ...cachedSales.where((s) => s.id != createdSale.id),
+        ];
+        await LocalCache.saveSalesPage(
+          includeItems: false,
+          sales: deduped.map((e) => e.toJson()).toList(),
+          page: (salesCache['page'] as num?)?.toInt() ?? 1,
+          hasMore: salesCache['has_more'] == true,
+        );
+      } catch (_) {}
+    }
+
+    final itemsCache = LocalCache.loadSalesPage(includeItems: true);
+    if (itemsCache != null) {
+      try {
+        final raw = (itemsCache['sales'] as List<dynamic>? ?? const <dynamic>[]);
+        final cachedSales = raw.map((e) => Sale.fromJson(e)).toList();
+        final deduped = <Sale>[
+          createdSale,
+          ...cachedSales.where((s) => s.id != createdSale.id),
+        ];
+        await LocalCache.saveSalesPage(
+          includeItems: true,
+          sales: deduped.map((e) => e.toJson()).toList(),
+          page: (itemsCache['page'] as num?)?.toInt() ?? 1,
+          hasMore: itemsCache['has_more'] == true,
+        );
+      } catch (_) {}
+    }
+
+    await LocalCache.saveSalePreview(createdSale.id, createdSale.toJson());
+
+    final suggested = LocalCache.loadItemSuggestions();
+    final merged = <String>{...suggested};
+    for (final item in createdSale.items) {
+      final name = item.productName.trim();
+      if (name.isNotEmpty) merged.add(name);
+    }
+    await LocalCache.saveItemSuggestions(merged.toList());
+  }
+
+  Future<void> _refreshHomeSummaryCacheAfterSaleCreate() async {
+    try {
+      final home = await _api.getHomeSummary();
+      await LocalCache.saveHomeSummary(home.toJson());
+    } catch (_) {
+      // Ignore refresh failure; local optimistic caches are already updated.
     }
   }
 

@@ -249,7 +249,7 @@ class SaleInput {
   final String? createdAt;
 
   Map<String, dynamic> toJson() => {
-        'signature_id': signatureId,
+        'signature_id': int.tryParse(signatureId),
         'customer_name': customerName,
         'customer_contact': customerContact,
         'items': items.map((e) => e.toJson()).toList(),
@@ -271,7 +271,7 @@ class SaleUpdateInput {
   final List<SaleItemInput>? items;
 
   Map<String, dynamic> toJson() => {
-        'signature_id': signatureId,
+        'signature_id': signatureId == null ? null : int.tryParse(signatureId!),
         'customer_name': customerName,
         'customer_contact': customerContact,
         'items': items?.map((e) => e.toJson()).toList(),
