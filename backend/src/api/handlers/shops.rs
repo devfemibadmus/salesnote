@@ -4,6 +4,7 @@ use actix_web::web::ReqData;
 use actix_web::{web, HttpResponse, Responder};
 use argon2::PasswordHasher;
 use futures_util::StreamExt;
+use image::codecs::jpeg::JpegEncoder;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -20,13 +21,62 @@ pub struct FcmSubscribeInput {
     pub fcm_token: Option<String>,
 }
 
-const MAX_IMAGE_SIZE: usize = 5 * 1024 * 1024;
+const MAX_TEXT_FIELD_SIZE: usize = 1024 * 1024;
+const MAX_PROFILE_IMAGE_SIZE: usize = 10 * 1024 * 1024;
+const PROFILE_IMAGE_MAX_DIMENSION: u32 = 1600;
+const PROFILE_IMAGE_JPEG_QUALITY: u8 = 82;
+const MIN_SHOP_NAME_CHARS: usize = 3;
+const MAX_SHOP_NAME_CHARS: usize = 40;
+const MIN_ADDRESS_CHARS: usize = 8;
+const MAX_ADDRESS_CHARS: usize = 40;
+const MIN_ADDRESS_WORDS: usize = 4;
+const MAX_ADDRESS_WORDS: usize = 10;
 
 #[derive(Debug, Serialize)]
 pub struct SettingsSummaryResponse {
     pub shop: ShopProfile,
     pub devices: Vec<DeviceSession>,
     pub current_device_push_enabled: bool,
+}
+
+fn count_words(value: &str) -> usize {
+    value
+        .split_whitespace()
+        .filter(|part| !part.trim().is_empty())
+        .count()
+}
+
+fn validate_shop_patch(input: &ShopUpdateInput) -> Result<(), &'static str> {
+    if let Some(name) = input.name.as_deref() {
+        let trimmed = name.trim();
+        let chars = trimmed.chars().count();
+        if chars < MIN_SHOP_NAME_CHARS {
+            return Err("shop name must be at least 3 characters");
+        }
+        if chars > MAX_SHOP_NAME_CHARS {
+            return Err("shop name must be 40 characters or less");
+        }
+    }
+
+    if let Some(address) = input.address.as_deref() {
+        let trimmed = address.trim();
+        let chars = trimmed.chars().count();
+        if chars < MIN_ADDRESS_CHARS {
+            return Err("address must be at least 8 characters");
+        }
+        if chars > MAX_ADDRESS_CHARS {
+            return Err("address must be 40 characters or less");
+        }
+        let words = count_words(trimmed);
+        if words < MIN_ADDRESS_WORDS {
+            return Err("address must be at least 4 words");
+        }
+        if words > MAX_ADDRESS_WORDS {
+            return Err("address must be 10 words or less");
+        }
+    }
+
+    Ok(())
 }
 
 fn extension_from_mime(mime: &mime::Mime) -> Option<&'static str> {
@@ -62,7 +112,7 @@ async fn read_text_field(field: &mut actix_multipart::Field) -> Result<String, H
             }
         };
         bytes.extend_from_slice(&chunk);
-        if bytes.len() > MAX_IMAGE_SIZE {
+        if bytes.len() > MAX_TEXT_FIELD_SIZE {
             return Err(json_error(
                 actix_web::http::StatusCode::BAD_REQUEST,
                 "field too large",
@@ -74,7 +124,7 @@ async fn read_text_field(field: &mut actix_multipart::Field) -> Result<String, H
         .map_err(|_| json_error(actix_web::http::StatusCode::BAD_REQUEST, "invalid text"))
 }
 
-async fn read_file_field(
+async fn read_file_field_and_optimize_logo(
     field: &mut actix_multipart::Field,
     dest_path: &Path,
 ) -> Result<(), HttpResponse> {
@@ -91,7 +141,7 @@ async fn read_file_field(
             }
         };
         size += chunk.len();
-        if size > MAX_IMAGE_SIZE {
+        if size > MAX_PROFILE_IMAGE_SIZE {
             return Err(json_error(
                 actix_web::http::StatusCode::BAD_REQUEST,
                 "image too large",
@@ -99,6 +149,20 @@ async fn read_file_field(
         }
         file_bytes.extend_from_slice(&chunk);
     }
+
+    let mut image = image::load_from_memory(&file_bytes).map_err(|_| {
+        json_error(
+            actix_web::http::StatusCode::BAD_REQUEST,
+            "invalid image data",
+        )
+    })?;
+
+    let width = image.width();
+    let height = image.height();
+    if width > PROFILE_IMAGE_MAX_DIMENSION || height > PROFILE_IMAGE_MAX_DIMENSION {
+        image = image.thumbnail(PROFILE_IMAGE_MAX_DIMENSION, PROFILE_IMAGE_MAX_DIMENSION);
+    }
+
     if let Some(parent) = dest_path.parent() {
         if std::fs::create_dir_all(parent).is_err() {
             return Err(json_error(
@@ -107,12 +171,21 @@ async fn read_file_field(
             ));
         }
     }
-    if std::fs::write(dest_path, &file_bytes).is_err() {
-        return Err(json_error(
+    let file = std::fs::File::create(dest_path).map_err(|_| {
+        json_error(
             actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
             "storage error",
+        )
+    })?;
+    let mut writer = std::io::BufWriter::new(file);
+    let mut encoder = JpegEncoder::new_with_quality(&mut writer, PROFILE_IMAGE_JPEG_QUALITY);
+    if encoder.encode_image(&image).is_err() {
+        return Err(json_error(
+            actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "image processing error",
         ));
     }
+
     Ok(())
 }
 
@@ -219,7 +292,7 @@ pub async fn update_my_shop(
                             .get_filename()
                             .and_then(extension_from_filename)
                     });
-                    let ext = match ext {
+                    let _validated_ext = match ext {
                         Some(e) => e,
                         None => {
                             return json_error(
@@ -229,11 +302,11 @@ pub async fn update_my_shop(
                         }
                     };
 
-                    let filename = format!("shop_{}.{}", *shop_id, ext);
+                    let filename = format!("shop_{}.jpg", *shop_id);
                     let rel_path = format!("uploads/logos/{}", filename);
                     let dest = PathBuf::from("uploads").join("logos").join(filename);
 
-                    if let Err(resp) = read_file_field(&mut field, &dest).await {
+                    if let Err(resp) = read_file_field_and_optimize_logo(&mut field, &dest).await {
                         return resp;
                     }
                     multipart_input.logo_url = Some(rel_path);
@@ -289,6 +362,10 @@ pub async fn update_my_shop(
         if v.trim().is_empty() {
             input.password = None;
         }
+    }
+
+    if let Err(message) = validate_shop_patch(&input) {
+        return json_error(StatusCode::BAD_REQUEST, message);
     }
 
     let mut password_hash: Option<String> = None;

@@ -15,6 +15,33 @@ use crate::models::{
     SaleInput, SaleUpdateInput, Signature,
 };
 
+const MAX_ITEM_NAME_CHARS: usize = 20;
+const MAX_SALE_TOTAL: f64 = 9_999_999_999.99;
+
+fn validate_sale_items_and_total(input: &SaleInput) -> Result<(), &'static str> {
+    if input.items.is_empty() {
+        return Err("items required");
+    }
+
+    let mut total = 0.0_f64;
+    for item in &input.items {
+        let name = item.product_name.trim();
+        if name.is_empty() {
+            return Err("item name required");
+        }
+        if name.chars().count() > MAX_ITEM_NAME_CHARS {
+            return Err("item name must not be more than 20 characters");
+        }
+
+        total += item.quantity * item.unit_price;
+        if !total.is_finite() || total > MAX_SALE_TOTAL {
+            return Err("sale total must not be more than 9,999,999,999.99");
+        }
+    }
+
+    Ok(())
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SalesListQuery {
     pub page: Option<i64>,
@@ -70,18 +97,19 @@ pub async fn create_sale(
     shop_id: ReqData<i64>,
     payload: web::Json<SaleInput>,
 ) -> impl Responder {
-    if let Err(resp) = require_active_session(&state, &req, *shop_id).await {
-        return resp;
+    if let Err(message) = validate_sale_items_and_total(&payload) {
+        return json_error(StatusCode::BAD_REQUEST, message);
     }
 
-    if payload.items.is_empty() {
-        return json_error(StatusCode::BAD_REQUEST, "items required");
-    }
     if payload.customer_name.trim().is_empty() || payload.customer_contact.trim().is_empty() {
         return json_error(
             StatusCode::BAD_REQUEST,
             "customer name and contact are required",
         );
+    }
+
+    if let Err(resp) = require_active_session(&state, &req, *shop_id).await {
+        return resp;
     }
 
     let input = payload.into_inner();
