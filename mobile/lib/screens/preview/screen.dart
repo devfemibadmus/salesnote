@@ -136,11 +136,16 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: const Color(0xFFDDE6F2)),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                  child: Stack(
+                    children: [
+                      const Positioned.fill(
+                        child: _ReceiptWatermark(text: 'Salesnote'),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                         Center(child: _PreviewShopAvatar(shop: widget.shop)),
                         const SizedBox(height: 12),
                         Center(
@@ -238,18 +243,6 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                           strong: true,
                         ),
                         const SizedBox(height: 24),
-                        const Center(
-                          child: Text(
-                            'Thank you for your business!',
-                            style: TextStyle(
-                              color: Color(0xFF5B6E8A),
-                              fontSize: 20,
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                         Column(
                           children: [
                             SizedBox(
@@ -293,8 +286,10 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                      ],
-                    ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
