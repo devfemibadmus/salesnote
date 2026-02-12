@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app/navigator.dart';
 import '../app/routes.dart';
-import 'local_cache.dart';
+import 'cache/local.dart';
 
 class InAppNotification {
   const InAppNotification({
@@ -173,20 +173,18 @@ class NotificationService {
   static Future<void> markRead(String id) async {
     final list = loadInbox();
     var changed = false;
-    final next = list
-        .map((n) {
-          if (n.id != id || n.isRead) return n;
-          changed = true;
-          return InAppNotification(
-            id: n.id,
-            title: n.title,
-            body: n.body,
-            kind: n.kind,
-            createdAtMillis: n.createdAtMillis,
-            isRead: true,
-          );
-        })
-        .toList();
+    final next = list.map((n) {
+      if (n.id != id || n.isRead) return n;
+      changed = true;
+      return InAppNotification(
+        id: n.id,
+        title: n.title,
+        body: n.body,
+        kind: n.kind,
+        createdAtMillis: n.createdAtMillis,
+        isRead: true,
+      );
+    }).toList();
     if (!changed) return;
     await LocalCache.saveNotifications(next.map((e) => e.toJson()).toList());
     _refreshUnreadCount();
@@ -354,11 +352,7 @@ class NotificationService {
     String title,
     String body,
   ) {
-    final merged = {
-      ...data,
-      'title': title,
-      'body': body,
-    };
+    final merged = {...data, 'title': title, 'body': body};
     return Uri(
       queryParameters: merged.map(
         (key, value) => MapEntry(key, value.toString()),
