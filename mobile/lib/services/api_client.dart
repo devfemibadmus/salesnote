@@ -7,7 +7,7 @@ import '../app/navigator.dart';
 import '../app/routes.dart';
 import '../app/config.dart';
 import '../data/models.dart';
-import 'local_cache.dart';
+import 'cache/local.dart';
 import 'token_store.dart';
 
 class ApiClient {
