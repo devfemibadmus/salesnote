@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/routes.dart';
-import '../../services/local_cache.dart';
+import '../../services/cache/local.dart';
 import 'slides/analytics.dart';
 import 'slides/history.dart';
 import 'slides/quick_receipts.dart';
