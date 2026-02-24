@@ -13,6 +13,11 @@ fn default_backup_path() -> PathBuf {
 async fn main() -> std::io::Result<()> {
     config::init_tracing();
     let settings = config::Settings::load();
+    tracing::info!(
+        "[backup] starting (profile={}, env_file={})",
+        config::active_env_profile(),
+        config::active_env_file()
+    );
 
     let backup_path = std::env::var("SALESNOTE__BACKUP_PATH")
         .map(PathBuf::from)

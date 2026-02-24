@@ -6,8 +6,17 @@ use tokio_cron_scheduler::{Job, JobScheduler};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     salesnote_backend::config::init_tracing();
     let settings = Arc::new(salesnote_backend::config::Settings::load());
+    tracing::info!(
+        "[worker] starting (profile={}, env_file={})",
+        salesnote_backend::config::active_env_profile(),
+        salesnote_backend::config::active_env_file()
+    );
 
-    let pool = salesnote_backend::db::init(&settings.database_url)
+    let pool = salesnote_backend::db::init(
+        &settings.database_url,
+        settings.pool_max_size,
+        settings.pool_min_idle,
+    )
         .await
         .expect("failed to init database");
     let pool = Arc::new(pool);

@@ -10,8 +10,17 @@ use salesnote_backend::api::{routes, state};
 async fn main() -> std::io::Result<()> {
     config::init_tracing();
     let settings = config::Settings::load();
+    tracing::info!(
+        "[api] starting (profile={}, env_file={})",
+        config::active_env_profile(),
+        config::active_env_file()
+    );
 
-    let pool = db::init(&settings.database_url)
+    let pool = db::init(
+        &settings.database_url,
+        settings.pool_max_size,
+        settings.pool_min_idle,
+    )
         .await
         .expect("failed to init database");
 

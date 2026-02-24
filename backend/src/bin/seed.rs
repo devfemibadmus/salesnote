@@ -401,6 +401,11 @@ async fn cleanup_existing_shop_data_via_api(
 async fn main() -> std::io::Result<()> {
     config::init_tracing();
     let settings = config::Settings::load();
+    tracing::info!(
+        "[seed] starting (profile={}, env_file={})",
+        config::active_env_profile(),
+        config::active_env_file()
+    );
 
     let seed_name = env_or_empty("SALESNOTE__SEED_SHOP_NAME");
     let seed_phone = env_or_empty("SALESNOTE__SEED_SHOP_PHONE");
