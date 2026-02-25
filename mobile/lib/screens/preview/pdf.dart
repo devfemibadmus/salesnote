@@ -26,6 +26,8 @@ extension _PreviewPdf on _SalePreviewScreenState {
 
     final subtotal = widget.total;
     final grandTotal = widget.total;
+    final customerName = widget.customerName.trim();
+    final customerContact = widget.customerContact.trim();
     final qtyLabelStyle = pw.TextStyle(
       color: PdfColor.fromInt(0xFF5B6E8A),
       fontSize: 12,
@@ -49,17 +51,8 @@ extension _PreviewPdf on _SalePreviewScreenState {
         margin: pw.EdgeInsets.zero,
         build: (context) {
           return pw.Container(
-            margin: const pw.EdgeInsets.fromLTRB(16, 14, 16, 14),
             width: double.infinity,
-            decoration: pw.BoxDecoration(
-              color: PdfColors.white,
-              borderRadius: pw.BorderRadius.circular(14),
-              border: pw.Border.all(
-                color: PdfColor.fromInt(0xFFDDE6F2),
-                width: 1,
-              ),
-            ),
-            padding: const pw.EdgeInsets.fromLTRB(18, 18, 18, 14),
+            color: PdfColors.white,
             child: pw.Stack(
               children: [
                 pw.Positioned.fill(
@@ -72,9 +65,11 @@ extension _PreviewPdf on _SalePreviewScreenState {
                     ),
                   ),
                 ),
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
+                pw.Padding(
+                  padding: const pw.EdgeInsets.fromLTRB(18, 18, 18, 14),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
                     pw.Center(
                       child: _pdfAvatar(
                         shopLogoBytes,
@@ -117,6 +112,58 @@ extension _PreviewPdf on _SalePreviewScreenState {
                         ),
                       ),
                     ),
+                    if (customerName.isNotEmpty ||
+                        customerContact.isNotEmpty) ...[
+                      pw.SizedBox(height: 12),
+                      pw.Container(
+                        width: double.infinity,
+                        padding: const pw.EdgeInsets.all(10),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColor.fromInt(0xFFF8FAFC),
+                          borderRadius: pw.BorderRadius.circular(8),
+                          border: pw.Border.all(
+                            color: PdfColor.fromInt(0xFFE5ECF6),
+                            width: 1,
+                          ),
+                        ),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'CUSTOMER',
+                              style: pw.TextStyle(
+                                color: PdfColor.fromInt(0xFF8A9AB3),
+                                fontSize: 10,
+                                fontWeight: pw.FontWeight.bold,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            if (customerName.isNotEmpty) ...[
+                              pw.SizedBox(height: 4),
+                              pw.Text(
+                                customerName,
+                                style: pw.TextStyle(
+                                  color: PdfColor.fromInt(0xFF0E1930),
+                                  fontSize: 12,
+                                  fontWeight: pw.FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                            if (customerContact.isNotEmpty) ...[
+                              pw.SizedBox(height: 2),
+                              pw.Text(
+                                customerContact,
+                                style: pw.TextStyle(
+                                  color: PdfColor.fromInt(0xFF5A6C88),
+                                  fontSize: 11,
+                                  fontWeight: pw.FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                     pw.SizedBox(height: 14),
                     pw.Divider(color: PdfColor.fromInt(0xFFE5ECF6)),
                     pw.SizedBox(height: 8),
@@ -301,7 +348,8 @@ extension _PreviewPdf on _SalePreviewScreenState {
                         ),
                       ),
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -312,33 +360,50 @@ extension _PreviewPdf on _SalePreviewScreenState {
     return pdf.save();
   }
 
-  Future<File> _savePdfToDevice(Uint8List bytes) async {
+  Future<String> _savePdfToDevice(Uint8List bytes) async {
     final now = DateTime.now();
     final stamp = DateFormat('yyyyMMdd_HHmmss').format(now);
-    final fileName = 'salesnote_receipt_$stamp.pdf';
-
-    File file;
-    if (Platform.isAndroid) {
-      final downloadDir = Directory('/storage/emulated/0/Download');
-      if (await downloadDir.exists()) {
-        file = File('${downloadDir.path}/$fileName');
-      } else {
-        final docDir = await getApplicationDocumentsDirectory();
-        file = File('${docDir.path}/$fileName');
-      }
-    } else {
-      final docDir = await getApplicationDocumentsDirectory();
-      file = File('${docDir.path}/$fileName');
+    final fileName = 'salesnote_receipt_$stamp';
+    final savedPath = await FileSaver.instance.saveAs(
+      name: fileName,
+      bytes: bytes,
+      includeExtension: true,
+      fileExtension: 'pdf',
+      mimeType: MimeType.pdf,
+    );
+    if (savedPath == null || savedPath.trim().isEmpty) {
+      throw Exception('Save cancelled.');
     }
+    return savedPath;
+  }
 
-    try {
-      await file.writeAsBytes(bytes, flush: true);
-      return file;
-    } catch (_) {
-      final fallback = await getApplicationDocumentsDirectory();
-      final fallbackFile = File('${fallback.path}/$fileName');
-      await fallbackFile.writeAsBytes(bytes, flush: true);
-      return fallbackFile;
+  Future<Uint8List> _buildReceiptImageBytes() async {
+    final renderObject = _receiptBoundaryKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderRepaintBoundary) {
+      throw Exception('Receipt preview is not ready.');
+    }
+    final view = ui.PlatformDispatcher.instance.views.first;
+    final pixelRatio = view.devicePixelRatio.clamp(1.0, 3.0);
+    final image = await renderObject.toImage(pixelRatio: pixelRatio);
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData == null) {
+      throw Exception('Unable to render image.');
+    }
+    return byteData.buffer.asUint8List();
+  }
+
+  Future<void> _saveImageToDevice(Uint8List bytes) async {
+    final now = DateTime.now();
+    final stamp = DateFormat('yyyyMMdd_HHmmss').format(now);
+    final fileName = 'salesnote_receipt_$stamp.png';
+    final result = await SaverGallery.saveImage(
+      bytes,
+      fileName: fileName,
+      quality: 100,
+      skipIfExists: false,
+    );
+    if (!result.isSuccess) {
+      throw Exception(result.errorMessage ?? 'Unable to save image to gallery.');
     }
   }
 

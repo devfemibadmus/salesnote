@@ -1,13 +1,15 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:file_saver/file_saver.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:saver_gallery/saver_gallery.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../data/models.dart';
 import '../../services/currency.dart';

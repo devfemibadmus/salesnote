@@ -34,8 +34,11 @@ class SalePreviewScreen extends StatefulWidget {
 
 class _SalePreviewScreenState extends State<SalePreviewScreen> {
   bool _busy = false;
+  bool _fitsSinglePage = false;
   late final String _currencySymbol;
   late final String _currencyLocale;
+  final ScrollController _receiptScrollController = ScrollController();
+  final GlobalKey _receiptBoundaryKey = GlobalKey();
 
   @override
   void initState() {
@@ -43,6 +46,18 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     final ctx = CurrencyService.resolveContext();
     _currencyLocale = ctx.locale;
     _currencySymbol = ctx.symbol;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_receiptScrollController.hasClients) return;
+      _updateSinglePageFlag(
+        _receiptScrollController.position.maxScrollExtent <= 1,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _receiptScrollController.dispose();
+    super.dispose();
   }
 
   String _formatAmount(num amount) {
@@ -64,15 +79,15 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     }
   }
 
-  Future<void> _handleDownload() async {
+  Future<void> _handleDownloadPdf() async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
       final bytes = await _buildReceiptPdfBytes();
-      final file = await _savePdfToDevice(bytes);
+      await _savePdfToDevice(bytes);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('PDF downloaded: ${file.path}')),
+        const SnackBar(content: Text('PDF downloaded successfully.')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -86,12 +101,144 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     }
   }
 
+  Future<void> _handleDownloadImage() async {
+    if (_busy) return;
+    if (!_fitsSinglePage) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Image download is only available for single-page receipts.'),
+        ),
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final bytes = await _buildReceiptImageBytes();
+      await _saveImageToDevice(bytes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image saved to gallery.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to download image: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _handleShare() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final bytes = await _buildReceiptPdfBytes();
+      final fileName =
+          'salesnote_receipt_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+      await Share.shareXFiles(
+        [
+          XFile.fromData(
+            bytes,
+            mimeType: 'application/pdf',
+            name: fileName,
+          ),
+        ],
+        text: 'Salesnote receipt',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to share receipt: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _openActionsSheet() async {
+    if (_busy) return;
+    final action = await showModalBottomSheet<_ReceiptAction>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 54,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD1D9E6),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.download_rounded),
+                title: const Text('Download PDF'),
+                onTap: () => Navigator.of(context).pop(_ReceiptAction.downloadPdf),
+              ),
+              ListTile(
+                leading: const Icon(Icons.image_outlined),
+                title: const Text('Download Image'),
+                subtitle: !_fitsSinglePage
+                    ? const Text('Only available for single-page receipts')
+                    : null,
+                enabled: _fitsSinglePage,
+                onTap: _fitsSinglePage
+                    ? () => Navigator.of(context).pop(_ReceiptAction.downloadImage)
+                    : null,
+              ),
+              ListTile(
+                leading: const Icon(Icons.share_outlined),
+                title: const Text('Share'),
+                onTap: () => Navigator.of(context).pop(_ReceiptAction.share),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _ReceiptAction.downloadPdf:
+        await _handleDownloadPdf();
+        break;
+      case _ReceiptAction.downloadImage:
+        await _handleDownloadImage();
+        break;
+      case _ReceiptAction.share:
+        await _handleShare();
+        break;
+    }
+  }
+
+  void _updateSinglePageFlag(bool next) {
+    if (_fitsSinglePage == next) return;
+    setState(() => _fitsSinglePage = next);
+  }
+
   @override
   Widget build(BuildContext context) {
     final timestamp = widget.createdAt ?? DateTime.now();
     final dateText = DateFormat('MMM d, yyyy | HH:mm').format(timestamp);
     final receiptNo =
         widget.receiptNumber ?? '#REC-${timestamp.millisecondsSinceEpoch % 1000000}';
+    final customerName = widget.customerName.trim();
+    final customerContact = widget.customerContact.trim();
 
     return PopScope(
       canPop: !_busy,
@@ -127,25 +274,33 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFDDE6F2)),
-                  ),
-                  child: Stack(
-                    children: [
-                      const Positioned.fill(
-                        child: _ReceiptWatermark(text: 'Salesnote'),
+              child: NotificationListener<ScrollMetricsNotification>(
+                onNotification: (notification) {
+                  _updateSinglePageFlag(notification.metrics.maxScrollExtent <= 1);
+                  return false;
+                },
+                child: SingleChildScrollView(
+                  controller: _receiptScrollController,
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: RepaintBoundary(
+                    key: _receiptBoundaryKey,
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFDDE6F2)),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                      child: Stack(
+                        children: [
+                          const Positioned.fill(
+                            child: _ReceiptWatermark(text: 'Salesnote'),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                         Center(child: _PreviewShopAvatar(shop: widget.shop)),
                         const SizedBox(height: 12),
                         Center(
@@ -185,6 +340,55 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                             ),
                           ),
                         ),
+                        if (customerName.isNotEmpty ||
+                            customerContact.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE5ECF6)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'CUSTOMER',
+                                  style: TextStyle(
+                                    color: Color(0xFF8A9AB3),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                if (customerName.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    customerName,
+                                    style: const TextStyle(
+                                      color: Color(0xFF0E1930),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                                if (customerContact.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    customerContact,
+                                    style: const TextStyle(
+                                      color: Color(0xFF5A6C88),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 18),
                         const Divider(color: Color(0xFFE5ECF6), height: 1),
                         const SizedBox(height: 12),
@@ -286,10 +490,12 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                          ],
-                        ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -302,7 +508,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                 height: 58,
                 child: widget.isCreatedSale
                     ? OutlinedButton.icon(
-                        onPressed: _busy ? null : _handleDownload,
+                        onPressed: _busy ? null : _openActionsSheet,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF1C2D44),
                           side: const BorderSide(color: Color(0xFFD8E2EF)),
@@ -316,9 +522,9 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                                 height: 18,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Icon(Icons.download_rounded),
+                            : const Icon(Icons.more_horiz_rounded),
                         label: const Text(
-                          'Download PDF',
+                          'Receipt Actions',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -425,3 +631,5 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     );
   }
 }
+
+enum _ReceiptAction { downloadPdf, downloadImage, share }
