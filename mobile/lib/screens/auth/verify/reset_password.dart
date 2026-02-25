@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/api_client.dart';
+import '../../../services/token_store.dart';
+
 class ResetPassword extends StatefulWidget {
-  const ResetPassword({super.key});
+  const ResetPassword({
+    super.key,
+    required this.phoneOrEmail,
+    required this.code,
+  });
+
+  final String phoneOrEmail;
+  final String code;
 
   @override
   State<ResetPassword> createState() => _ResetPasswordState();
@@ -14,8 +24,10 @@ class _ResetPasswordState extends State<ResetPassword> {
 
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+  final _api = ApiClient(TokenStore());
   bool _showPassword = false;
   bool _showConfirm = false;
+  bool _loading = false;
   String? _passwordError;
   String? _confirmError;
 
@@ -26,7 +38,7 @@ class _ResetPasswordState extends State<ResetPassword> {
     super.dispose();
   }
 
-  void _reset() {
+  Future<void> _reset() async {
     final password = _password.text;
     final confirm = _confirm.text;
     setState(() {
@@ -53,7 +65,26 @@ class _ResetPasswordState extends State<ResetPassword> {
       setState(() => _confirmError = 'Passwords do not match.');
       return;
     }
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    try {
+      FocusManager.instance.primaryFocus?.unfocus();
+      setState(() => _loading = true);
+      await _api.resetPassword(widget.phoneOrEmail, widget.code, password.trim());
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Password reset successful. Please sign in.')),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.hideCurrentSnackBar();
+      final message = e is ApiException ? e.message : e.toString();
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -100,6 +131,7 @@ class _ResetPasswordState extends State<ResetPassword> {
               const SizedBox(height: 8),
               TextField(
                 controller: _password,
+                enabled: !_loading,
                 obscureText: !_showPassword,
                 onChanged: (_) {
                   if (_passwordError != null) {
@@ -138,6 +170,7 @@ class _ResetPasswordState extends State<ResetPassword> {
               const SizedBox(height: 8),
               TextField(
                 controller: _confirm,
+                enabled: !_loading,
                 obscureText: !_showConfirm,
                 onChanged: (_) {
                   if (_confirmError != null) {
@@ -176,9 +209,9 @@ class _ResetPasswordState extends State<ResetPassword> {
                       borderRadius: BorderRadius.circular(18),
                     ),
                   ),
-                  onPressed: _reset,
-                  child: const Text(
-                    'Reset password',
+                  onPressed: _loading ? null : _reset,
+                  child: Text(
+                    _loading ? 'Please wait...' : 'Reset password',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),

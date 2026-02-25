@@ -182,7 +182,7 @@ class ApiClient {
     return AuthResult(accessToken: '', shop: result.data);
   }
 
-  Future<void> forgotPassword(String email) async {
+  Future<void> forgotPassword(String phoneOrEmail) async {
     final uri = _uri('/auth/forgot-password');
     final headers = await _headers();
     final response = await _timedRequest(
@@ -191,7 +191,45 @@ class ApiClient {
       () => _client.post(
         uri,
         headers: headers,
-        body: jsonEncode({'email': email}),
+        body: jsonEncode({'phone_or_email': phoneOrEmail}),
+      ),
+    );
+    await _handle(response, (data) => data);
+  }
+
+  Future<void> verifyResetCode(String phoneOrEmail, String code) async {
+    final uri = _uri('/auth/verify-code');
+    final headers = await _headers();
+    final response = await _timedRequest(
+      'POST',
+      uri,
+      () => _client.post(
+        uri,
+        headers: headers,
+        body: jsonEncode({'phone_or_email': phoneOrEmail, 'code': code}),
+      ),
+    );
+    await _handle(response, (data) => data);
+  }
+
+  Future<void> resetPassword(
+    String phoneOrEmail,
+    String code,
+    String newPassword,
+  ) async {
+    final uri = _uri('/auth/reset-password');
+    final headers = await _headers();
+    final response = await _timedRequest(
+      'POST',
+      uri,
+      () => _client.post(
+        uri,
+        headers: headers,
+        body: jsonEncode({
+          'phone_or_email': phoneOrEmail,
+          'code': code,
+          'new_password': newPassword,
+        }),
       ),
     );
     await _handle(response, (data) => data);

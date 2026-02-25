@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../services/api_client.dart';
+import '../../../services/token_store.dart';
 import 'reset_password.dart';
 
 class VerifyCode extends StatefulWidget {
-  const VerifyCode({super.key});
+  const VerifyCode({super.key, required this.phoneOrEmail});
+
+  final String phoneOrEmail;
 
   @override
   State<VerifyCode> createState() => _VerifyCodeState();
@@ -17,10 +21,13 @@ class _VerifyCodeState extends State<VerifyCode> {
   static const _textDark = Color(0xFF0F172A);
   static const _textMuted = Color(0xFF64748B);
 
-  final _controllers = List.generate(4, (_) => TextEditingController());
-  final _focusNodes = List.generate(4, (_) => FocusNode());
+  final _controllers = List.generate(6, (_) => TextEditingController());
+  final _focusNodes = List.generate(6, (_) => FocusNode());
+  final _api = ApiClient(TokenStore());
   Timer? _resendTimer;
   int _resendSeconds = 120;
+  bool _loading = false;
+  String? _errorText;
 
   @override
   void initState() {
@@ -40,10 +47,53 @@ class _VerifyCodeState extends State<VerifyCode> {
     super.dispose();
   }
 
-  void _next() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ResetPassword()),
-    );
+  Future<void> _verify() async {
+    if (_loading) return;
+    if (!_isComplete()) {
+      setState(() => _errorText = 'Enter the 6-digit code.');
+      _showError('Enter the 6-digit code.');
+      return;
+    }
+
+    final code = _controllers.map((c) => c.text.trim()).join();
+    try {
+      FocusManager.instance.primaryFocus?.unfocus();
+      setState(() {
+        _loading = true;
+        _errorText = null;
+      });
+      await _api.verifyResetCode(widget.phoneOrEmail, code);
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              ResetPassword(phoneOrEmail: widget.phoneOrEmail, code: code),
+        ),
+      );
+    } catch (e) {
+      _showError(_errorMessage(e));
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _resend() async {
+    if (_resendSeconds != 0 || _loading) return;
+    try {
+      setState(() => _loading = true);
+      await _api.forgotPassword(widget.phoneOrEmail);
+      if (!mounted) return;
+      _showError('Code resent.');
+      _startResendTimer();
+    } catch (e) {
+      _showError(_errorMessage(e));
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   void _onChanged(int index, String value) {
@@ -57,8 +107,11 @@ class _VerifyCodeState extends State<VerifyCode> {
     if (value.isEmpty && index > 0) {
       _focusNodes[index - 1].requestFocus();
     }
+    if (_errorText != null) {
+      setState(() => _errorText = null);
+    }
     if (_isComplete()) {
-      _next();
+      _verify();
     }
   }
 
@@ -70,7 +123,7 @@ class _VerifyCodeState extends State<VerifyCode> {
     }
     if (digits.length >= _controllers.length) {
       _focusNodes.last.unfocus();
-      _next();
+      _verify();
     } else {
       _focusNodes[digits.length].requestFocus();
     }
@@ -78,6 +131,18 @@ class _VerifyCodeState extends State<VerifyCode> {
 
   bool _isComplete() {
     return _controllers.every((c) => c.text.trim().isNotEmpty);
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _errorMessage(Object error) {
+    if (error is ApiException) return error.message;
+    return error.toString();
   }
 
   void _startResendTimer() {
@@ -127,16 +192,16 @@ class _VerifyCodeState extends State<VerifyCode> {
               ),
               const SizedBox(height: 10),
               const Text(
-                'Enter the 4-digit code sent to your phone or email.',
+                'Enter the 6-digit code sent to your phone or email.',
                 style: TextStyle(fontSize: 18, color: _textMuted, height: 1.4),
               ),
               const SizedBox(height: 32),
               Center(
                 child: Wrap(
-                  spacing: 20,
-                  children: List.generate(4, (index) {
+                  spacing: 10,
+                  children: List.generate(6, (index) {
                     return SizedBox(
-                      width: 62,
+                      width: 48,
                       child: TextField(
                       controller: _controllers[index],
                       focusNode: _focusNodes[index],
@@ -169,6 +234,15 @@ class _VerifyCodeState extends State<VerifyCode> {
                   }),
                 ),
               ),
+              if (_errorText != null) ...[
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    _errorText!,
+                    style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),
+                  ),
+                ),
+              ],
               const SizedBox(height: 28),
               SizedBox(
                 width: double.infinity,
@@ -180,9 +254,9 @@ class _VerifyCodeState extends State<VerifyCode> {
                       borderRadius: BorderRadius.circular(18),
                     ),
                   ),
-                  onPressed: _next,
-                  child: const Text(
-                    'Verify',
+                  onPressed: _loading ? null : _verify,
+                  child: Text(
+                    _loading ? 'Please wait...' : 'Verify',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -190,7 +264,7 @@ class _VerifyCodeState extends State<VerifyCode> {
               const SizedBox(height: 16),
               Center(
                 child: TextButton(
-                  onPressed: _resendSeconds == 0 ? _startResendTimer : null,
+                  onPressed: _resendSeconds == 0 && !_loading ? _resend : null,
                   child: Text(
                     _resendSeconds == 0
                         ? 'Resend code'

@@ -81,29 +81,49 @@ class _ForgotPasswordState extends State<ForgotPassword> {
     });
   }
 
-
   Future<void> _next() async {
-    if (!_useEmail) {
-      setState(() => _errorText = 'Enter your email to receive a reset code.');
-      _showError('Enter your email to receive a reset code.');
-      return;
-    }
-
-    final input = _email.text.trim();
-    if (!Validators.isValidEmail(input)) {
-      setState(() => _errorText = 'Enter a valid email.');
-      _showError('Enter a valid email.');
-      return;
+    String phoneOrEmail;
+    if (_useEmail) {
+      final input = _email.text.trim();
+      if (!Validators.isValidEmail(input)) {
+        setState(() => _errorText = 'Enter a valid email.');
+        _showError('Enter a valid email.');
+        return;
+      }
+      phoneOrEmail = input.toLowerCase();
+    } else {
+      final input = _phoneOrEmail.text.trim();
+      if (input.isEmpty) {
+        setState(() => _phoneError = 'Enter a phone number.');
+        _showError('Enter a phone number.');
+        return;
+      }
+      final region = _country?.countryCode ?? _deviceRegionCode;
+      final normalized = await PhoneService.normalizeE164(
+        input,
+        region,
+        countryPhoneCode: _country?.phoneCode,
+      );
+      if (normalized == null) {
+        setState(() => _phoneError = 'Enter a valid phone number.');
+        _showError('Enter a valid phone number.');
+        return;
+      }
+      phoneOrEmail = normalized;
     }
     setState(() => _errorText = null);
 
     try {
       FocusManager.instance.primaryFocus?.unfocus();
       setState(() => _loading = true);
-      await _api.forgotPassword(input);
+      await _api.forgotPassword(phoneOrEmail);
       if (!mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const VerifyCode()),
+      Navigator.of(
+        context,
+      ).push(
+        MaterialPageRoute(
+          builder: (_) => VerifyCode(phoneOrEmail: phoneOrEmail),
+        ),
       );
     } catch (e) {
       _showError(_errorMessage(e));
@@ -116,11 +136,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _errorMessage(Object error) {
@@ -141,180 +157,198 @@ class _ForgotPasswordState extends State<ForgotPassword> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
               children: [
-              IconButton(
-                alignment: Alignment.centerLeft,
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Forgot Password',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: _textDark,
+                IconButton(
+                  alignment: Alignment.centerLeft,
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.arrow_back_ios_new, size: 20),
                 ),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Enter your phone or email to receive a reset code.',
-                style: TextStyle(fontSize: 18, color: _textMuted, height: 1.4),
-              ),
-              const SizedBox(height: 28),
-              const Text(
-                'Phone or Email',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: _textMuted,
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (_useEmail)
-                TextField(
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  enabled: !_loading,
-                  onChanged: (_) {
-                    if (_errorText != null) {
-                      setState(() => _errorText = null);
-                    }
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'name@email.com',
-                    hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    errorText: _errorText,
+                const SizedBox(height: 20),
+                const Text(
+                  'Forgot Password',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w800,
+                    color: _textDark,
                   ),
-                )
-              else
-                Row(
-                  children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        showCountryPicker(
-                          context: context,
-                          showPhoneCode: true,
-                          onSelect: (value) async {
-                            setState(() => _country = value);
-                          },
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              _country?.flagEmoji ?? '🇳🇬',
-                              style: const TextStyle(fontSize: 18),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '+${_country?.phoneCode ?? '234'}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF111827),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(Icons.keyboard_arrow_down, size: 18),
-                          ],
-                        ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Enter your phone or email to receive a reset code.',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: _textMuted,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                const Text(
+                  'Phone or Email',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: _textMuted,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (_useEmail)
+                  TextField(
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    enabled: !_loading,
+                    onChanged: (_) {
+                      if (_errorText != null) {
+                        setState(() => _errorText = null);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'name@email.com',
+                      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 18,
                       ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      errorText: _errorText,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _phoneOrEmail,
-                        keyboardType: TextInputType.phone,
-                        enabled: !_loading,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        onChanged: (_) {
-                          if (_errorText != null) {
-                            setState(() => _errorText = null);
-                          }
-                          _onPhoneChanged(_phoneOrEmail.text);
+                  )
+                else
+                  Row(
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          showCountryPicker(
+                            context: context,
+                            showPhoneCode: true,
+                            onSelect: (value) async {
+                              setState(() => _country = value);
+                            },
+                          );
                         },
-                        decoration: InputDecoration(
-                          hintText: '8104156984',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 16,
                           ),
-                          focusedBorder: OutlineInputBorder(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                _country?.flagEmoji ?? '🇳🇬',
+                                style: const TextStyle(fontSize: 18),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '+${_country?.phoneCode ?? '234'}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF111827),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(Icons.keyboard_arrow_down, size: 18),
+                            ],
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              if (!_useEmail && _phoneError != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  _phoneError!,
-                  style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),
-                ),
-              ],
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => setState(() {
-                    _useEmail = !_useEmail;
-                    _errorText = null;
-                  }),
-                  child: Text(
-                    _useEmail ? 'Use phone instead' : 'Use email instead',
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _phoneOrEmail,
+                          keyboardType: TextInputType.phone,
+                          enabled: !_loading,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          onChanged: (_) {
+                            if (_errorText != null) {
+                              setState(() => _errorText = null);
+                            }
+                            _onPhoneChanged(_phoneOrEmail.text);
+                          },
+                          decoration: InputDecoration(
+                            hintText: '8104156984',
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 18,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (!_useEmail && _phoneError != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _phoneError!,
                     style: const TextStyle(
-                      color: _textMuted,
-                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFDC2626),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () => setState(() {
+                      _useEmail = !_useEmail;
+                      _errorText = null;
+                    }),
+                    child: Text(
+                      _useEmail ? 'Use phone instead' : 'Use email instead',
+                      style: const TextStyle(
+                        color: _textMuted,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    onPressed: _loading ? null : _next,
+                    child: Text(
+                      _loading ? 'Please wait...' : 'Send reset code',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                  onPressed: _loading ? null : _next,
-                  child: Text(
-                    _loading ? 'Please wait...' : 'Send reset code',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                  ),
                 ),
-              ),
               ],
             ),
           ),
