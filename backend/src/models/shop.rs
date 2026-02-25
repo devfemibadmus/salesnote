@@ -35,7 +35,7 @@ pub struct ShopUpdateInput {
 pub struct ShopUpdatePayload {
     pub shop_id: i64,
     pub input: ShopUpdateInput,
-    pub password_hash: Option<String>,
+    pub password: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -49,7 +49,7 @@ pub struct AuthorizedShopUpdatePayload {
     pub shop_id: i64,
     pub device_id: i64,
     pub input: ShopUpdateInput,
-    pub password_hash: Option<String>,
+    pub password: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -101,7 +101,10 @@ impl ShopProfile {
                 address = COALESCE($4, address),
                 logo_url = COALESCE($5, logo_url),
                 timezone = COALESCE($6, timezone),
-                password_hash = COALESCE($7, password_hash)
+                password_hash = CASE
+                  WHEN $7 IS NULL THEN password_hash
+                  ELSE crypt($7, gen_salt('bf', 12))
+                END
              WHERE id = $8",
         )
         .bind(&payload.input.name)
@@ -110,7 +113,7 @@ impl ShopProfile {
         .bind(&payload.input.address)
         .bind(&payload.input.logo_url)
         .bind(&payload.input.timezone)
-        .bind(&payload.password_hash)
+        .bind(&payload.password)
         .bind(payload.shop_id)
         .execute(pool)
         .await?;
@@ -264,7 +267,10 @@ impl ShopProfile {
               address = COALESCE($6, s.address),
               logo_url = COALESCE($7, s.logo_url),
               timezone = COALESCE($8, s.timezone),
-              password_hash = COALESCE($9, s.password_hash)
+              password_hash = CASE
+                WHEN $9 IS NULL THEN s.password_hash
+                ELSE crypt($9, gen_salt('bf', 12))
+              END
             WHERE s.id = $1
               AND EXISTS (SELECT 1 FROM auth_active)
             RETURNING
@@ -284,7 +290,7 @@ impl ShopProfile {
             .bind(payload.input.address.as_deref())
             .bind(payload.input.logo_url.as_deref())
             .bind(payload.input.timezone.as_deref())
-            .bind(payload.password_hash.as_deref())
+            .bind(payload.password.as_deref())
             .fetch_optional(pool)
             .await?;
 

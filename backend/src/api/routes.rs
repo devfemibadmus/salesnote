@@ -14,7 +14,9 @@ pub fn init_routes(cfg: &mut web::ServiceConfig, state: AppState) {
             .route("/register", web::post().to(register))
             .route("/login", web::post().to(login))
             .route("/refresh", web::post().to(refresh_token))
-            .route("/forgot-password", web::post().to(forgot_password)),
+            .route("/forgot-password", web::post().to(forgot_password))
+            .route("/verify-code", web::post().to(verify_code))
+            .route("/reset-password", web::post().to(reset_password)),
     );
 
     cfg.service(

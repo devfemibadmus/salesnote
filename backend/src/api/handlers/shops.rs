@@ -2,7 +2,6 @@ use actix_multipart::Multipart;
 use actix_web::http::StatusCode;
 use actix_web::web::ReqData;
 use actix_web::{web, HttpResponse, Responder};
-use argon2::PasswordHasher;
 use futures_util::StreamExt;
 use image::codecs::jpeg::JpegEncoder;
 use serde::Serialize;
@@ -368,20 +367,7 @@ pub async fn update_my_shop(
         return json_error(StatusCode::BAD_REQUEST, message);
     }
 
-    let mut password_hash: Option<String> = None;
-    if let Some(password) = &input.password {
-        let salt = argon2::password_hash::SaltString::generate(
-            &mut argon2::password_hash::rand_core::OsRng,
-        );
-        let hash = match argon2::Argon2::default().hash_password(password.as_bytes(), &salt) {
-            Ok(h) => h.to_string(),
-            Err(e) => {
-                tracing::error!("hash error: {}", e);
-                return json_error(StatusCode::INTERNAL_SERVER_ERROR, "password error");
-            }
-        };
-        password_hash = Some(hash);
-    }
+    let password = input.password.clone();
 
     match ShopProfile::update_authorized(
         &state.pool,
@@ -389,7 +375,7 @@ pub async fn update_my_shop(
             shop_id: *shop_id,
             device_id: (*device_id).0,
             input,
-            password_hash,
+            password,
         },
     )
     .await

@@ -12,9 +12,10 @@ use crate::api::response::{json_created, json_error, json_ok};
 use crate::api::state::AppState;
 use crate::api::middlewares::auth::AuthDeviceId;
 use crate::models::{
-    build_token, hash_password, AuthForgotPasswordInput, AuthLoginInput,
+    build_token, AuthForgotPasswordInput, AuthLoginInput,
     AuthLoginResponse, AuthRefreshInput, AuthRegisterInput, Claims,
     DeviceSession, ShopAuthRecord, ShopProfile, LoginOneStepPayload, LoginOneStepResult,
+    AuthVerifyCodeInput, AuthResetPasswordInput, ResetPasswordResult,
     AuthorizedDeviceListPayload, AuthorizedDeviceDeletePayload,
 };
 
@@ -35,15 +36,10 @@ pub async fn register(
         return json_error(StatusCode::BAD_REQUEST, msg);
     }
 
-    let password_hash = match hash_password(&input.password) {
-        Ok(hash) => hash,
-        Err(_) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, "password error"),
-    };
-
     match ShopProfile::create_with_welcome_email(
         &state.pool,
         &input,
-        &password_hash,
+        &input.password,
         &state.dashboard_url,
     )
     .await
@@ -180,21 +176,26 @@ pub async fn forgot_password(
     state: web::Data<AppState>,
     payload: web::Json<AuthForgotPasswordInput>,
 ) -> impl Responder {
-    let email = payload.email.trim().to_lowercase();
-    if email.is_empty() {
-        return json_error(StatusCode::BAD_REQUEST, "email required");
-    }
-    if email.len() > 50 {
-        return json_error(StatusCode::BAD_REQUEST, "email too long");
-    }
-    if !is_valid_email(&email) {
-        return json_error(StatusCode::BAD_REQUEST, "invalid email");
-    }
+    let Some(phone_or_email) = normalize_phone_or_email(
+        payload.phone_or_email.as_deref(),
+        payload.email.as_deref(),
+    ) else {
+        return json_error(StatusCode::BAD_REQUEST, "phone_or_email required");
+    };
 
     let mut rng = rand::thread_rng();
     let code = format!("{:06}", rng.gen_range(0..=999_999));
+    let window_minutes = state.forgot_password_window_minutes.max(1);
+    let max_requests = state.forgot_password_max_requests.max(1);
 
-    let result = match ShopAuthRecord::create_forgot_password_request(&state.pool, &email, &code).await
+    let result = match ShopAuthRecord::create_forgot_password_request(
+        &state.pool,
+        &phone_or_email,
+        &code,
+        window_minutes,
+        max_requests,
+    )
+    .await
     {
         Ok(v) => v,
         Err(e) => {
@@ -206,14 +207,110 @@ pub async fn forgot_password(
         }
     };
 
-    if result.has_shop && result.request_count >= 2 {
+    let max_requests_i32 = i32::try_from(max_requests).unwrap_or(i32::MAX);
+    if result.has_shop && result.request_count >= max_requests_i32 {
         return json_error(
             StatusCode::TOO_MANY_REQUESTS,
             "Too many requests. Try again later.",
         );
     }
 
-    json_ok("If that email exists, a reset code has been sent.")
+    json_ok("If that account exists, a reset code has been sent.")
+}
+
+pub async fn verify_code(
+    state: web::Data<AppState>,
+    payload: web::Json<AuthVerifyCodeInput>,
+) -> impl Responder {
+    let Some(phone_or_email) = normalize_strict_phone_or_email(&payload.phone_or_email) else {
+        return json_error(StatusCode::BAD_REQUEST, "invalid phone or email");
+    };
+
+    let code = payload.code.trim();
+    if !is_valid_reset_code(code) {
+        return json_error(StatusCode::BAD_REQUEST, "invalid code");
+    }
+    let max_incorrect_attempts = state.reset_code_max_incorrect_attempts.max(1);
+
+    let result = match ShopAuthRecord::verify_reset_code(
+        &state.pool,
+        &phone_or_email,
+        code,
+        max_incorrect_attempts,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!("verify code flow error: {}", e);
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            );
+        }
+    };
+
+    if result.too_many_attempts {
+        return json_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many incorrect attempts. Request a new code.",
+        );
+    }
+
+    if !result.has_shop || !result.is_valid {
+        return json_error(StatusCode::UNAUTHORIZED, "invalid or expired code");
+    }
+
+    json_ok("Code verified")
+}
+
+pub async fn reset_password(
+    state: web::Data<AppState>,
+    payload: web::Json<AuthResetPasswordInput>,
+) -> impl Responder {
+    let Some(phone_or_email) = normalize_strict_phone_or_email(&payload.phone_or_email) else {
+        return json_error(StatusCode::BAD_REQUEST, "invalid phone or email");
+    };
+
+    let code = payload.code.trim();
+    if !is_valid_reset_code(code) {
+        return json_error(StatusCode::BAD_REQUEST, "invalid code");
+    }
+
+    let password = payload.new_password.trim();
+    if password.len() < 5 {
+        return json_error(StatusCode::BAD_REQUEST, "password must be at least 5 characters");
+    }
+    if password.len() > 20 {
+        return json_error(StatusCode::BAD_REQUEST, "password must be 20 characters or less");
+    }
+    let max_incorrect_attempts = state.reset_code_max_incorrect_attempts.max(1);
+
+    match ShopAuthRecord::reset_password_with_code(
+        &state.pool,
+        &phone_or_email,
+        code,
+        password,
+        max_incorrect_attempts,
+    )
+    .await
+    {
+        Ok(ResetPasswordResult::Success) => json_ok("Password reset successful."),
+        Ok(ResetPasswordResult::TooManyAttempts) => json_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many incorrect attempts. Request a new code.",
+        ),
+        Ok(ResetPasswordResult::InvalidCode) => {
+            json_error(StatusCode::UNAUTHORIZED, "invalid or expired code")
+        }
+        Err(e) => {
+            tracing::error!("reset password flow error: {}", e);
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
+        }
+    }
 }
 
 pub async fn list_devices(
@@ -391,6 +488,41 @@ fn is_valid_phone(phone: &str) -> bool {
         return false;
     }
     !digits.starts_with('0')
+}
+
+fn normalize_phone_or_email(
+    phone_or_email: Option<&str>,
+    email_fallback: Option<&str>,
+) -> Option<String> {
+    let primary = phone_or_email.unwrap_or("").trim();
+    let fallback = email_fallback.unwrap_or("").trim();
+    let value = if !primary.is_empty() { primary } else { fallback };
+    normalize_strict_phone_or_email(value)
+}
+
+fn normalize_strict_phone_or_email(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+
+    if trimmed.contains('@') {
+        let email = trimmed.to_lowercase();
+        if email.len() > 50 || !is_valid_email(&email) {
+            return None;
+        }
+        return Some(email);
+    }
+
+    if !is_valid_phone(trimmed) {
+        return None;
+    }
+
+    Some(trimmed.to_string())
+}
+
+fn is_valid_reset_code(value: &str) -> bool {
+    value.len() == 6 && value.chars().all(|ch| ch.is_ascii_digit())
 }
 
 fn count_words(text: &str) -> usize {

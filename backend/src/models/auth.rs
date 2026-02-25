@@ -1,7 +1,5 @@
-use argon2::password_hash::{rand_core::OsRng, SaltString};
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
 use jsonwebtoken::{encode, EncodingKey, Header};
-use rand::RngCore;
+use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::Row;
@@ -31,7 +29,23 @@ pub struct AuthLoginInput {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AuthForgotPasswordInput {
-    pub email: String,
+    #[serde(default)]
+    pub phone_or_email: Option<String>,
+    #[serde(default)]
+    pub email: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AuthVerifyCodeInput {
+    pub phone_or_email: String,
+    pub code: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct AuthResetPasswordInput {
+    pub phone_or_email: String,
+    pub code: String,
+    pub new_password: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -57,7 +71,7 @@ pub struct Claims {
 #[derive(Debug, Clone)]
 pub struct CreateShopPayload {
     pub input: AuthRegisterInput,
-    pub password_hash: String,
+    pub password: String,
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +156,20 @@ pub struct RefreshSessionResult {
 pub struct ForgotPasswordResult {
     pub has_shop: bool,
     pub request_count: i32,
+}
+
+#[derive(Debug)]
+pub struct VerifyResetCodeResult {
+    pub has_shop: bool,
+    pub is_valid: bool,
+    pub too_many_attempts: bool,
+}
+
+#[derive(Debug)]
+pub enum ResetPasswordResult {
+    Success,
+    InvalidCode,
+    TooManyAttempts,
 }
 #[derive(Debug)]
 pub struct ShopAuthRecord {
@@ -378,50 +406,149 @@ impl ShopAuthRecord {
         pool: &sqlx::PgPool,
         payload: &LoginOneStepPayload,
     ) -> Result<LoginOneStepResult, sqlx::Error> {
-        let find = FindShopPayload {
-            phone_or_email: payload.phone_or_email.clone(),
-        };
-        let Some(record) = Self::find_for_login(pool, &find).await? else {
-            return Ok(LoginOneStepResult::InvalidCredentials);
-        };
+        let refresh_token = generate_refresh_token();
+        let refresh_hash = hash_refresh_token(&refresh_token);
 
-        if let Some(locked_until) = record.locked_until.as_deref() {
-            let locked = chrono::DateTime::parse_from_rfc3339(locked_until)
-                .map(|dt| dt.with_timezone(&chrono::Utc) > chrono::Utc::now())
-                .or_else(|_| {
-                    chrono::DateTime::parse_from_str(locked_until, "%Y-%m-%d %H:%M:%S")
-                        .map(|dt| dt.with_timezone(&chrono::Utc) > chrono::Utc::now())
-                })
-                .unwrap_or(false);
-            if locked {
-                return Ok(LoginOneStepResult::Locked);
-            }
+        let row = sqlx::query(
+            "WITH login_target AS (
+               SELECT id, password_hash, failed_login_attempts, locked_until
+               FROM shops
+               WHERE phone = $1 OR email = $2
+               LIMIT 1
+             ),
+             login_state AS (
+               SELECT
+                 id AS shop_id,
+                 CASE
+                   WHEN locked_until IS NOT NULL AND locked_until > NOW() THEN 'locked'
+                   WHEN password_hash LIKE '$argon2%' THEN 'legacy'
+                   WHEN (
+                     password_hash LIKE '$2a$%' OR
+                     password_hash LIKE '$2b$%' OR
+                     password_hash LIKE '$2y$%'
+                   ) AND crypt($3, password_hash) = password_hash THEN 'success'
+                   ELSE 'invalid'
+                 END AS status
+               FROM login_target
+             ),
+             failed_login AS (
+               UPDATE shops s
+               SET failed_login_attempts = s.failed_login_attempts + 1,
+                   locked_until = CASE
+                     WHEN s.failed_login_attempts + 1 >= $12 THEN NOW() + ($13 || ' minutes')::interval
+                     ELSE s.locked_until
+                   END
+               WHERE s.id = (SELECT shop_id FROM login_state WHERE status = 'invalid')
+               RETURNING s.id
+             ),
+             clear_lock AS (
+               UPDATE shops s
+               SET failed_login_attempts = 0, locked_until = NULL
+               WHERE s.id = (SELECT shop_id FROM login_state WHERE status = 'success')
+                 AND (s.failed_login_attempts <> 0 OR s.locked_until IS NOT NULL)
+               RETURNING s.id
+             ),
+             existing_device AS (
+               SELECT d.id
+               FROM device_sessions d
+               JOIN login_state ls ON ls.shop_id = d.shop_id
+               WHERE ls.status = 'success'
+                 AND d.deleted_at IS NULL
+                 AND d.device_name IS NOT DISTINCT FROM $4
+                 AND d.device_platform IS NOT DISTINCT FROM $5
+                 AND d.device_os IS NOT DISTINCT FROM $6
+               ORDER BY d.last_seen_at DESC
+               LIMIT 1
+             ),
+             updated_device AS (
+               UPDATE device_sessions d
+               SET ip_address = $7,
+                   location = $8,
+                   user_agent = $9,
+                   last_seen_at = NOW()
+               WHERE d.id IN (SELECT id FROM existing_device)
+               RETURNING d.id
+             ),
+             inserted_device AS (
+               INSERT INTO device_sessions (shop_id, device_name, device_platform, device_os, ip_address, location, user_agent)
+               SELECT ls.shop_id, $4, $5, $6, $7, $8, $9
+               FROM login_state ls
+               WHERE ls.status = 'success'
+                 AND NOT EXISTS (SELECT 1 FROM updated_device)
+               RETURNING id
+             ),
+             device_row AS (
+               SELECT id FROM updated_device
+               UNION ALL
+               SELECT id FROM inserted_device
+               LIMIT 1
+             ),
+             revoke_old AS (
+               UPDATE refresh_tokens
+               SET revoked_at = NOW()
+               WHERE shop_id = (SELECT shop_id FROM login_state WHERE status = 'success')
+                 AND device_session_id = (SELECT id FROM device_row)
+                 AND revoked_at IS NULL
+               RETURNING id
+             ),
+             insert_refresh AS (
+               INSERT INTO refresh_tokens (shop_id, device_session_id, token_hash, expires_at)
+               SELECT ls.shop_id, (SELECT id FROM device_row), $10, NOW() + ($11 || ' days')::interval
+               FROM login_state ls
+               WHERE ls.status = 'success'
+               RETURNING id
+             ),
+             shop_row AS (
+               SELECT id, name, phone, email, address, logo_url,
+                      total_revenue, total_orders, total_customers, timezone,
+                      created_at::text AS created_at
+               FROM shops
+               WHERE id = (SELECT shop_id FROM login_state WHERE status = 'success')
+             )
+             SELECT
+               COALESCE((SELECT status FROM login_state LIMIT 1), 'missing') AS login_status,
+               (SELECT id FROM device_row LIMIT 1) AS device_id,
+               (SELECT row_to_json(shop_row) FROM shop_row) AS shop_json",
+        )
+        .bind(&payload.phone_or_email)
+        .bind(&payload.phone_or_email)
+        .bind(&payload.password)
+        .bind(&payload.device_name)
+        .bind(&payload.device_platform)
+        .bind(&payload.device_os)
+        .bind(&payload.ip_address)
+        .bind(&payload.location)
+        .bind(&payload.user_agent)
+        .bind(&refresh_hash)
+        .bind(payload.refresh_token_days)
+        .bind(payload.max_failed_attempts)
+        .bind(payload.lock_minutes)
+        .fetch_one(pool)
+        .await?;
+
+        let status = row.get::<String, _>("login_status");
+        if status == "locked" {
+            return Ok(LoginOneStepResult::Locked);
+        }
+        if status != "success" {
+            return Ok(LoginOneStepResult::InvalidCredentials);
         }
 
-        if !verify_password(&record.password_hash, &payload.password) {
-            Self::record_failed_login(
-                pool,
-                record.id,
-                payload.max_failed_attempts,
-                payload.lock_minutes,
-            )
-            .await?;
-            return Ok(LoginOneStepResult::InvalidCredentials);
-        }
+        let device_session_id = row.get::<Option<i64>, _>("device_id").ok_or_else(|| {
+            sqlx::Error::Protocol("missing device session id from login query".into())
+        })?;
+        let shop_json = row
+            .get::<Option<serde_json::Value>, _>("shop_json")
+            .ok_or_else(|| sqlx::Error::Protocol("missing shop payload from login query".into()))?;
+        let shop: ShopProfile = serde_json::from_value(shop_json).map_err(|e| {
+            sqlx::Error::Protocol(format!("invalid shop json from login query: {}", e))
+        })?;
 
-        let session_payload = LoginSessionPayload {
-            shop_id: record.id,
-            device_name: payload.device_name.clone(),
-            device_platform: payload.device_platform.clone(),
-            device_os: payload.device_os.clone(),
-            ip_address: payload.ip_address.clone(),
-            location: payload.location.clone(),
-            user_agent: payload.user_agent.clone(),
-            refresh_token_days: payload.refresh_token_days,
-        };
-
-        let session = Self::create_login_session(pool, &session_payload).await?;
-        Ok(LoginOneStepResult::Success(session))
+        Ok(LoginOneStepResult::Success(LoginSessionResult {
+            device_session_id,
+            shop,
+            refresh_token,
+        }))
     }
 
     pub async fn reset_code_count(
@@ -636,12 +763,17 @@ impl ShopAuthRecord {
 
     pub async fn create_forgot_password_request(
         pool: &sqlx::PgPool,
-        email: &str,
+        phone_or_email: &str,
         code: &str,
+        window_minutes: i64,
+        max_requests: i64,
     ) -> Result<ForgotPasswordResult, sqlx::Error> {
         let row = sqlx::query(
             "WITH shop_row AS (
-               SELECT id FROM shops WHERE email = $1 LIMIT 1
+               SELECT id, email
+               FROM shops
+               WHERE phone = $1 OR email = $2
+               LIMIT 1
              ),
              request_count AS (
                SELECT
@@ -650,21 +782,21 @@ impl ShopAuthRecord {
                      SELECT COUNT(*)::int
                      FROM password_reset_codes
                      WHERE shop_id = (SELECT id FROM shop_row)
-                       AND created_at >= NOW() - interval '120 minutes'
+                       AND created_at >= NOW() - make_interval(mins => $4)
                    )
                    ELSE 0
                  END AS cnt
              ),
              inserted_code AS (
                INSERT INTO password_reset_codes (shop_id, code, expires_at)
-               SELECT (SELECT id FROM shop_row), $2, NOW() + interval '10 minutes'
+               SELECT (SELECT id FROM shop_row), $3, NOW() + interval '10 minutes'
                WHERE EXISTS(SELECT 1 FROM shop_row)
-                 AND (SELECT cnt FROM request_count) < 2
+                 AND (SELECT cnt FROM request_count) < $5
                RETURNING shop_id
              ),
              inserted_email AS (
                INSERT INTO email_outbox (to_email, template, payload)
-               SELECT $1, 'password_reset_code', json_build_object('code', $2)
+               SELECT (SELECT email FROM shop_row), 'password_reset_code', json_build_object('code', $3)
                WHERE EXISTS(SELECT 1 FROM inserted_code)
                RETURNING id
              )
@@ -672,8 +804,11 @@ impl ShopAuthRecord {
                EXISTS(SELECT 1 FROM shop_row) AS has_shop,
                (SELECT cnt FROM request_count) AS request_count",
         )
-        .bind(email)
+        .bind(phone_or_email)
+        .bind(phone_or_email)
         .bind(code)
+        .bind(window_minutes)
+        .bind(max_requests)
         .fetch_one(pool)
         .await?;
 
@@ -681,6 +816,175 @@ impl ShopAuthRecord {
             has_shop: row.get("has_shop"),
             request_count: row.get("request_count"),
         })
+    }
+
+    pub async fn verify_reset_code(
+        pool: &sqlx::PgPool,
+        phone_or_email: &str,
+        code: &str,
+        max_incorrect_attempts: i64,
+    ) -> Result<VerifyResetCodeResult, sqlx::Error> {
+        let row = sqlx::query(
+            "WITH shop_row AS (
+               SELECT id
+               FROM shops
+               WHERE phone = $1 OR email = $2
+               LIMIT 1
+             ),
+             latest_code AS (
+               SELECT id, code, failed_attempts
+               FROM password_reset_codes
+               WHERE shop_id = (SELECT id FROM shop_row)
+                 AND expires_at > NOW()
+               ORDER BY created_at DESC
+               LIMIT 1
+             ),
+             valid_code AS (
+               SELECT id
+               FROM latest_code
+               WHERE code = $3
+                 AND failed_attempts < $4
+             ),
+             bumped AS (
+               UPDATE password_reset_codes prc
+               SET failed_attempts = prc.failed_attempts + 1
+               WHERE prc.id = (
+                 SELECT id
+                 FROM latest_code
+                 WHERE code <> $3
+                   AND failed_attempts < $4
+               )
+               RETURNING prc.failed_attempts
+             )
+             SELECT
+               EXISTS(SELECT 1 FROM shop_row) AS has_shop,
+               EXISTS(SELECT 1 FROM valid_code) AS is_valid,
+               EXISTS(SELECT 1 FROM latest_code) AS has_active_code,
+               COALESCE(
+                 (SELECT failed_attempts FROM bumped LIMIT 1),
+                 (SELECT failed_attempts FROM latest_code LIMIT 1),
+                 0
+               ) AS failed_after_attempt",
+        )
+        .bind(phone_or_email)
+        .bind(phone_or_email)
+        .bind(code)
+        .bind(max_incorrect_attempts)
+        .fetch_one(pool)
+        .await?;
+
+        let max_attempts_i32 = i32::try_from(max_incorrect_attempts).unwrap_or(i32::MAX);
+        let has_shop: bool = row.get("has_shop");
+        let is_valid: bool = row.get("is_valid");
+        let has_active_code: bool = row.get("has_active_code");
+        let failed_after_attempt: i32 = row.get("failed_after_attempt");
+
+        Ok(VerifyResetCodeResult {
+            has_shop,
+            is_valid,
+            too_many_attempts: has_shop
+                && has_active_code
+                && !is_valid
+                && failed_after_attempt >= max_attempts_i32,
+        })
+    }
+
+    pub async fn reset_password_with_code(
+        pool: &sqlx::PgPool,
+        phone_or_email: &str,
+        code: &str,
+        new_password: &str,
+        max_incorrect_attempts: i64,
+    ) -> Result<ResetPasswordResult, sqlx::Error> {
+        let row = sqlx::query(
+            "WITH shop_row AS (
+               SELECT id
+               FROM shops
+               WHERE phone = $1 OR email = $2
+               LIMIT 1
+             ),
+             latest_code AS (
+               SELECT id, shop_id, code, failed_attempts
+               FROM password_reset_codes
+               WHERE shop_id = (SELECT id FROM shop_row)
+                 AND expires_at > NOW()
+               ORDER BY created_at DESC
+               LIMIT 1
+             ),
+             valid_code AS (
+               SELECT id, shop_id
+               FROM latest_code
+               WHERE code = $3
+                 AND failed_attempts < $5
+             ),
+             bumped AS (
+               UPDATE password_reset_codes prc
+               SET failed_attempts = prc.failed_attempts + 1
+               WHERE prc.id = (
+                 SELECT id
+                 FROM latest_code
+                 WHERE code <> $3
+                   AND failed_attempts < $5
+               )
+               RETURNING prc.failed_attempts
+             ),
+             updated_shop AS (
+               UPDATE shops
+               SET password_hash = crypt($4, gen_salt('bf', 12)),
+                   failed_login_attempts = 0,
+                   locked_until = NULL
+               WHERE id = (SELECT shop_id FROM valid_code)
+               RETURNING id
+             ),
+             delete_codes AS (
+               DELETE FROM password_reset_codes
+               WHERE shop_id = (SELECT id FROM updated_shop)
+               RETURNING id
+             ),
+             revoke_tokens AS (
+               UPDATE refresh_tokens
+               SET revoked_at = NOW()
+               WHERE shop_id = (SELECT id FROM updated_shop)
+                 AND revoked_at IS NULL
+               RETURNING id
+             ),
+             close_sessions AS (
+               UPDATE device_sessions
+               SET deleted_at = NOW()
+               WHERE shop_id = (SELECT id FROM updated_shop)
+                 AND deleted_at IS NULL
+               RETURNING id
+             )
+             SELECT
+               EXISTS(SELECT 1 FROM updated_shop) AS updated,
+               EXISTS(SELECT 1 FROM latest_code) AS has_active_code,
+               COALESCE(
+                 (SELECT failed_attempts FROM bumped LIMIT 1),
+                 (SELECT failed_attempts FROM latest_code LIMIT 1),
+                 0
+               ) AS failed_after_attempt",
+        )
+        .bind(phone_or_email)
+        .bind(phone_or_email)
+        .bind(code)
+        .bind(new_password)
+        .bind(max_incorrect_attempts)
+        .fetch_one(pool)
+        .await?;
+
+        let updated: bool = row.get("updated");
+        if updated {
+            return Ok(ResetPasswordResult::Success);
+        }
+
+        let has_active_code: bool = row.get("has_active_code");
+        let failed_after_attempt: i32 = row.get("failed_after_attempt");
+        let max_attempts_i32 = i32::try_from(max_incorrect_attempts).unwrap_or(i32::MAX);
+        if has_active_code && failed_after_attempt >= max_attempts_i32 {
+            return Ok(ResetPasswordResult::TooManyAttempts);
+        }
+
+        Ok(ResetPasswordResult::InvalidCode)
     }
 }
 
@@ -691,13 +995,13 @@ impl ShopProfile {
     ) -> Result<ShopProfile, sqlx::Error> {
         let row = sqlx::query(
             "INSERT INTO shops (name, phone, email, password_hash, address, logo_url, timezone)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             VALUES ($1, $2, $3, crypt($4, gen_salt('bf', 12)), $5, $6, $7)
              RETURNING id, created_at::text as created_at",
         )
         .bind(&payload.input.shop_name)
         .bind(&payload.input.phone)
         .bind(&payload.input.email)
-        .bind(&payload.password_hash)
+        .bind(&payload.password)
         .bind(&payload.input.address)
         .bind(&payload.input.logo_url)
         .bind(&payload.input.timezone)
@@ -725,13 +1029,13 @@ impl ShopProfile {
     pub async fn create_with_welcome_email(
         pool: &sqlx::PgPool,
         input: &AuthRegisterInput,
-        password_hash: &str,
+        password: &str,
         dashboard_url: &str,
     ) -> Result<ShopProfile, sqlx::Error> {
         let row = sqlx::query(
             "WITH inserted_shop AS (
                INSERT INTO shops (name, phone, email, password_hash, address, logo_url, timezone)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)
+               VALUES ($1, $2, $3, crypt($4, gen_salt('bf', 12)), $5, $6, $7)
                RETURNING id, name, phone, email, address, logo_url,
                          total_revenue, total_orders, total_customers, timezone,
                          created_at::text AS created_at
@@ -747,7 +1051,7 @@ impl ShopProfile {
         .bind(&input.shop_name)
         .bind(&input.phone)
         .bind(&input.email)
-        .bind(password_hash)
+        .bind(password)
         .bind(&input.address)
         .bind(&input.logo_url)
         .bind(&input.timezone)
@@ -761,24 +1065,6 @@ impl ShopProfile {
         })?;
         Ok(shop)
     }
-}
-
-pub fn hash_password(password: &str) -> Result<String, ()> {
-    let salt = SaltString::generate(&mut OsRng);
-    Argon2::default()
-        .hash_password(password.as_bytes(), &salt)
-        .map(|h| h.to_string())
-        .map_err(|_| ())
-}
-
-pub fn verify_password(hash: &str, password: &str) -> bool {
-    let parsed = PasswordHash::new(hash);
-    let Ok(parsed) = parsed else {
-        return false;
-    };
-    Argon2::default()
-        .verify_password(password.as_bytes(), &parsed)
-        .is_ok()
 }
 
 pub fn build_token(shop_id: i64, device_session_id: Option<i64>, jwt_secret: &str) -> Result<String, ()> {

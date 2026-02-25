@@ -28,6 +28,12 @@ pub struct Settings {
     pub jwt_secret: String,
     pub refresh_token_days: i64,
     pub rate_limit_per_minute: u32,
+    #[serde(default = "default_forgot_password_max_requests")]
+    pub forgot_password_max_requests: i64,
+    #[serde(default = "default_forgot_password_window_minutes")]
+    pub forgot_password_window_minutes: i64,
+    #[serde(default = "default_reset_code_max_incorrect_attempts")]
+    pub reset_code_max_incorrect_attempts: i64,
     pub redis_url: String,
     pub smtp_host: String,
     pub smtp_port: u16,
@@ -344,6 +350,18 @@ fn default_pool_max_size() -> u32 {
 
 fn default_pool_min_idle() -> u32 {
     10
+}
+
+fn default_forgot_password_max_requests() -> i64 {
+    2
+}
+
+fn default_forgot_password_window_minutes() -> i64 {
+    120
+}
+
+fn default_reset_code_max_incorrect_attempts() -> i64 {
+    5
 }
 
 fn default_enable_backtrace() -> bool {
