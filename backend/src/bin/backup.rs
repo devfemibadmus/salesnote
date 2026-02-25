@@ -27,10 +27,7 @@ async fn main() -> std::io::Result<()> {
         std::fs::create_dir_all(parent).expect("failed to create backup directory");
     }
 
-    tracing::info!(
-        "backing up postgres database -> {}",
-        backup_path.display()
-    );
+    tracing::info!("backing up postgres database -> {}", backup_path.display());
 
     let status = Command::new("pg_dump")
         .arg("--dbname")

@@ -75,12 +75,8 @@ where
                         Ok(id) => id,
                         Err(_) => {
                             let (req, _pl) = req.into_parts();
-                            let response =
-                                json_error(StatusCode::UNAUTHORIZED, "unauthorized");
-                            return Ok(ServiceResponse::new(
-                                req,
-                                response.map_into_right_body(),
-                            ));
+                            let response = json_error(StatusCode::UNAUTHORIZED, "unauthorized");
+                            return Ok(ServiceResponse::new(req, response.map_into_right_body()));
                         }
                     };
 
@@ -106,8 +102,7 @@ where
                 }
                 Err(_) => {
                     let (req, _pl) = req.into_parts();
-                    let response =
-                        json_error(StatusCode::UNAUTHORIZED, "unauthorized");
+                    let response = json_error(StatusCode::UNAUTHORIZED, "unauthorized");
                     Ok(ServiceResponse::new(req, response.map_into_right_body()))
                 }
             }

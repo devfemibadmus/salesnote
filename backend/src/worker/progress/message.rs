@@ -53,8 +53,8 @@ pub fn build_progress_message(input: ProgressInput) -> Option<NotificationMessag
         });
     }
 
-    let percent = ((input.previous_sales as f64) / (input.current_sales as f64) * 100.0)
-        .round() as i64;
+    let percent =
+        ((input.previous_sales as f64) / (input.current_sales as f64) * 100.0).round() as i64;
     let mut body = format!(
         "This time last {} you were making {}% of what you're making this {}. Last {}: {} sales. This {}: {} sales.",
         input.period_label,

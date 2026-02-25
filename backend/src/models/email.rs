@@ -1,6 +1,6 @@
 use serde::Serialize;
 use serde_json::Value;
-use sqlx::{Row, PgPool};
+use sqlx::{PgPool, Row};
 use tracing::warn;
 
 #[derive(Debug, Serialize)]
@@ -42,10 +42,7 @@ pub struct EmailFailPayload {
 }
 
 impl EmailOutbox {
-    pub async fn enqueue(
-        pool: &PgPool,
-        payload: &EmailEnqueuePayload,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn enqueue(pool: &PgPool, payload: &EmailEnqueuePayload) -> Result<(), sqlx::Error> {
         sqlx::query(
             "INSERT INTO email_outbox (to_email, template, payload)
              VALUES ($1, $2, $3)",
@@ -93,10 +90,7 @@ impl EmailOutbox {
             .collect())
     }
 
-    pub async fn mark_sent(
-        pool: &PgPool,
-        payload: &EmailMarkPayload,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn mark_sent(pool: &PgPool, payload: &EmailMarkPayload) -> Result<(), sqlx::Error> {
         let row = sqlx::query(
             "UPDATE email_outbox
              SET status = 'sent', sent_at = NOW(), last_error = NULL
@@ -112,10 +106,7 @@ impl EmailOutbox {
         Ok(())
     }
 
-    pub async fn mark_failed(
-        pool: &PgPool,
-        payload: &EmailFailPayload,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn mark_failed(pool: &PgPool, payload: &EmailFailPayload) -> Result<(), sqlx::Error> {
         let row = sqlx::query(
             "UPDATE email_outbox
              SET status = $1, attempts = attempts + 1, last_error = $2

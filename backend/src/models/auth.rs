@@ -202,7 +202,7 @@ impl ShopAuthRecord {
             created_at: self.created_at.clone(),
         }
     }
- 
+
     pub async fn find_for_login(
         pool: &sqlx::PgPool,
         payload: &FindShopPayload,
@@ -265,7 +265,7 @@ impl ShopAuthRecord {
             timezone: row.get("timezone"),
         }))
     }
- 
+
     pub async fn record_failed_login(
         pool: &sqlx::PgPool,
         shop_id: i64,
@@ -1067,7 +1067,11 @@ impl ShopProfile {
     }
 }
 
-pub fn build_token(shop_id: i64, device_session_id: Option<i64>, jwt_secret: &str) -> Result<String, ()> {
+pub fn build_token(
+    shop_id: i64,
+    device_session_id: Option<i64>,
+    jwt_secret: &str,
+) -> Result<String, ()> {
     let exp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| ())?

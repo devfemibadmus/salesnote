@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{Row, PgPool};
+use sqlx::{PgPool, Row};
 
 use crate::api::sql::common::AUTH_CTE;
 use crate::models::IdPayload;
@@ -99,8 +99,9 @@ impl Signature {
 
         let signature_json: Option<serde_json::Value> = row.try_get("signature_json").ok();
         if let Some(signature_json) = signature_json {
-            let signature: Signature = serde_json::from_value(signature_json)
-                .map_err(|e| sqlx::Error::Protocol(format!("invalid signature json: {}", e).into()))?;
+            let signature: Signature = serde_json::from_value(signature_json).map_err(|e| {
+                sqlx::Error::Protocol(format!("invalid signature json: {}", e).into())
+            })?;
             return Ok(AuthorizedSignatureCreateResult::Created(signature));
         }
 
@@ -217,10 +218,7 @@ impl Signature {
         Ok(AuthorizedSignatureDeleteResult::NotFound)
     }
 
-    pub async fn count_for_shop(
-        pool: &PgPool,
-        payload: &IdPayload,
-    ) -> Result<i64, sqlx::Error> {
+    pub async fn count_for_shop(pool: &PgPool, payload: &IdPayload) -> Result<i64, sqlx::Error> {
         let row = sqlx::query("SELECT COUNT(*) as cnt FROM signatures WHERE shop_id = $1")
             .bind(&payload.id)
             .fetch_one(pool)
@@ -255,10 +253,7 @@ impl Signature {
         })
     }
 
-    pub async fn list(
-        pool: &PgPool,
-        payload: &IdPayload,
-    ) -> Result<Vec<Signature>, sqlx::Error> {
+    pub async fn list(pool: &PgPool, payload: &IdPayload) -> Result<Vec<Signature>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT id, shop_id, name, image_url, created_at::text as created_at
              FROM signatures WHERE shop_id = $1 ORDER BY created_at DESC",
@@ -270,10 +265,7 @@ impl Signature {
         Ok(rows.into_iter().map(Signature::from_row).collect())
     }
 
-    pub async fn get(
-        pool: &PgPool,
-        payload: &IdPayload,
-    ) -> Result<Option<Signature>, sqlx::Error> {
+    pub async fn get(pool: &PgPool, payload: &IdPayload) -> Result<Option<Signature>, sqlx::Error> {
         let row = sqlx::query(
             "SELECT id, shop_id, name, image_url, created_at::text as created_at FROM signatures WHERE id = $1",
         )

@@ -222,7 +222,10 @@ fn bootstrap_env() {
     ENV_BOOTSTRAPPED.get_or_init(|| {
         let env_file = resolve_env_file_path();
         if !env_file.exists() {
-            panic!("missing env file in backend/: {}", env_file.to_string_lossy());
+            panic!(
+                "missing env file in backend/: {}",
+                env_file.to_string_lossy()
+            );
         }
 
         if let Err(err) = dotenvy::from_path_override(&env_file) {

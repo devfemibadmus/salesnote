@@ -3,8 +3,8 @@ use std::net::SocketAddr;
 use actix_files::Files;
 use actix_web::{middleware::DefaultHeaders, middleware::Logger, web, App, HttpServer};
 
-use salesnote_backend::{config, db};
 use salesnote_backend::api::{routes, state};
+use salesnote_backend::{config, db};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -21,8 +21,8 @@ async fn main() -> std::io::Result<()> {
         settings.pool_max_size,
         settings.pool_min_idle,
     )
-        .await
-        .expect("failed to init database");
+    .await
+    .expect("failed to init database");
 
     let app_state = state::AppState {
         pool,

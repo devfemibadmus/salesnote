@@ -1,8 +1,8 @@
+use chrono::{Datelike, NaiveDate, TimeZone, Utc};
 use rand::Rng;
 use reqwest::Client;
 use salesnote_backend::config;
 use serde_json::{json, Value};
-use chrono::{Datelike, NaiveDate, TimeZone, Utc};
 use std::time::Instant;
 
 fn env_or_empty(key: &str) -> String {
@@ -268,7 +268,10 @@ async fn upload_signature_via_api(
         .await
         .map_err(|e| format!("signature image read failed: {}", e))?;
 
-    let boundary = format!("----salesnote-seed-{}", rand::thread_rng().gen_range(100000..999999));
+    let boundary = format!(
+        "----salesnote-seed-{}",
+        rand::thread_rng().gen_range(100000..999999)
+    );
     let mut body: Vec<u8> = Vec::new();
 
     let name_part = format!(
@@ -371,12 +374,14 @@ async fn cleanup_existing_shop_data_via_api(
             .and_then(Value::as_i64)
             .ok_or("sale id missing")?;
         let delete_url = format!("{}/sales/{}", base_url, sale_id);
-        delete_auth(client, &delete_url, bearer).await.map_err(|e| {
-            format!(
-                "cannot reset via API (sale delete failed for id={}): {}",
-                sale_id, e
-            )
-        })?;
+        delete_auth(client, &delete_url, bearer)
+            .await
+            .map_err(|e| {
+                format!(
+                    "cannot reset via API (sale delete failed for id={}): {}",
+                    sale_id, e
+                )
+            })?;
     }
 
     let sigs_url = format!("{}/signatures", base_url);
@@ -458,7 +463,14 @@ async fn main() -> std::io::Result<()> {
         tracing::warn!("register skipped: {}", err);
     }
 
-    let access_token = match login_and_get_token(&client, &base_url, seed_email.trim(), seed_password.trim()).await {
+    let access_token = match login_and_get_token(
+        &client,
+        &base_url,
+        seed_email.trim(),
+        seed_password.trim(),
+    )
+    .await
+    {
         Ok(token) => token,
         Err(e) => {
             tracing::error!("seed login failed: {}", e);
@@ -467,7 +479,8 @@ async fn main() -> std::io::Result<()> {
     };
 
     if register_result.is_err() {
-        if let Err(e) = cleanup_existing_shop_data_via_api(&client, &base_url, &access_token).await {
+        if let Err(e) = cleanup_existing_shop_data_via_api(&client, &base_url, &access_token).await
+        {
             tracing::error!("seed failed reset step: {}", e);
             return Ok(());
         }
@@ -555,7 +568,14 @@ async fn main() -> std::io::Result<()> {
             let minute = ((day_ordinal * 7 + n_i64 * 11) % 60) as u32;
             let second = ((day_ordinal * 13 + n_i64 * 3) % 60) as u32;
             let dt = Utc
-                .with_ymd_and_hms(day.year(), day.month(), day.day(), hour as u32, minute, second)
+                .with_ymd_and_hms(
+                    day.year(),
+                    day.month(),
+                    day.day(),
+                    hour as u32,
+                    minute,
+                    second,
+                )
                 .single()
                 .expect("invalid generated datetime");
 

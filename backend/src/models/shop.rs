@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{Row, PgPool};
+use sqlx::{PgPool, Row};
 
 use crate::api::sql::common::AUTH_CTE;
-use crate::models::IdPayload;
 use crate::models::DeviceSession;
+use crate::models::IdPayload;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShopProfile {
@@ -66,7 +66,10 @@ pub struct SettingsSummary {
 }
 
 impl ShopProfile {
-    pub async fn get(pool: &PgPool, payload: &IdPayload) -> Result<Option<ShopProfile>, sqlx::Error> {
+    pub async fn get(
+        pool: &PgPool,
+        payload: &IdPayload,
+    ) -> Result<Option<ShopProfile>, sqlx::Error> {
         let row = sqlx::query(
             "SELECT id, name, phone, email, address, logo_url,
                     total_revenue, total_orders, total_customers, timezone,

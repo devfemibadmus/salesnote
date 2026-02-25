@@ -7,12 +7,12 @@ use image::codecs::jpeg::JpegEncoder;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
+use crate::api::middlewares::auth::AuthDeviceId;
 use crate::api::response::{json_empty, json_error, json_ok};
 use crate::api::state::AppState;
-use crate::api::middlewares::auth::AuthDeviceId;
 use crate::models::{
     AuthorizedSettingsPayload, AuthorizedShopPayload, AuthorizedShopUpdatePayload, DeviceSession,
-    ShopProfile, ShopUpdateInput, SettingsSummary,
+    SettingsSummary, ShopProfile, ShopUpdateInput,
 };
 
 #[derive(Debug, serde::Deserialize)]
@@ -318,12 +318,24 @@ pub async fn update_my_shop(
                 };
 
                 match field_name.as_str() {
-                    "name" => multipart_input.name = if value.is_empty() { None } else { Some(value) },
-                    "phone" => multipart_input.phone = if value.is_empty() { None } else { Some(value) },
-                    "email" => multipart_input.email = if value.is_empty() { None } else { Some(value) },
-                    "address" => multipart_input.address = if value.is_empty() { None } else { Some(value) },
-                    "timezone" => multipart_input.timezone = if value.is_empty() { None } else { Some(value) },
-                    "password" => multipart_input.password = if value.is_empty() { None } else { Some(value) },
+                    "name" => {
+                        multipart_input.name = if value.is_empty() { None } else { Some(value) }
+                    }
+                    "phone" => {
+                        multipart_input.phone = if value.is_empty() { None } else { Some(value) }
+                    }
+                    "email" => {
+                        multipart_input.email = if value.is_empty() { None } else { Some(value) }
+                    }
+                    "address" => {
+                        multipart_input.address = if value.is_empty() { None } else { Some(value) }
+                    }
+                    "timezone" => {
+                        multipart_input.timezone = if value.is_empty() { None } else { Some(value) }
+                    }
+                    "password" => {
+                        multipart_input.password = if value.is_empty() { None } else { Some(value) }
+                    }
                     _ => {}
                 }
             }

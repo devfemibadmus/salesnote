@@ -17,8 +17,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         settings.pool_max_size,
         settings.pool_min_idle,
     )
-        .await
-        .expect("failed to init database");
+    .await
+    .expect("failed to init database");
     let pool = Arc::new(pool);
 
     if let Err(e) = salesnote_backend::worker::email::check_smtp(&settings).await {

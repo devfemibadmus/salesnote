@@ -14,9 +14,7 @@ use serde_json::Value;
 
 pub mod message;
 
-fn build_mailer(
-    settings: &config::Settings,
-) -> Result<AsyncSmtpTransport<Tokio1Executor>, String> {
+fn build_mailer(settings: &config::Settings) -> Result<AsyncSmtpTransport<Tokio1Executor>, String> {
     let creds = Credentials::new(
         settings.smtp_username.clone(),
         settings.smtp_password.clone(),
@@ -217,10 +215,7 @@ pub async fn check_smtp(settings: &config::Settings) -> Result<(), String> {
             Err(err.to_string())
         }
         Err(_) => {
-            tracing::error!(
-                "smtp check timeout after {}s",
-                settings.smtp_timeout_secs
-            );
+            tracing::error!("smtp check timeout after {}s", settings.smtp_timeout_secs);
             Err(format!(
                 "smtp check timeout after {}s",
                 settings.smtp_timeout_secs

@@ -22,21 +22,27 @@ pub async fn home_summary(
 ) -> impl Responder {
     let started = Instant::now();
 
-    let data = match AnalyticsSummary::authorized_home_summary(&state.pool, *shop_id, (*device_id).0).await {
+    let data = match AnalyticsSummary::authorized_home_summary(
+        &state.pool,
+        *shop_id,
+        (*device_id).0,
+    )
+    .await
+    {
         Ok(Some(v)) => v,
         Ok(None) => return json_error(StatusCode::UNAUTHORIZED, "unauthorized"),
         Err(e) => {
             tracing::error!("home summary query error: {}", e);
-            return json_error(StatusCode::INTERNAL_SERVER_ERROR, "Server error. Please try again.");
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            );
         }
     };
 
     let total_ms = started.elapsed().as_millis();
 
-    tracing::debug!(
-        "home_summary timing: single_query_total={}ms",
-        total_ms,
-    );
+    tracing::debug!("home_summary timing: single_query_total={}ms", total_ms,);
 
     json_ok(HomeSummaryResponse {
         shop: data.shop,

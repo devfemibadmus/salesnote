@@ -17,4 +17,3 @@ auth_touch AS (
   RETURNING id
 )
 "#;
-

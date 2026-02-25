@@ -89,5 +89,4 @@ pub fn init_routes(cfg: &mut web::ServiceConfig, state: AppState) {
             .wrap(auth_guard.clone())
             .route(web::get().to(analytics_summary)),
     );
-
 }

@@ -7,8 +7,7 @@ use crate::config::Settings;
 use crate::worker::notification::fcm::send_fcm_notification;
 use crate::worker::progress::message::{build_progress_message, ProgressInput};
 use crate::worker::progress::repo::{
-    already_sent_today, count_sales_between, fetch_shops_with_tokens, mark_sent,
-    top_item_between,
+    already_sent_today, count_sales_between, fetch_shops_with_tokens, mark_sent, top_item_between,
 };
 use crate::worker::progress::time::local_midnight;
 

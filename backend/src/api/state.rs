@@ -16,4 +16,3 @@ pub struct AppState {
     pub dashboard_url: String,
     pub redis: redis::Client,
 }
-

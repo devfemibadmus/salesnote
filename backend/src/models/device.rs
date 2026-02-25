@@ -250,10 +250,7 @@ impl DeviceSession {
         Ok(())
     }
 
-    pub async fn delete(
-        pool: &PgPool,
-        payload: &DeviceDeletePayload,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn delete(pool: &PgPool, payload: &DeviceDeletePayload) -> Result<(), sqlx::Error> {
         sqlx::query(
             "WITH deleted AS (
                UPDATE device_sessions

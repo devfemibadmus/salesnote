@@ -6,9 +6,9 @@ use image::ImageFormat;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::api::middlewares::auth::AuthDeviceId;
 use crate::api::response::{json_created, json_empty, json_error, json_ok};
 use crate::api::state::AppState;
-use crate::api::middlewares::auth::AuthDeviceId;
 use crate::models::{
     AuthorizedSignatureCreatePayload, AuthorizedSignatureCreateResult,
     AuthorizedSignatureDeletePayload, AuthorizedSignatureDeleteResult,
@@ -67,10 +67,10 @@ async fn read_file_field_bytes(
             Err(_) => return Err(json_error(StatusCode::BAD_REQUEST, "invalid file")),
         };
         size += chunk.len();
-    if size > MAX_IMAGE_SIZE {
-        return Err(json_error(StatusCode::BAD_REQUEST, "image too large"));
-    }
-    file_bytes.extend_from_slice(&chunk);
+        if size > MAX_IMAGE_SIZE {
+            return Err(json_error(StatusCode::BAD_REQUEST, "image too large"));
+        }
+        file_bytes.extend_from_slice(&chunk);
     }
     Ok(file_bytes)
 }
@@ -104,7 +104,10 @@ fn remove_signature_background(bytes: &[u8], out_path: &Path) -> Result<(), Http
 
     if let Some(parent) = out_path.parent() {
         if std::fs::create_dir_all(parent).is_err() {
-            return Err(json_error(StatusCode::INTERNAL_SERVER_ERROR, "storage error"));
+            return Err(json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "storage error",
+            ));
         }
     }
 
@@ -166,7 +169,9 @@ pub async fn create_signature(
 
             let processed_filename = format!("sig_{}_{}_processed.png", *shop_id, ts.as_millis());
             let processed_rel_path = format!("uploads/signatures/{}", processed_filename);
-            let processed_dest = PathBuf::from("uploads").join("signatures").join(processed_filename);
+            let processed_dest = PathBuf::from("uploads")
+                .join("signatures")
+                .join(processed_filename);
 
             if let Err(resp) = remove_signature_background(&file_bytes, &processed_dest) {
                 return resp;
@@ -205,7 +210,10 @@ pub async fn create_signature(
         Ok(AuthorizedSignatureCreateResult::Created(signature)) => json_created(signature),
         Err(e) => {
             tracing::error!("create signature error: {}", e);
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Server error. Please try again.")
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
         }
     }
 }
@@ -228,7 +236,10 @@ pub async fn list_signatures(
         Ok(None) => json_error(StatusCode::UNAUTHORIZED, "unauthorized"),
         Err(e) => {
             tracing::error!("list signatures error: {}", e);
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Server error. Please try again.")
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
         }
     }
 }
@@ -252,7 +263,9 @@ pub async fn delete_signature(
         Ok(AuthorizedSignatureDeleteResult::Unauthorized) => {
             json_error(StatusCode::UNAUTHORIZED, "unauthorized")
         }
-        Ok(AuthorizedSignatureDeleteResult::NotFound) => json_error(StatusCode::NOT_FOUND, "not found"),
+        Ok(AuthorizedSignatureDeleteResult::NotFound) => {
+            json_error(StatusCode::NOT_FOUND, "not found")
+        }
         Ok(AuthorizedSignatureDeleteResult::InUse) => json_error(
             StatusCode::BAD_REQUEST,
             "signature already in use and can't delete",
@@ -260,7 +273,10 @@ pub async fn delete_signature(
         Ok(AuthorizedSignatureDeleteResult::Deleted) => json_empty(),
         Err(e) => {
             tracing::error!("delete signature error: {}", e);
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Server error. Please try again.")
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
         }
     }
 }

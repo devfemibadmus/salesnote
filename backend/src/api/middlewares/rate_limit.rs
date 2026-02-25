@@ -96,11 +96,16 @@ where
             .await;
 
             if let Ok(Ok(mut conn)) = conn_result {
-                let count_result = timeout(Duration::from_millis(120), conn.incr(&redis_key, 1)).await;
+                let count_result =
+                    timeout(Duration::from_millis(120), conn.incr(&redis_key, 1)).await;
                 if let Ok(Ok(count)) = count_result {
                     let count: i64 = count;
                     if count == 1 {
-                        let _ = timeout(Duration::from_millis(120), conn.expire::<_, ()>(&redis_key, 60)).await;
+                        let _ = timeout(
+                            Duration::from_millis(120),
+                            conn.expire::<_, ()>(&redis_key, 60),
+                        )
+                        .await;
                     }
                     if count as u32 > max_per_minute {
                         limited = true;

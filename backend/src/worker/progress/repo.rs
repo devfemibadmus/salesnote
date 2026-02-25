@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use sqlx::{Row, PgPool};
+use sqlx::{PgPool, Row};
 
 use crate::worker::progress::message::TopItem;
 
@@ -57,14 +57,12 @@ pub async fn mark_sent(
     kind: &str,
     day: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT INTO notification_logs (shop_id, kind, day) VALUES ($1, $2, $3)",
-    )
-    .bind(shop_id)
-    .bind(kind)
-    .bind(day)
-    .execute(pool)
-    .await?;
+    sqlx::query("INSERT INTO notification_logs (shop_id, kind, day) VALUES ($1, $2, $3)")
+        .bind(shop_id)
+        .bind(kind)
+        .bind(day)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 

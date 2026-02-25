@@ -8,15 +8,14 @@ use jsonwebtoken::{decode, DecodingKey, Validation};
 use rand::Rng;
 use std::str::FromStr;
 
+use crate::api::middlewares::auth::AuthDeviceId;
 use crate::api::response::{json_created, json_error, json_ok};
 use crate::api::state::AppState;
-use crate::api::middlewares::auth::AuthDeviceId;
 use crate::models::{
-    build_token, AuthForgotPasswordInput, AuthLoginInput,
-    AuthLoginResponse, AuthRefreshInput, AuthRegisterInput, Claims,
-    DeviceSession, ShopAuthRecord, ShopProfile, LoginOneStepPayload, LoginOneStepResult,
-    AuthVerifyCodeInput, AuthResetPasswordInput, ResetPasswordResult,
-    AuthorizedDeviceListPayload, AuthorizedDeviceDeletePayload,
+    build_token, AuthForgotPasswordInput, AuthLoginInput, AuthLoginResponse, AuthRefreshInput,
+    AuthRegisterInput, AuthResetPasswordInput, AuthVerifyCodeInput, AuthorizedDeviceDeletePayload,
+    AuthorizedDeviceListPayload, Claims, DeviceSession, LoginOneStepPayload, LoginOneStepResult,
+    ResetPasswordResult, ShopAuthRecord, ShopProfile,
 };
 
 pub async fn register(
@@ -77,7 +76,10 @@ pub async fn login(
         phone_or_email,
         password: payload.password.clone(),
         device_name: payload.device_name.as_ref().map(|v| v.trim().to_string()),
-        device_platform: payload.device_platform.as_ref().map(|v| v.trim().to_string()),
+        device_platform: payload
+            .device_platform
+            .as_ref()
+            .map(|v| v.trim().to_string()),
         device_os: payload.device_os.as_ref().map(|v| v.trim().to_string()),
         ip_address,
         location,
@@ -155,7 +157,11 @@ pub async fn refresh_token(
         return json_error(StatusCode::UNAUTHORIZED, "invalid refresh token");
     };
 
-    let token = match build_token(refreshed.shop_id, refreshed.device_session_id, &state.jwt_secret) {
+    let token = match build_token(
+        refreshed.shop_id,
+        refreshed.device_session_id,
+        &state.jwt_secret,
+    ) {
         Ok(t) => t,
         Err(_) => {
             return json_error(
@@ -176,10 +182,9 @@ pub async fn forgot_password(
     state: web::Data<AppState>,
     payload: web::Json<AuthForgotPasswordInput>,
 ) -> impl Responder {
-    let Some(phone_or_email) = normalize_phone_or_email(
-        payload.phone_or_email.as_deref(),
-        payload.email.as_deref(),
-    ) else {
+    let Some(phone_or_email) =
+        normalize_phone_or_email(payload.phone_or_email.as_deref(), payload.email.as_deref())
+    else {
         return json_error(StatusCode::BAD_REQUEST, "phone_or_email required");
     };
 
@@ -279,10 +284,16 @@ pub async fn reset_password(
 
     let password = payload.new_password.trim();
     if password.len() < 5 {
-        return json_error(StatusCode::BAD_REQUEST, "password must be at least 5 characters");
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "password must be at least 5 characters",
+        );
     }
     if password.len() > 20 {
-        return json_error(StatusCode::BAD_REQUEST, "password must be 20 characters or less");
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "password must be 20 characters or less",
+        );
     }
     let max_incorrect_attempts = state.reset_code_max_incorrect_attempts.max(1);
 
@@ -323,9 +334,7 @@ pub async fn list_devices(
         current_device_id: (*device_id).0,
     };
 
-    match DeviceSession::list_authorized(&state.pool, &payload)
-        .await
-    {
+    match DeviceSession::list_authorized(&state.pool, &payload).await {
         Ok(devices) => json_ok(devices),
         Err(e) => {
             tracing::error!("list devices error: {}", e);
@@ -347,9 +356,7 @@ pub async fn delete_device(
         target_device_id,
     };
 
-    match DeviceSession::delete_authorized(&state.pool, &payload)
-        .await
-    {
+    match DeviceSession::delete_authorized(&state.pool, &payload).await {
         Ok(true) => json_ok("Device removed"),
         Ok(false) => json_error(StatusCode::NOT_FOUND, "not found"),
         Err(e) => {
@@ -393,7 +400,11 @@ fn build_location_from_headers(headers: &HeaderMap) -> Option<String> {
 fn extract_client_ip(req: &HttpRequest) -> Option<String> {
     if let Some(v) = req.headers().get("X-Forwarded-For") {
         if let Ok(s) = v.to_str() {
-            if let Some(ip) = s.split(',').next().map(|v| v.trim()).filter(|v| !v.is_empty())
+            if let Some(ip) = s
+                .split(',')
+                .next()
+                .map(|v| v.trim())
+                .filter(|v| !v.is_empty())
             {
                 return Some(ip.to_string());
             }
@@ -496,7 +507,11 @@ fn normalize_phone_or_email(
 ) -> Option<String> {
     let primary = phone_or_email.unwrap_or("").trim();
     let fallback = email_fallback.unwrap_or("").trim();
-    let value = if !primary.is_empty() { primary } else { fallback };
+    let value = if !primary.is_empty() {
+        primary
+    } else {
+        fallback
+    };
     normalize_strict_phone_or_email(value)
 }
 
