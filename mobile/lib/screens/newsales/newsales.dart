@@ -24,6 +24,15 @@ part 'widgets/sheets.dart';
 part 'widgets/cards.dart';
 part 'widgets/controls.dart';
 
+enum _ChargeType { discount, vat, serviceFee, delivery, rounding, other }
+
+class _AdjustmentDraft {
+  const _AdjustmentDraft({required this.type, required this.amount});
+
+  final _ChargeType type;
+  final double amount;
+}
+
 class NewSaleScreen extends StatefulWidget {
   const NewSaleScreen({super.key});
 
@@ -39,6 +48,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   static const String _draftIndexKey = 'draft_new_sale_index';
   static const String _defaultDraftId = 'draft_1';
   static const String _defaultDraftLabel = 'New Sale';
+  static const String _defaultOtherLabel = 'Others';
+  static const double _maxAmount = 9_999_999_999.99;
 
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _customerContactController =
@@ -56,6 +67,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   bool _customerNameTouched = false;
   bool _customerContactTouched = false;
   bool _useEmailForContact = false;
+  double _discountAmount = 0;
+  double _vatAmount = 0;
+  double _serviceFeeAmount = 0;
+  double _deliveryFeeAmount = 0;
+  double _roundingAmount = 0;
+  double _otherAmount = 0;
+  String _otherLabel = _defaultOtherLabel;
   Country? _country;
   String? _phoneError;
   Timer? _phoneDebounce;
@@ -260,9 +278,27 @@ class _NewSaleScreenState extends State<NewSaleScreen>
           .toString()
           .trim();
       final signatureId = (draft['signature_id'] ?? '').toString().trim();
+      final discountAmount =
+          (draft['discount_amount'] as num?)?.toDouble() ?? 0;
+      final vatAmount =
+          ((draft['vat_amount'] ?? draft['tax_amount']) as num?)?.toDouble() ??
+          0;
+      final serviceFeeAmount =
+          (draft['service_fee_amount'] as num?)?.toDouble() ?? 0;
+      final deliveryFeeAmount =
+          (draft['delivery_fee_amount'] as num?)?.toDouble() ?? 0;
+      final roundingAmount =
+          (draft['rounding_amount'] as num?)?.toDouble() ?? 0;
+      final otherAmount = (draft['other_amount'] as num?)?.toDouble() ?? 0;
       return customerName.isNotEmpty ||
           customerContact.isNotEmpty ||
-          signatureId.isNotEmpty;
+          signatureId.isNotEmpty ||
+          discountAmount != 0 ||
+          vatAmount != 0 ||
+          serviceFeeAmount != 0 ||
+          deliveryFeeAmount != 0 ||
+          roundingAmount != 0 ||
+          otherAmount != 0;
     }
 
     if (hasMeaningfulData(currentActiveId)) {
@@ -287,6 +323,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _customerContactController.text = '';
         _useEmailForContact = false;
         _phoneError = null;
+        _discountAmount = 0;
+        _vatAmount = 0;
+        _serviceFeeAmount = 0;
+        _deliveryFeeAmount = 0;
+        _roundingAmount = 0;
+        _otherAmount = 0;
+        _otherLabel = _defaultOtherLabel;
         _selectedSignatureId = _signatures.isNotEmpty
             ? _signatures.first.id
             : null;
@@ -326,6 +369,18 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         } catch (_) {}
       }
       _phoneError = null;
+      _discountAmount = (draft['discount_amount'] as num?)?.toDouble() ?? 0;
+      _vatAmount =
+          ((draft['vat_amount'] ?? draft['tax_amount']) as num?)?.toDouble() ??
+          0;
+      _serviceFeeAmount =
+          (draft['service_fee_amount'] as num?)?.toDouble() ?? 0;
+      _deliveryFeeAmount =
+          (draft['delivery_fee_amount'] as num?)?.toDouble() ?? 0;
+      _roundingAmount = (draft['rounding_amount'] as num?)?.toDouble() ?? 0;
+      _otherAmount = (draft['other_amount'] as num?)?.toDouble() ?? 0;
+      final otherLabel = (draft['other_label'] ?? '').toString().trim();
+      _otherLabel = otherLabel.isEmpty ? _defaultOtherLabel : otherLabel;
       _selectedSignatureId = draft['signature_id']?.toString();
       _step = (draft['step'] as num?)?.toInt().clamp(0, 1) ?? 0;
       _customerNameTouched = false;
@@ -372,6 +427,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       'customer_contact': _customerContactController.text.trim(),
       'contact_use_email': _useEmailForContact,
       'contact_country': _country?.countryCode,
+      'discount_amount': _discountAmount,
+      'vat_amount': _vatAmount,
+      'service_fee_amount': _serviceFeeAmount,
+      'delivery_fee_amount': _deliveryFeeAmount,
+      'rounding_amount': _roundingAmount,
+      'other_amount': _otherAmount,
+      'other_label': _otherLabel,
       'signature_id': _selectedSignatureId,
       'step': _step,
       'items': _items
@@ -409,6 +471,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _customerContactController.text = '';
       _useEmailForContact = false;
       _phoneError = null;
+      _discountAmount = 0;
+      _vatAmount = 0;
+      _serviceFeeAmount = 0;
+      _deliveryFeeAmount = 0;
+      _roundingAmount = 0;
+      _otherAmount = 0;
+      _otherLabel = _defaultOtherLabel;
       _selectedSignatureId = _signatures.isNotEmpty
           ? _signatures.first.id
           : null;
@@ -446,6 +515,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _customerContactController.text = '';
         _useEmailForContact = false;
         _phoneError = null;
+        _discountAmount = 0;
+        _vatAmount = 0;
+        _serviceFeeAmount = 0;
+        _deliveryFeeAmount = 0;
+        _roundingAmount = 0;
+        _otherAmount = 0;
+        _otherLabel = _defaultOtherLabel;
         _selectedSignatureId = _signatures.isNotEmpty
             ? _signatures.first.id
             : null;
@@ -480,6 +556,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       setState(() {
         _customerNameController.text = '';
         _customerContactController.text = '';
+        _discountAmount = 0;
+        _vatAmount = 0;
+        _serviceFeeAmount = 0;
+        _deliveryFeeAmount = 0;
+        _roundingAmount = 0;
+        _otherAmount = 0;
+        _otherLabel = _defaultOtherLabel;
         _selectedSignatureId = _signatures.isNotEmpty
             ? _signatures.first.id
             : null;
@@ -501,10 +584,22 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     await _loadDraft(_activeDraftId);
   }
 
-  double get _saleTotal => _items.fold<double>(
+  double get _saleSubtotal => _items.fold<double>(
     0,
     (sum, item) => sum + (item.quantity * item.unitPrice),
   );
+
+  double get _saleTotal =>
+      _saleSubtotal -
+      _discountAmount +
+      _vatAmount +
+      _serviceFeeAmount +
+      _deliveryFeeAmount +
+      _roundingAmount +
+      _otherAmount;
+
+  bool get _pricingValid =>
+      _saleTotal.isFinite && _saleTotal >= 0 && _saleTotal <= _maxAmount;
 
   int get _itemCount =>
       _items.fold<int>(0, (sum, item) => sum + item.quantity.round());
@@ -600,6 +695,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       }
       return false;
     }
+    if (!_pricingValid) {
+      _showSnackBar('Grand total must be between 0 and 9,999,999,999.99.');
+      return false;
+    }
 
     setState(() => _submitting = true);
     try {
@@ -620,6 +719,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         signatureId: _selectedSignatureId!,
         customerName: _customerNameController.text.trim(),
         customerContact: contact,
+        discountAmount: _discountAmount,
+        vatAmount: _vatAmount,
+        serviceFeeAmount: _serviceFeeAmount,
+        deliveryFeeAmount: _deliveryFeeAmount,
+        roundingAmount: _roundingAmount,
+        otherAmount: _otherAmount,
+        otherLabel: _otherLabel,
         items: _items
             .map(
               (item) => SaleItemInput(
@@ -731,6 +837,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       }
       return;
     }
+    if (!_pricingValid) {
+      _showSnackBar('Grand total must be between 0 and 9,999,999,999.99.');
+      return;
+    }
 
     SignatureItem? signature;
     for (final item in _signatures) {
@@ -757,6 +867,14 @@ class _NewSaleScreenState extends State<NewSaleScreen>
                 ),
               )
               .toList(),
+          subtotal: _saleSubtotal,
+          discountAmount: _discountAmount,
+          vatAmount: _vatAmount,
+          serviceFeeAmount: _serviceFeeAmount,
+          deliveryFeeAmount: _deliveryFeeAmount,
+          roundingAmount: _roundingAmount,
+          otherAmount: _otherAmount,
+          otherLabel: _otherLabel,
           total: _saleTotal,
           onCreate: _submitSale,
         ),
@@ -894,6 +1012,400 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     unawaited(_saveDraft());
   }
 
+  String _chargeLabel(_ChargeType type) {
+    switch (type) {
+      case _ChargeType.discount:
+        return 'Discount';
+      case _ChargeType.vat:
+        return 'VAT';
+      case _ChargeType.serviceFee:
+        return 'Service Fee';
+      case _ChargeType.delivery:
+        return 'Delivery';
+      case _ChargeType.rounding:
+        return 'Rounding';
+      case _ChargeType.other:
+        return _otherLabel.trim().isEmpty ? _defaultOtherLabel : _otherLabel;
+    }
+  }
+
+  double _chargeAmount(_ChargeType type) {
+    switch (type) {
+      case _ChargeType.discount:
+        return _discountAmount;
+      case _ChargeType.vat:
+        return _vatAmount;
+      case _ChargeType.serviceFee:
+        return _serviceFeeAmount;
+      case _ChargeType.delivery:
+        return _deliveryFeeAmount;
+      case _ChargeType.rounding:
+        return _roundingAmount;
+      case _ChargeType.other:
+        return _otherAmount;
+    }
+  }
+
+  void _setChargeAmount(_ChargeType type, double amount) {
+    switch (type) {
+      case _ChargeType.discount:
+        _discountAmount = amount;
+        break;
+      case _ChargeType.vat:
+        _vatAmount = amount;
+        break;
+      case _ChargeType.serviceFee:
+        _serviceFeeAmount = amount;
+        break;
+      case _ChargeType.delivery:
+        _deliveryFeeAmount = amount;
+        break;
+      case _ChargeType.rounding:
+        _roundingAmount = amount;
+        break;
+      case _ChargeType.other:
+        _otherAmount = amount;
+        _otherLabel = _defaultOtherLabel;
+        break;
+    }
+  }
+
+  _ChargeType _nextSuggestedChargeType() {
+    const preferredOrder = <_ChargeType>[
+      _ChargeType.discount,
+      _ChargeType.vat,
+      _ChargeType.serviceFee,
+      _ChargeType.delivery,
+      _ChargeType.rounding,
+      _ChargeType.other,
+    ];
+    for (final type in preferredOrder) {
+      if (_chargeAmount(type) == 0) {
+        return type;
+      }
+    }
+    return _ChargeType.discount;
+  }
+
+  Future<void> _openAdjustmentSheet({_ChargeType? initialType}) async {
+    final types = const <_ChargeType>[
+      _ChargeType.discount,
+      _ChargeType.vat,
+      _ChargeType.serviceFee,
+      _ChargeType.delivery,
+      _ChargeType.rounding,
+      _ChargeType.other,
+    ];
+    var selectedType = initialType ?? _nextSuggestedChargeType();
+    final current = _chargeAmount(selectedType);
+    var usePercentage = false;
+    final controller = TextEditingController(
+      text: current == 0
+          ? ''
+          : _ThousandsSeparatedNumberFormatter.formatForDisplay(
+              current.toStringAsFixed(2),
+              allowNegative: selectedType == _ChargeType.rounding,
+            ),
+    );
+    String? errorText;
+
+    void syncEditorValue() {
+      final amount = _chargeAmount(selectedType);
+      if (amount == 0) {
+        controller.text = '';
+        return;
+      }
+      if (usePercentage) {
+        if (_saleSubtotal <= 0) {
+          controller.text = '';
+          return;
+        }
+        final percentage = (amount / _saleSubtotal) * 100;
+        controller.text = _ThousandsSeparatedNumberFormatter.formatForDisplay(
+          percentage.toStringAsFixed(2),
+          allowNegative: selectedType == _ChargeType.rounding,
+        );
+        return;
+      }
+      controller.text = _ThousandsSeparatedNumberFormatter.formatForDisplay(
+        amount.toStringAsFixed(2),
+        allowNegative: selectedType == _ChargeType.rounding,
+      );
+    }
+
+    final result = await showModalBottomSheet<_AdjustmentDraft?>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocalState) {
+          final allowNegative = selectedType == _ChargeType.rounding;
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              24,
+              20,
+              24,
+              24 + MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD6DFEB),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Add Adjustment',
+                          style: TextStyle(
+                            color: Color(0xFF0E1930),
+                            fontSize: 24,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(null),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: types
+                        .map(
+                          (type) => _SuggestionChip(
+                            label: _chargeLabel(type),
+                            active: selectedType == type,
+                            onTap: () {
+                              setLocalState(() {
+                                selectedType = type;
+                                syncEditorValue();
+                                errorText = null;
+                              });
+                            },
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFD7E0EB)),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          usePercentage ? 'Percentage' : 'Amount',
+                          style: const TextStyle(
+                            color: Color(0xFF475569),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const Spacer(),
+                        const Text(
+                          'Use %',
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Switch(
+                          value: usePercentage,
+                          activeThumbColor: const Color(0xFF1677E6),
+                          onChanged: (value) {
+                            setLocalState(() {
+                              usePercentage = value;
+                              syncEditorValue();
+                              errorText = null;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _InputBox(
+                    controller: controller,
+                    hint: usePercentage
+                        ? (allowNegative ? 'e.g -5 or 8.5' : 'e.g 8.5')
+                        : (allowNegative ? 'e.g -20 or 20' : 'e.g 20'),
+                    compact: true,
+                    isInvalid: errorText != null,
+                    textAlign: usePercentage
+                        ? TextAlign.right
+                        : TextAlign.start,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                      signed: true,
+                    ),
+                    inputFormatters: [
+                      _ThousandsSeparatedNumberFormatter(
+                        allowNegative: allowNegative,
+                      ),
+                    ],
+                    onChanged: (_) {
+                      if (errorText != null) {
+                        setLocalState(() => errorText = null);
+                      }
+                    },
+                    prefix: usePercentage
+                        ? null
+                        : Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Text(
+                              _currencySymbol,
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                    suffix: usePercentage
+                        ? Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Text(
+                              '%',
+                              style: const TextStyle(
+                                color: Color(0xFF64748B),
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                  if (errorText != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      errorText!,
+                      style: const TextStyle(
+                        color: Color(0xFFEF4444),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 58,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final raw = controller.text.trim();
+                        if (raw.isEmpty) {
+                          setLocalState(() => errorText = 'Enter amount.');
+                          return;
+                        }
+                        final parsed = double.tryParse(
+                          _ThousandsSeparatedNumberFormatter.normalize(raw),
+                        );
+                        if (parsed == null || !parsed.isFinite) {
+                          setLocalState(
+                            () => errorText = 'Enter a valid number.',
+                          );
+                          return;
+                        }
+                        var resolvedAmount = parsed;
+                        if (usePercentage) {
+                          if (_saleSubtotal <= 0) {
+                            setLocalState(
+                              () => errorText =
+                                  'Add item first before using percentage.',
+                            );
+                            return;
+                          }
+                          resolvedAmount = (_saleSubtotal * parsed) / 100;
+                        }
+                        if (!resolvedAmount.isFinite) {
+                          setLocalState(() => errorText = 'Amount is invalid.');
+                          return;
+                        }
+                        if (!allowNegative && resolvedAmount < 0) {
+                          setLocalState(
+                            () => errorText = 'This amount cannot be negative.',
+                          );
+                          return;
+                        }
+                        if (resolvedAmount.abs() > _maxAmount) {
+                          setLocalState(
+                            () => errorText = 'Amount is too large.',
+                          );
+                          return;
+                        }
+                        Navigator.of(context).pop(
+                          _AdjustmentDraft(
+                            type: selectedType,
+                            amount: resolvedAmount,
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1677E6),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        elevation: 7,
+                        shadowColor: const Color(0x331677E6),
+                      ),
+                      child: const Text(
+                        'Save Adjustment',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _setChargeAmount(result.type, result.amount);
+    });
+    await _saveDraft();
+  }
+
+  Future<void> _removeCharge(_ChargeType type) async {
+    if (_chargeAmount(type) == 0) return;
+    setState(() => _setChargeAmount(type, 0));
+    await _saveDraft();
+  }
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(
       context,
@@ -980,7 +1492,15 @@ class _NewSaleScreenState extends State<NewSaleScreen>
             onCreateDraft: _createDraft,
             onSwitchDraft: _switchDraft,
             onDeleteDraft: _deleteDraft,
+            saleSubtotal: _saleSubtotal,
             saleTotal: _saleTotal,
+            discountAmount: _discountAmount,
+            vatAmount: _vatAmount,
+            serviceFeeAmount: _serviceFeeAmount,
+            deliveryFeeAmount: _deliveryFeeAmount,
+            roundingAmount: _roundingAmount,
+            otherAmount: _otherAmount,
+            otherLabel: _otherLabel,
             itemCount: _itemCount,
             submitting: _submitting,
             onBack: () {
@@ -988,6 +1508,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
               unawaited(_saveDraft());
             },
             onAddItem: _openAddItemSheet,
+            onAddAdjustment: _openAdjustmentSheet,
+            onEditAdjustment: (type) => _openAdjustmentSheet(initialType: type),
+            onRemoveAdjustment: _removeCharge,
             onEdit: (index) => _openAddItemSheet(editIndex: index),
             onIncrement: (index) => _changeQuantity(index, 1),
             onDecrement: (index) => _changeQuantity(index, -1),

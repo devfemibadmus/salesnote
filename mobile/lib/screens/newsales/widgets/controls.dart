@@ -10,8 +10,10 @@ class _InputBox extends StatelessWidget {
     this.inputFormatters,
     this.isInvalid = false,
     this.prefix,
+    this.suffix,
     this.onChanged,
     this.compact = false,
+    this.textAlign = TextAlign.start,
   });
 
   final TextEditingController controller;
@@ -22,8 +24,10 @@ class _InputBox extends StatelessWidget {
   final List<TextInputFormatter>? inputFormatters;
   final bool isInvalid;
   final Widget? prefix;
+  final Widget? suffix;
   final ValueChanged<String>? onChanged;
   final bool compact;
+  final TextAlign textAlign;
 
   @override
   Widget build(BuildContext context) {
@@ -46,6 +50,7 @@ class _InputBox extends StatelessWidget {
             child: TextField(
               controller: controller,
               focusNode: focusNode,
+              textAlign: textAlign,
               textInputAction: textInputAction,
               keyboardType: keyboardType,
               inputFormatters: inputFormatters,
@@ -68,9 +73,126 @@ class _InputBox extends StatelessWidget {
               ),
             ),
           ),
+          if (suffix != null) ...[suffix!],
         ],
       ),
     );
+  }
+}
+
+class _ThousandsSeparatedNumberFormatter extends TextInputFormatter {
+  const _ThousandsSeparatedNumberFormatter({this.allowNegative = false});
+
+  final bool allowNegative;
+
+  static String normalize(String input) {
+    return input.replaceAll(',', '').trim();
+  }
+
+  static double parse(String input) {
+    return double.tryParse(normalize(input)) ?? 0;
+  }
+
+  static String formatForDisplay(String input, {bool allowNegative = false}) {
+    return _formatSanitized(input, allowNegative: allowNegative);
+  }
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final formatted = _formatSanitized(
+      newValue.text,
+      allowNegative: allowNegative,
+    );
+
+    final selectionFromEnd = newValue.text.length - newValue.selection.end;
+    final nextOffset = (formatted.length - selectionFromEnd).clamp(
+      0,
+      formatted.length,
+    );
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: nextOffset),
+      composing: TextRange.empty,
+    );
+  }
+
+  static String _formatSanitized(String input, {required bool allowNegative}) {
+    if (input.isEmpty) {
+      return '';
+    }
+
+    final source = input.replaceAll(',', '').replaceAll(' ', '');
+    if (source.isEmpty) {
+      return '';
+    }
+
+    final buffer = StringBuffer();
+    var hasDot = false;
+    var hasSign = false;
+
+    for (var i = 0; i < source.length; i++) {
+      final ch = source[i];
+      final code = ch.codeUnitAt(0);
+      final isDigit = code >= 48 && code <= 57;
+
+      if (isDigit) {
+        buffer.write(ch);
+        continue;
+      }
+      if (ch == '.' && !hasDot) {
+        hasDot = true;
+        buffer.write(ch);
+        continue;
+      }
+      if (ch == '-' && allowNegative && !hasSign && buffer.isEmpty) {
+        hasSign = true;
+        buffer.write(ch);
+      }
+    }
+
+    var raw = buffer.toString();
+    if (raw.isEmpty) {
+      return '';
+    }
+    if (raw == '-' && allowNegative) {
+      return raw;
+    }
+    if (raw == '.') {
+      return '0.';
+    }
+    if (raw == '-.') {
+      return '-0.';
+    }
+
+    final negative = raw.startsWith('-');
+    if (negative) {
+      raw = raw.substring(1);
+    }
+
+    final hasDecimal = raw.contains('.');
+    final split = raw.split('.');
+    var intPart = split.first;
+    final decimalPart = split.length > 1 ? split.sublist(1).join() : '';
+
+    if (intPart.isEmpty) {
+      intPart = '0';
+    }
+    intPart = intPart.replaceFirst(RegExp(r'^0+(?=\d)'), '');
+
+    final formattedInt = intPart.replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (_) => ',',
+    );
+
+    final sign = negative ? '-' : '';
+    if (!hasDecimal) {
+      return '$sign$formattedInt';
+    }
+    return '$sign$formattedInt.$decimalPart';
   }
 }
 

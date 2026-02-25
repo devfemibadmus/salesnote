@@ -328,11 +328,22 @@ class _NewSaleItemsStep extends StatelessWidget {
     required this.onCreateDraft,
     required this.onSwitchDraft,
     required this.onDeleteDraft,
+    required this.saleSubtotal,
     required this.saleTotal,
+    required this.discountAmount,
+    required this.vatAmount,
+    required this.serviceFeeAmount,
+    required this.deliveryFeeAmount,
+    required this.roundingAmount,
+    required this.otherAmount,
+    required this.otherLabel,
     required this.itemCount,
     required this.submitting,
     required this.onBack,
     required this.onAddItem,
+    required this.onAddAdjustment,
+    required this.onEditAdjustment,
+    required this.onRemoveAdjustment,
     required this.onIncrement,
     required this.onDecrement,
     required this.onSetQuantity,
@@ -349,11 +360,22 @@ class _NewSaleItemsStep extends StatelessWidget {
   final Future<void> Function() onCreateDraft;
   final Future<void> Function(String draftId) onSwitchDraft;
   final Future<void> Function(String draftId) onDeleteDraft;
+  final double saleSubtotal;
   final double saleTotal;
+  final double discountAmount;
+  final double vatAmount;
+  final double serviceFeeAmount;
+  final double deliveryFeeAmount;
+  final double roundingAmount;
+  final double otherAmount;
+  final String otherLabel;
   final int itemCount;
   final bool submitting;
   final VoidCallback onBack;
   final Future<void> Function() onAddItem;
+  final Future<void> Function() onAddAdjustment;
+  final Future<void> Function(_ChargeType type) onEditAdjustment;
+  final Future<void> Function(_ChargeType type) onRemoveAdjustment;
   final ValueChanged<int> onIncrement;
   final ValueChanged<int> onDecrement;
   final void Function(int index, double value) onSetQuantity;
@@ -364,6 +386,52 @@ class _NewSaleItemsStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    String signedAmount(double value) {
+      if (value < 0) {
+        return '-${formatAmount(value.abs(), decimalDigits: 2)}';
+      }
+      return '+${formatAmount(value, decimalDigits: 2)}';
+    }
+
+    final adjustments = <_AppliedAdjustment>[
+      if (discountAmount != 0)
+        _AppliedAdjustment(
+          type: _ChargeType.discount,
+          label: 'Discount',
+          signedValue: signedAmount(-discountAmount),
+        ),
+      if (vatAmount != 0)
+        _AppliedAdjustment(
+          type: _ChargeType.vat,
+          label: 'VAT',
+          signedValue: signedAmount(vatAmount),
+        ),
+      if (serviceFeeAmount != 0)
+        _AppliedAdjustment(
+          type: _ChargeType.serviceFee,
+          label: 'Service Fee',
+          signedValue: signedAmount(serviceFeeAmount),
+        ),
+      if (deliveryFeeAmount != 0)
+        _AppliedAdjustment(
+          type: _ChargeType.delivery,
+          label: 'Delivery',
+          signedValue: signedAmount(deliveryFeeAmount),
+        ),
+      if (roundingAmount != 0)
+        _AppliedAdjustment(
+          type: _ChargeType.rounding,
+          label: 'Rounding',
+          signedValue: signedAmount(roundingAmount),
+        ),
+      if (otherAmount != 0)
+        _AppliedAdjustment(
+          type: _ChargeType.other,
+          label: otherLabel.trim().isEmpty ? 'Others' : otherLabel,
+          signedValue: signedAmount(otherAmount),
+        ),
+    ];
+
     return Column(
       children: [
         const SizedBox(height: 12),
@@ -485,7 +553,7 @@ class _NewSaleItemsStep extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'SALE TOTAL',
+                'PRICING',
                 style: TextStyle(
                   color: Color(0xFF6B7A92),
                   fontWeight: FontWeight.w700,
@@ -497,33 +565,133 @@ class _NewSaleItemsStep extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      formatAmount(saleTotal, decimalDigits: 2),
-                      style: const TextStyle(
-                        color: Color(0xFF0E1930),
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
+                    child: SizedBox(
+                      height: 42,
+                      child: OutlinedButton.icon(
+                        onPressed: () => unawaited(onAddAdjustment()),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text(
+                          'Add Adjustment',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF1677E6),
+                          side: const BorderSide(color: Color(0xFF9DBDE6)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 10),
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDDF7E7),
+                      color: const Color(0xFFEAF2FF),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '$itemCount ITEMS',
                       style: const TextStyle(
-                        color: Color(0xFF118044),
+                        color: Color(0xFF275A9E),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                 ],
+              ),
+              if (adjustments.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFD),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFDCE6F2)),
+                  ),
+                  child: Column(
+                    children: adjustments
+                        .map(
+                          (entry) => _AdjustmentTile(
+                            label: entry.label,
+                            value: entry.signedValue,
+                            onEdit: () =>
+                                unawaited(onEditAdjustment(entry.type)),
+                            onRemove: () =>
+                                unawaited(onRemoveAdjustment(entry.type)),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              _PricingLine(
+                label: 'Subtotal',
+                value: formatAmount(saleSubtotal, decimalDigits: 2),
+                strong: false,
+              ),
+              if (discountAmount != 0) ...[
+                const SizedBox(height: 6),
+                _PricingLine(
+                  label: 'Discount',
+                  value: signedAmount(-discountAmount),
+                  strong: false,
+                ),
+              ],
+              if (vatAmount != 0) ...[
+                const SizedBox(height: 6),
+                _PricingLine(
+                  label: 'VAT',
+                  value: signedAmount(vatAmount),
+                  strong: false,
+                ),
+              ],
+              if (serviceFeeAmount != 0) ...[
+                const SizedBox(height: 6),
+                _PricingLine(
+                  label: 'Service Fee',
+                  value: signedAmount(serviceFeeAmount),
+                  strong: false,
+                ),
+              ],
+              if (deliveryFeeAmount != 0) ...[
+                const SizedBox(height: 6),
+                _PricingLine(
+                  label: 'Delivery',
+                  value: signedAmount(deliveryFeeAmount),
+                  strong: false,
+                ),
+              ],
+              if (roundingAmount != 0) ...[
+                const SizedBox(height: 6),
+                _PricingLine(
+                  label: 'Rounding',
+                  value: signedAmount(roundingAmount),
+                  strong: false,
+                ),
+              ],
+              if (otherAmount != 0) ...[
+                const SizedBox(height: 6),
+                _PricingLine(
+                  label: otherLabel.trim().isEmpty ? 'Others' : otherLabel,
+                  value: signedAmount(otherAmount),
+                  strong: false,
+                ),
+              ],
+              const SizedBox(height: 8),
+              _PricingLine(
+                label: 'Grand Total',
+                value: formatAmount(saleTotal, decimalDigits: 2),
+                strong: true,
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -559,6 +727,117 @@ class _NewSaleItemsStep extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AppliedAdjustment {
+  const _AppliedAdjustment({
+    required this.type,
+    required this.label,
+    required this.signedValue,
+  });
+
+  final _ChargeType type;
+  final String label;
+  final String signedValue;
+}
+
+class _AdjustmentTile extends StatelessWidget {
+  const _AdjustmentTile({
+    required this.label,
+    required this.value,
+    required this.onEdit,
+    required this.onRemove,
+  });
+
+  final String label;
+  final String value;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF324967),
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Color(0xFF0E1930),
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
+          ),
+          IconButton(
+            onPressed: onEdit,
+            icon: const Icon(
+              Icons.edit_rounded,
+              size: 18,
+              color: Color(0xFF1677E6),
+            ),
+            splashRadius: 18,
+          ),
+          IconButton(
+            onPressed: onRemove,
+            icon: const Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: Color(0xFF8A99AE),
+            ),
+            splashRadius: 18,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PricingLine extends StatelessWidget {
+  const _PricingLine({
+    required this.label,
+    required this.value,
+    required this.strong,
+  });
+
+  final String label;
+  final String value;
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: strong ? const Color(0xFF0E1930) : const Color(0xFF60708A),
+              fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+              fontSize: strong ? 16 : 14,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            color: strong ? const Color(0xFF1677E6) : const Color(0xFF0E1930),
+            fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+            fontSize: strong ? 19 : 14,
           ),
         ),
       ],

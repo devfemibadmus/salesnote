@@ -33,7 +33,10 @@ class _AddItemSheetState extends State<_AddItemSheet> {
     final initial = widget.initialItem;
     if (initial != null) {
       _itemNameController.text = initial.productName;
-      _unitPriceController.text = initial.unitPrice.toStringAsFixed(2);
+      _unitPriceController.text =
+          _ThousandsSeparatedNumberFormatter.formatForDisplay(
+            initial.unitPrice.toStringAsFixed(2),
+          );
       _qty = initial.quantity.clamp(1, 9999).toDouble();
     }
     _itemNameController.addListener(_onItemNameChanged);
@@ -50,7 +53,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
   }
 
   double get _unitPrice =>
-      double.tryParse(_unitPriceController.text.trim()) ?? 0;
+      _ThousandsSeparatedNumberFormatter.parse(_unitPriceController.text);
   double get _lineTotal => _unitPrice * _qty;
 
   bool get _canAdd =>
@@ -331,6 +334,9 @@ class _AddItemSheetState extends State<_AddItemSheet> {
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
                                   ),
+                              inputFormatters: const [
+                                _ThousandsSeparatedNumberFormatter(),
+                              ],
                               onChanged: (_) => setState(() {}),
                               prefix: Padding(
                                 padding: const EdgeInsets.only(right: 8),
@@ -447,4 +453,3 @@ class _AddItemSheetState extends State<_AddItemSheet> {
     );
   }
 }
-

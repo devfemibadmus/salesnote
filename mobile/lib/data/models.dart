@@ -18,14 +18,14 @@ class RegisterInput {
   final String? logoUrl;
 
   Map<String, dynamic> toJson() => {
-        'shop_name': shopName,
-        'phone': phone,
-        'email': email,
-        'password': password,
-        'timezone': timezone,
-        'address': address,
-        'logo_url': logoUrl,
-      };
+    'shop_name': shopName,
+    'phone': phone,
+    'email': email,
+    'password': password,
+    'timezone': timezone,
+    'address': address,
+    'logo_url': logoUrl,
+  };
 }
 
 class ShopUpdateInput {
@@ -46,13 +46,13 @@ class ShopUpdateInput {
   final String? password;
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'phone': phone,
-        'email': email,
-        'address': address,
-        'logo_url': logoUrl,
-        'password': password,
-      };
+    'name': name,
+    'phone': phone,
+    'email': email,
+    'address': address,
+    'logo_url': logoUrl,
+    'password': password,
+  };
 }
 
 class ShopProfile {
@@ -90,15 +90,15 @@ class ShopProfile {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'phone': phone,
-        'email': email,
-        'address': address,
-        'logo_url': logoUrl,
-        'timezone': timezone,
-        'created_at': createdAt,
-      };
+    'id': id,
+    'name': name,
+    'phone': phone,
+    'email': email,
+    'address': address,
+    'logo_url': logoUrl,
+    'timezone': timezone,
+    'created_at': createdAt,
+  };
 }
 
 class AuthResult {
@@ -121,10 +121,7 @@ class SignatureInput {
   final String name;
   final String imageUrl;
 
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        'image_url': imageUrl,
-      };
+  Map<String, dynamic> toJson() => {'name': name, 'image_url': imageUrl};
 }
 
 class SignatureItem {
@@ -153,12 +150,12 @@ class SignatureItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'shop_id': shopId,
-        'name': name,
-        'image_url': imageUrl,
-        'created_at': createdAt,
-      };
+    'id': id,
+    'shop_id': shopId,
+    'name': name,
+    'image_url': imageUrl,
+    'created_at': createdAt,
+  };
 }
 
 class SuggestionInput {
@@ -167,10 +164,7 @@ class SuggestionInput {
   final String key;
   final String value;
 
-  Map<String, dynamic> toJson() => {
-        'key': key,
-        'value': value,
-      };
+  Map<String, dynamic> toJson() => {'key': key, 'value': value};
 }
 
 class SuggestionItem {
@@ -205,14 +199,14 @@ class SuggestionItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'shop_id': shopId,
-        'key': key,
-        'value': value,
-        'usage_count': usageCount,
-        'last_used_at': lastUsedAt,
-        'created_at': createdAt,
-      };
+    'id': id,
+    'shop_id': shopId,
+    'key': key,
+    'value': value,
+    'usage_count': usageCount,
+    'last_used_at': lastUsedAt,
+    'created_at': createdAt,
+  };
 }
 
 class SaleItemInput {
@@ -227,10 +221,10 @@ class SaleItemInput {
   final double unitPrice;
 
   Map<String, dynamic> toJson() => {
-        'product_name': productName,
-        'quantity': quantity,
-        'unit_price': unitPrice,
-      };
+    'product_name': productName,
+    'quantity': quantity,
+    'unit_price': unitPrice,
+  };
 }
 
 class SaleInput {
@@ -240,6 +234,13 @@ class SaleInput {
     required this.customerContact,
     required this.items,
     this.createdAt,
+    this.discountAmount = 0,
+    this.vatAmount = 0,
+    this.serviceFeeAmount = 0,
+    this.deliveryFeeAmount = 0,
+    this.roundingAmount = 0,
+    this.otherAmount = 0,
+    this.otherLabel = 'Others',
   });
 
   final String signatureId;
@@ -247,14 +248,28 @@ class SaleInput {
   final String customerContact;
   final List<SaleItemInput> items;
   final String? createdAt;
+  final double discountAmount;
+  final double vatAmount;
+  final double serviceFeeAmount;
+  final double deliveryFeeAmount;
+  final double roundingAmount;
+  final double otherAmount;
+  final String otherLabel;
 
   Map<String, dynamic> toJson() => {
-        'signature_id': int.tryParse(signatureId),
-        'customer_name': customerName,
-        'customer_contact': customerContact,
-        'items': items.map((e) => e.toJson()).toList(),
-        'created_at': createdAt,
-      };
+    'signature_id': int.tryParse(signatureId),
+    'customer_name': customerName,
+    'customer_contact': customerContact,
+    'items': items.map((e) => e.toJson()).toList(),
+    'created_at': createdAt,
+    'discount_amount': discountAmount,
+    'vat_amount': vatAmount,
+    'service_fee_amount': serviceFeeAmount,
+    'delivery_fee_amount': deliveryFeeAmount,
+    'rounding_amount': roundingAmount,
+    'other_amount': otherAmount,
+    'other_label': otherLabel,
+  };
 }
 
 class SaleUpdateInput {
@@ -263,19 +278,40 @@ class SaleUpdateInput {
     this.customerName,
     this.customerContact,
     this.items,
+    this.discountAmount,
+    this.vatAmount,
+    this.serviceFeeAmount,
+    this.deliveryFeeAmount,
+    this.roundingAmount,
+    this.otherAmount,
+    this.otherLabel,
   });
 
   final String? signatureId;
   final String? customerName;
   final String? customerContact;
   final List<SaleItemInput>? items;
+  final double? discountAmount;
+  final double? vatAmount;
+  final double? serviceFeeAmount;
+  final double? deliveryFeeAmount;
+  final double? roundingAmount;
+  final double? otherAmount;
+  final String? otherLabel;
 
   Map<String, dynamic> toJson() => {
-        'signature_id': signatureId == null ? null : int.tryParse(signatureId!),
-        'customer_name': customerName,
-        'customer_contact': customerContact,
-        'items': items?.map((e) => e.toJson()).toList(),
-      };
+    'signature_id': signatureId == null ? null : int.tryParse(signatureId!),
+    'customer_name': customerName,
+    'customer_contact': customerContact,
+    'items': items?.map((e) => e.toJson()).toList(),
+    'discount_amount': discountAmount,
+    'vat_amount': vatAmount,
+    'service_fee_amount': serviceFeeAmount,
+    'delivery_fee_amount': deliveryFeeAmount,
+    'rounding_amount': roundingAmount,
+    'other_amount': otherAmount,
+    'other_label': otherLabel,
+  };
 }
 
 class SaleItem {
@@ -307,13 +343,13 @@ class SaleItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'sale_id': saleId,
-        'product_name': productName,
-        'quantity': quantity,
-        'unit_price': unitPrice,
-        'line_total': lineTotal,
-      };
+    'id': id,
+    'sale_id': saleId,
+    'product_name': productName,
+    'quantity': quantity,
+    'unit_price': unitPrice,
+    'line_total': lineTotal,
+  };
 }
 
 class Sale {
@@ -323,6 +359,14 @@ class Sale {
     required this.signatureId,
     this.customerName,
     this.customerContact,
+    required this.subtotal,
+    required this.discountAmount,
+    required this.vatAmount,
+    required this.serviceFeeAmount,
+    required this.deliveryFeeAmount,
+    required this.roundingAmount,
+    required this.otherAmount,
+    required this.otherLabel,
     required this.total,
     required this.createdAt,
     required this.items,
@@ -333,6 +377,14 @@ class Sale {
   final String signatureId;
   final String? customerName;
   final String? customerContact;
+  final double subtotal;
+  final double discountAmount;
+  final double vatAmount;
+  final double serviceFeeAmount;
+  final double deliveryFeeAmount;
+  final double roundingAmount;
+  final double otherAmount;
+  final String otherLabel;
   final double total;
   final String createdAt;
   final List<SaleItem> items;
@@ -344,24 +396,41 @@ class Sale {
       signatureId: json['signature_id'].toString(),
       customerName: json['customer_name'] as String?,
       customerContact: json['customer_contact'] as String?,
+      subtotal: ((json['subtotal'] ?? json['total']) as num).toDouble(),
+      discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
+      vatAmount:
+          ((json['vat_amount'] ?? json['tax_amount']) as num?)?.toDouble() ?? 0,
+      serviceFeeAmount: (json['service_fee_amount'] as num?)?.toDouble() ?? 0,
+      deliveryFeeAmount: (json['delivery_fee_amount'] as num?)?.toDouble() ?? 0,
+      roundingAmount: (json['rounding_amount'] as num?)?.toDouble() ?? 0,
+      otherAmount: (json['other_amount'] as num?)?.toDouble() ?? 0,
+      otherLabel: (json['other_label'] as String?)?.trim().isNotEmpty == true
+          ? (json['other_label'] as String).trim()
+          : 'Others',
       total: (json['total'] as num).toDouble(),
       createdAt: json['created_at'] as String,
-      items: (json['items'] as List)
-          .map((e) => SaleItem.fromJson(e))
-          .toList(),
+      items: (json['items'] as List).map((e) => SaleItem.fromJson(e)).toList(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'shop_id': shopId,
-        'signature_id': signatureId,
-        'customer_name': customerName,
-        'customer_contact': customerContact,
-        'total': total,
-        'created_at': createdAt,
-        'items': items.map((e) => e.toJson()).toList(),
-      };
+    'id': id,
+    'shop_id': shopId,
+    'signature_id': signatureId,
+    'customer_name': customerName,
+    'customer_contact': customerContact,
+    'subtotal': subtotal,
+    'discount_amount': discountAmount,
+    'vat_amount': vatAmount,
+    'service_fee_amount': serviceFeeAmount,
+    'delivery_fee_amount': deliveryFeeAmount,
+    'rounding_amount': roundingAmount,
+    'other_amount': otherAmount,
+    'other_label': otherLabel,
+    'total': total,
+    'created_at': createdAt,
+    'items': items.map((e) => e.toJson()).toList(),
+  };
 }
 
 class ReceiptCreateInput {
@@ -371,9 +440,9 @@ class ReceiptCreateInput {
   final String? signatureId;
 
   Map<String, dynamic> toJson() => {
-        'sale_id': saleId,
-        'signature_id': signatureId,
-      };
+    'sale_id': saleId,
+    'signature_id': signatureId,
+  };
 }
 
 class ReceiptItem {
@@ -402,12 +471,12 @@ class ReceiptItem {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'sale_id': saleId,
-        'shop_id': shopId,
-        'signature_id': signatureId,
-        'created_at': createdAt,
-      };
+    'id': id,
+    'sale_id': saleId,
+    'shop_id': shopId,
+    'signature_id': signatureId,
+    'created_at': createdAt,
+  };
 }
 
 class Receipt {
@@ -436,12 +505,12 @@ class Receipt {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'sale_id': saleId,
-        'shop_id': shopId,
-        'signature_id': signatureId,
-        'created_at': createdAt,
-      };
+    'id': id,
+    'sale_id': saleId,
+    'shop_id': shopId,
+    'signature_id': signatureId,
+    'created_at': createdAt,
+  };
 }
 
 class ReceiptDetail {
@@ -462,16 +531,18 @@ class ReceiptDetail {
       receipt: Receipt.fromJson(json['receipt']),
       shop: ShopProfile.fromJson(json['shop']),
       sale: Sale.fromJson(json['sale']),
-      signature: json['signature'] == null ? null : SignatureItem.fromJson(json['signature']),
+      signature: json['signature'] == null
+          ? null
+          : SignatureItem.fromJson(json['signature']),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'receipt': receipt.toJson(),
-        'shop': shop.toJson(),
-        'sale': sale.toJson(),
-        'signature': signature?.toJson(),
-      };
+    'receipt': receipt.toJson(),
+    'shop': shop.toJson(),
+    'sale': sale.toJson(),
+    'signature': signature?.toJson(),
+  };
 }
 
 class AnalyticsPoint {
@@ -494,10 +565,10 @@ class AnalyticsPoint {
   }
 
   Map<String, dynamic> toJson() => {
-        'period': period,
-        'total': total,
-        'units': units,
-      };
+    'period': period,
+    'total': total,
+    'units': units,
+  };
 }
 
 class ProductMovement {
@@ -521,10 +592,10 @@ class ProductMovement {
   }
 
   Map<String, dynamic> toJson() => {
-        'product_name': productName,
-        'quantity': quantity,
-        'sold_30_days': sold30Days,
-      };
+    'product_name': productName,
+    'quantity': quantity,
+    'sold_30_days': sold30Days,
+  };
 }
 
 class AnalyticsSummary {
@@ -563,12 +634,12 @@ class AnalyticsSummary {
   }
 
   Map<String, dynamic> toJson() => {
-        'daily': daily.map((e) => e.toJson()).toList(),
-        'weekly': weekly.map((e) => e.toJson()).toList(),
-        'monthly': monthly.map((e) => e.toJson()).toList(),
-        'fast_moving': fastMoving.map((e) => e.toJson()).toList(),
-        'slow_moving': slowMoving.map((e) => e.toJson()).toList(),
-      };
+    'daily': daily.map((e) => e.toJson()).toList(),
+    'weekly': weekly.map((e) => e.toJson()).toList(),
+    'monthly': monthly.map((e) => e.toJson()).toList(),
+    'fast_moving': fastMoving.map((e) => e.toJson()).toList(),
+    'slow_moving': slowMoving.map((e) => e.toJson()).toList(),
+  };
 }
 
 class HomeSummary {
@@ -593,10 +664,10 @@ class HomeSummary {
   }
 
   Map<String, dynamic> toJson() => {
-        'shop': shop.toJson(),
-        'analytics': analytics.toJson(),
-        'recent_sales': recentSales.map((e) => e.toJson()).toList(),
-      };
+    'shop': shop.toJson(),
+    'analytics': analytics.toJson(),
+    'recent_sales': recentSales.map((e) => e.toJson()).toList(),
+  };
 }
 
 class DeviceSession {
@@ -646,19 +717,19 @@ class DeviceSession {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'shop_id': shopId,
-        'device_name': deviceName,
-        'device_platform': devicePlatform,
-        'device_os': deviceOs,
-        'ip_address': ipAddress,
-        'location': location,
-        'user_agent': userAgent,
-        'fcm_token': fcmToken,
-        'created_at': createdAt,
-        'last_seen_at': lastSeenAt,
-        'deleted_at': deletedAt,
-      };
+    'id': id,
+    'shop_id': shopId,
+    'device_name': deviceName,
+    'device_platform': devicePlatform,
+    'device_os': deviceOs,
+    'ip_address': ipAddress,
+    'location': location,
+    'user_agent': userAgent,
+    'fcm_token': fcmToken,
+    'created_at': createdAt,
+    'last_seen_at': lastSeenAt,
+    'deleted_at': deletedAt,
+  };
 }
 
 class SettingsSummary {
@@ -678,15 +749,13 @@ class SettingsSummary {
       devices: (json['devices'] as List)
           .map((e) => DeviceSession.fromJson(e))
           .toList(),
-      currentDevicePushEnabled:
-          json['current_device_push_enabled'] == true,
+      currentDevicePushEnabled: json['current_device_push_enabled'] == true,
     );
   }
 
   Map<String, dynamic> toJson() => {
-        'shop': shop.toJson(),
-        'devices': devices.map((e) => e.toJson()).toList(),
-        'current_device_push_enabled': currentDevicePushEnabled,
-      };
+    'shop': shop.toJson(),
+    'devices': devices.map((e) => e.toJson()).toList(),
+    'current_device_push_enabled': currentDevicePushEnabled,
+  };
 }
-

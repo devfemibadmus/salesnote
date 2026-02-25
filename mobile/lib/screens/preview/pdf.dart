@@ -24,10 +24,14 @@ extension _PreviewPdf on _SalePreviewScreenState {
       widget.signature?.imageUrl,
     );
 
-    final subtotal = widget.total;
-    final grandTotal = widget.total;
     final customerName = widget.customerName.trim();
     final customerContact = widget.customerContact.trim();
+    final hasCustomerDetails =
+        customerName.isNotEmpty || customerContact.isNotEmpty;
+    final customerTopValue = customerContact.isNotEmpty
+        ? customerContact
+        : customerName;
+    final customerBottomValue = customerContact.isNotEmpty ? customerName : '';
     final qtyLabelStyle = pw.TextStyle(
       color: PdfColor.fromInt(0xFF5B6E8A),
       fontSize: 12,
@@ -70,284 +74,422 @@ extension _PreviewPdf on _SalePreviewScreenState {
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                    pw.Center(
-                      child: _pdfAvatar(
-                        shopLogoBytes,
-                        widget.shop?.name ?? 'S',
-                      ),
-                    ),
-                    pw.SizedBox(height: 8),
-                    pw.Center(
-                      child: pw.Text(
-                        widget.shop?.name ?? 'Shop',
-                        style: pw.TextStyle(
-                          color: PdfColor.fromInt(0xFF0E1930),
-                          fontSize: 21,
-                          fontWeight: pw.FontWeight.bold,
+                      pw.Center(
+                        child: _pdfAvatar(
+                          shopLogoBytes,
+                          widget.shop?.name ?? 'S',
                         ),
                       ),
-                    ),
-                    if ((widget.shop?.address ?? '').trim().isNotEmpty) ...[
+                      pw.SizedBox(height: 8),
+                      pw.Center(
+                        child: pw.Text(
+                          widget.shop?.name ?? 'Shop',
+                          style: pw.TextStyle(
+                            color: PdfColor.fromInt(0xFF0E1930),
+                            fontSize: 21,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if ((widget.shop?.address ?? '').trim().isNotEmpty) ...[
+                        pw.SizedBox(height: 4),
+                        pw.Center(
+                          child: pw.Text(
+                            widget.shop!.address!.trim(),
+                            textAlign: pw.TextAlign.center,
+                            style: pw.TextStyle(
+                              color: PdfColor.fromInt(0xFF5A6C88),
+                              fontSize: 13,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
                       pw.SizedBox(height: 4),
                       pw.Center(
                         child: pw.Text(
-                          widget.shop!.address!.trim(),
-                          textAlign: pw.TextAlign.center,
+                          widget.shop?.phone ?? '',
                           style: pw.TextStyle(
-                            color: PdfColor.fromInt(0xFF5A6C88),
+                            color: PdfColor.fromInt(0xFF1677E6),
                             fontSize: 13,
                             fontWeight: pw.FontWeight.bold,
                           ),
                         ),
                       ),
-                    ],
-                    pw.SizedBox(height: 4),
-                    pw.Center(
-                      child: pw.Text(
-                        widget.shop?.phone ?? '',
-                        style: pw.TextStyle(
-                          color: PdfColor.fromInt(0xFF1677E6),
-                          fontSize: 13,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (customerName.isNotEmpty ||
-                        customerContact.isNotEmpty) ...[
-                      pw.SizedBox(height: 12),
-                      pw.Container(
-                        width: double.infinity,
-                        padding: const pw.EdgeInsets.all(10),
-                        decoration: pw.BoxDecoration(
-                          color: PdfColor.fromInt(0xFFF8FAFC),
-                          borderRadius: pw.BorderRadius.circular(8),
-                          border: pw.Border.all(
-                            color: PdfColor.fromInt(0xFFE5ECF6),
-                            width: 1,
+                      pw.SizedBox(height: 14),
+                      pw.Divider(color: PdfColor.fromInt(0xFFE5ECF6)),
+                      pw.SizedBox(height: 8),
+                      pw.Row(
+                        children: [
+                          pw.SizedBox(
+                            width: 36,
+                            child: pw.Text('QTY', style: headLabelStyle),
                           ),
-                        ),
-                        child: pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text(
-                              'CUSTOMER',
-                              style: pw.TextStyle(
-                                color: PdfColor.fromInt(0xFF8A9AB3),
-                                fontSize: 10,
-                                fontWeight: pw.FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
+                          pw.Expanded(
+                            child: pw.Text(
+                              'DESCRIPTION',
+                              style: headLabelStyle,
                             ),
-                            if (customerName.isNotEmpty) ...[
-                              pw.SizedBox(height: 4),
-                              pw.Text(
-                                customerName,
-                                style: pw.TextStyle(
-                                  color: PdfColor.fromInt(0xFF0E1930),
-                                  fontSize: 12,
-                                  fontWeight: pw.FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                            if (customerContact.isNotEmpty) ...[
-                              pw.SizedBox(height: 2),
-                              pw.Text(
-                                customerContact,
-                                style: pw.TextStyle(
-                                  color: PdfColor.fromInt(0xFF5A6C88),
-                                  fontSize: 11,
-                                  fontWeight: pw.FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
+                          ),
+                          pw.Text('AMOUNT', style: headLabelStyle),
+                        ],
                       ),
-                    ],
-                    pw.SizedBox(height: 14),
-                    pw.Divider(color: PdfColor.fromInt(0xFFE5ECF6)),
-                    pw.SizedBox(height: 8),
-                    pw.Row(
-                      children: [
-                        pw.SizedBox(
-                          width: 36,
-                          child: pw.Text('QTY', style: headLabelStyle),
-                        ),
-                        pw.Expanded(
-                          child: pw.Text('DESCRIPTION', style: headLabelStyle),
-                        ),
-                        pw.Text('AMOUNT', style: headLabelStyle),
-                      ],
-                    ),
-                    pw.SizedBox(height: 6),
-                    pw.Divider(color: PdfColor.fromInt(0xFFE5ECF6)),
-                    pw.SizedBox(height: 2),
-                    ...widget.items.map((item) {
-                      return pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 6),
-                        child: pw.Row(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.SizedBox(
-                              width: 36,
-                              child: pw.Text(
-                                item.quantity % 1 == 0
-                                    ? item.quantity.toInt().toString()
-                                    : item.quantity.toStringAsFixed(2),
-                                style: qtyLabelStyle,
+                      pw.SizedBox(height: 6),
+                      pw.Divider(color: PdfColor.fromInt(0xFFE5ECF6)),
+                      pw.SizedBox(height: 2),
+                      ...widget.items.map((item) {
+                        return pw.Padding(
+                          padding: const pw.EdgeInsets.symmetric(vertical: 6),
+                          child: pw.Row(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.SizedBox(
+                                width: 36,
+                                child: pw.Text(
+                                  item.quantity % 1 == 0
+                                      ? item.quantity.toInt().toString()
+                                      : item.quantity.toStringAsFixed(2),
+                                  style: qtyLabelStyle,
+                                ),
                               ),
-                            ),
-                            pw.Expanded(
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              pw.Expanded(
+                                child: pw.Column(
+                                  crossAxisAlignment:
+                                      pw.CrossAxisAlignment.start,
+                                  children: [
+                                    pw.Text(
+                                      item.productName,
+                                      style: pw.TextStyle(
+                                        color: PdfColor.fromInt(0xFF0E1930),
+                                        fontSize: 13,
+                                        fontWeight: pw.FontWeight.bold,
+                                      ),
+                                    ),
+                                    pw.SizedBox(height: 2),
+                                    pw.Text(
+                                      'Unit: ${_formatPdfAmount(item.unitPrice)}',
+                                      style: pw.TextStyle(
+                                        color: PdfColor.fromInt(0xFF8A9AB3),
+                                        fontSize: 11,
+                                        fontWeight: pw.FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              pw.SizedBox(width: 8),
+                              pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.end,
                                 children: [
                                   pw.Text(
-                                    item.productName,
+                                    _formatPdfAmount(item.lineTotal),
                                     style: pw.TextStyle(
                                       color: PdfColor.fromInt(0xFF0E1930),
                                       fontSize: 13,
                                       fontWeight: pw.FontWeight.bold,
                                     ),
                                   ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      pw.SizedBox(height: 6),
+                      pw.Divider(color: PdfColor.fromInt(0xFFE5ECF6)),
+                      pw.SizedBox(height: 10),
+                      _pdfAmountRow(
+                        'Subtotal',
+                        _formatPdfAmount(widget.subtotal),
+                        false,
+                      ),
+                      if (widget.discountAmount != 0) ...[
+                        pw.SizedBox(height: 6),
+                        _pdfAmountRow(
+                          'Discount',
+                          _formatSignedPdfAmount(-widget.discountAmount),
+                          false,
+                        ),
+                      ],
+                      if (widget.vatAmount != 0) ...[
+                        pw.SizedBox(height: 6),
+                        _pdfAmountRow(
+                          'VAT',
+                          _formatSignedPdfAmount(widget.vatAmount),
+                          false,
+                        ),
+                      ],
+                      if (widget.serviceFeeAmount != 0) ...[
+                        pw.SizedBox(height: 6),
+                        _pdfAmountRow(
+                          'Service Fee',
+                          _formatSignedPdfAmount(widget.serviceFeeAmount),
+                          false,
+                        ),
+                      ],
+                      if (widget.deliveryFeeAmount != 0) ...[
+                        pw.SizedBox(height: 6),
+                        _pdfAmountRow(
+                          'Delivery',
+                          _formatSignedPdfAmount(widget.deliveryFeeAmount),
+                          false,
+                        ),
+                      ],
+                      if (widget.roundingAmount != 0) ...[
+                        pw.SizedBox(height: 6),
+                        _pdfAmountRow(
+                          'Rounding',
+                          _formatSignedPdfAmount(widget.roundingAmount),
+                          false,
+                        ),
+                      ],
+                      if (widget.otherAmount != 0) ...[
+                        pw.SizedBox(height: 6),
+                        _pdfAmountRow(
+                          widget.otherLabel.trim().isEmpty
+                              ? 'Others'
+                              : widget.otherLabel,
+                          _formatSignedPdfAmount(widget.otherAmount),
+                          false,
+                        ),
+                      ],
+                      pw.SizedBox(height: 6),
+                      _pdfAmountRow(
+                        'Grand Total',
+                        _formatPdfAmount(widget.total),
+                        true,
+                      ),
+                      pw.SizedBox(height: 18),
+                      if (hasCustomerDetails)
+                        pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Expanded(
+                              flex: 6,
+                              child: pw.Padding(
+                                padding: const pw.EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                child: pw.Column(
+                                  crossAxisAlignment:
+                                      pw.CrossAxisAlignment.stretch,
+                                  children: [
+                                    pw.Container(
+                                      height: 52,
+                                      alignment: pw.Alignment.bottomCenter,
+                                      child: pw.Text(
+                                        customerTopValue,
+                                        textAlign: pw.TextAlign.center,
+                                        maxLines: 2,
+                                        style: pw.TextStyle(
+                                          color: PdfColor.fromInt(0xFF5A6C88),
+                                          fontSize: 10,
+                                          fontWeight: pw.FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    pw.Divider(
+                                      color: PdfColor.fromInt(0xFFD6DEEA),
+                                    ),
+                                    pw.SizedBox(height: 4),
+                                    if (customerBottomValue.isNotEmpty)
+                                      pw.Text(
+                                        customerBottomValue,
+                                        textAlign: pw.TextAlign.center,
+                                        maxLines: 2,
+                                        style: pw.TextStyle(
+                                          color: PdfColor.fromInt(0xFF0E1930),
+                                          fontSize: 10,
+                                          fontWeight: pw.FontWeight.bold,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            pw.SizedBox(width: 12),
+                            pw.Expanded(
+                              flex: 5,
+                              child: pw.Column(
+                                children: [
+                                  pw.Container(
+                                    height: 52,
+                                    alignment: pw.Alignment.center,
+                                    child: signatureBytes == null
+                                        ? pw.SizedBox()
+                                        : pw.Stack(
+                                            alignment: pw.Alignment.center,
+                                            children: [
+                                              pw.Transform.translate(
+                                                offset: const PdfPoint(2.0, 0),
+                                                child: pw.Opacity(
+                                                  opacity: 1.0,
+                                                  child: pw.Image(
+                                                    pw.MemoryImage(
+                                                      signatureBytes,
+                                                    ),
+                                                    fit: pw.BoxFit.contain,
+                                                  ),
+                                                ),
+                                              ),
+                                              pw.Transform.translate(
+                                                offset: const PdfPoint(1.4, 0),
+                                                child: pw.Opacity(
+                                                  opacity: 1.0,
+                                                  child: pw.Image(
+                                                    pw.MemoryImage(
+                                                      signatureBytes,
+                                                    ),
+                                                    fit: pw.BoxFit.contain,
+                                                  ),
+                                                ),
+                                              ),
+                                              pw.Transform.translate(
+                                                offset: const PdfPoint(0.8, 0),
+                                                child: pw.Opacity(
+                                                  opacity: 1.0,
+                                                  child: pw.Image(
+                                                    pw.MemoryImage(
+                                                      signatureBytes,
+                                                    ),
+                                                    fit: pw.BoxFit.contain,
+                                                  ),
+                                                ),
+                                              ),
+                                              pw.Transform.translate(
+                                                offset: const PdfPoint(0.2, 0),
+                                                child: pw.Opacity(
+                                                  opacity: 1.0,
+                                                  child: pw.Image(
+                                                    pw.MemoryImage(
+                                                      signatureBytes,
+                                                    ),
+                                                    fit: pw.BoxFit.contain,
+                                                  ),
+                                                ),
+                                              ),
+                                              pw.Image(
+                                                pw.MemoryImage(signatureBytes),
+                                                fit: pw.BoxFit.contain,
+                                              ),
+                                            ],
+                                          ),
+                                  ),
                                   pw.SizedBox(height: 2),
+                                  pw.Divider(
+                                    color: PdfColor.fromInt(0xFFD6DEEA),
+                                  ),
+                                  pw.SizedBox(height: 4),
                                   pw.Text(
-                                    'Unit: ${_formatPdfAmount(item.unitPrice)}',
+                                    'AUTHORIZED SIGNATURE',
+                                    textAlign: pw.TextAlign.center,
                                     style: pw.TextStyle(
                                       color: PdfColor.fromInt(0xFF8A9AB3),
                                       fontSize: 11,
                                       fontWeight: pw.FontWeight.bold,
+                                      letterSpacing: 1,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                            pw.SizedBox(width: 8),
-                            pw.Column(
-                              crossAxisAlignment: pw.CrossAxisAlignment.end,
-                              children: [
-                                pw.Text(
-                                  _formatPdfAmount(item.lineTotal),
-                                  style: pw.TextStyle(
-                                    color: PdfColor.fromInt(0xFF0E1930),
-                                    fontSize: 13,
-                                    fontWeight: pw.FontWeight.bold,
-                                  ),
-                                ),
-                              ],
                             ),
                           ],
-                        ),
-                      );
-                    }),
-                    pw.SizedBox(height: 6),
-                    pw.Divider(color: PdfColor.fromInt(0xFFE5ECF6)),
-                    pw.SizedBox(height: 10),
-                    _pdfAmountRow(
-                      'Subtotal',
-                      _formatPdfAmount(subtotal),
-                      false,
-                    ),
-                    pw.SizedBox(height: 6),
-                    _pdfAmountRow(
-                      'Grand Total',
-                      _formatPdfAmount(grandTotal),
-                      true,
-                    ),
-                    pw.SizedBox(height: 18),
-                    pw.SizedBox(height: 8),
-                    pw.Center(
-                      child: pw.Container(
-                        height: 52,
-                        alignment: pw.Alignment.center,
-                        child: signatureBytes == null
-                            ? pw.SizedBox()
-                            : pw.Stack(
-                                alignment: pw.Alignment.center,
-                                children: [
-                                  pw.Transform.translate(
-                                    offset: const PdfPoint(2.0, 0),
-                                    child: pw.Opacity(
-                                      opacity: 1.0,
-                                      child: pw.Image(
+                        )
+                      else ...[
+                        pw.Center(
+                          child: pw.Container(
+                            height: 52,
+                            alignment: pw.Alignment.center,
+                            child: signatureBytes == null
+                                ? pw.SizedBox()
+                                : pw.Stack(
+                                    alignment: pw.Alignment.center,
+                                    children: [
+                                      pw.Transform.translate(
+                                        offset: const PdfPoint(2.0, 0),
+                                        child: pw.Opacity(
+                                          opacity: 1.0,
+                                          child: pw.Image(
+                                            pw.MemoryImage(signatureBytes),
+                                            fit: pw.BoxFit.contain,
+                                          ),
+                                        ),
+                                      ),
+                                      pw.Transform.translate(
+                                        offset: const PdfPoint(1.4, 0),
+                                        child: pw.Opacity(
+                                          opacity: 1.0,
+                                          child: pw.Image(
+                                            pw.MemoryImage(signatureBytes),
+                                            fit: pw.BoxFit.contain,
+                                          ),
+                                        ),
+                                      ),
+                                      pw.Transform.translate(
+                                        offset: const PdfPoint(0.8, 0),
+                                        child: pw.Opacity(
+                                          opacity: 1.0,
+                                          child: pw.Image(
+                                            pw.MemoryImage(signatureBytes),
+                                            fit: pw.BoxFit.contain,
+                                          ),
+                                        ),
+                                      ),
+                                      pw.Transform.translate(
+                                        offset: const PdfPoint(0.2, 0),
+                                        child: pw.Opacity(
+                                          opacity: 1.0,
+                                          child: pw.Image(
+                                            pw.MemoryImage(signatureBytes),
+                                            fit: pw.BoxFit.contain,
+                                          ),
+                                        ),
+                                      ),
+                                      pw.Image(
                                         pw.MemoryImage(signatureBytes),
                                         fit: pw.BoxFit.contain,
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                  pw.Transform.translate(
-                                    offset: const PdfPoint(1.4, 0),
-                                    child: pw.Opacity(
-                                      opacity: 1.0,
-                                      child: pw.Image(
-                                        pw.MemoryImage(signatureBytes),
-                                        fit: pw.BoxFit.contain,
-                                      ),
-                                    ),
-                                  ),
-                                  pw.Transform.translate(
-                                    offset: const PdfPoint(0.8, 0),
-                                    child: pw.Opacity(
-                                      opacity: 1.0,
-                                      child: pw.Image(
-                                        pw.MemoryImage(signatureBytes),
-                                        fit: pw.BoxFit.contain,
-                                      ),
-                                    ),
-                                  ),
-                                  pw.Transform.translate(
-                                    offset: const PdfPoint(0.2, 0),
-                                    child: pw.Opacity(
-                                      opacity: 1.0,
-                                      child: pw.Image(
-                                        pw.MemoryImage(signatureBytes),
-                                        fit: pw.BoxFit.contain,
-                                      ),
-                                    ),
-                                  ),
-                                  pw.Image(
-                                    pw.MemoryImage(signatureBytes),
-                                    fit: pw.BoxFit.contain,
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                    pw.SizedBox(height: 2),
-                    pw.Divider(color: PdfColor.fromInt(0xFFD6DEEA)),
-                    pw.SizedBox(height: 4),
-                    pw.Center(
-                      child: pw.Text(
-                        'AUTHORIZED SIGNATURE',
-                        style: pw.TextStyle(
-                          color: PdfColor.fromInt(0xFF8A9AB3),
-                          fontSize: 11,
-                          fontWeight: pw.FontWeight.bold,
-                          letterSpacing: 1,
+                          ),
+                        ),
+                        pw.SizedBox(height: 2),
+                        pw.Divider(color: PdfColor.fromInt(0xFFD6DEEA)),
+                        pw.SizedBox(height: 4),
+                        pw.Center(
+                          child: pw.Text(
+                            'AUTHORIZED SIGNATURE',
+                            style: pw.TextStyle(
+                              color: PdfColor.fromInt(0xFF8A9AB3),
+                              fontSize: 11,
+                              fontWeight: pw.FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ),
+                      ],
+                      pw.SizedBox(height: 10),
+                      pw.Center(
+                        child: pw.Text(
+                          dateText,
+                          style: pw.TextStyle(
+                            color: PdfColor.fromInt(0xFF8A9AB3),
+                            fontSize: 11,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                    pw.SizedBox(height: 10),
-                    pw.Center(
-                      child: pw.Text(
-                        dateText,
-                        style: pw.TextStyle(
-                          color: PdfColor.fromInt(0xFF8A9AB3),
-                          fontSize: 11,
-                          fontWeight: pw.FontWeight.bold,
+                      pw.SizedBox(height: 3),
+                      pw.Center(
+                        child: pw.Text(
+                          receiptNo,
+                          style: pw.TextStyle(
+                            color: PdfColor.fromInt(0xFF8A9AB3),
+                            fontSize: 11,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                    pw.SizedBox(height: 3),
-                    pw.Center(
-                      child: pw.Text(
-                        receiptNo,
-                        style: pw.TextStyle(
-                          color: PdfColor.fromInt(0xFF8A9AB3),
-                          fontSize: 11,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                    ),
                     ],
                   ),
                 ),
@@ -403,7 +545,9 @@ extension _PreviewPdf on _SalePreviewScreenState {
       skipIfExists: false,
     );
     if (!result.isSuccess) {
-      throw Exception(result.errorMessage ?? 'Unable to save image to gallery.');
+      throw Exception(
+        result.errorMessage ?? 'Unable to save image to gallery.',
+      );
     }
   }
 
@@ -486,6 +630,13 @@ extension _PreviewPdf on _SalePreviewScreenState {
 
   String _formatPdfAmount(num amount) {
     return _formatAmount(amount);
+  }
+
+  String _formatSignedPdfAmount(double amount) {
+    if (amount < 0) {
+      return '-${_formatPdfAmount(amount.abs())}';
+    }
+    return '+${_formatPdfAmount(amount)}';
   }
 
   pw.Widget _pdfWatermarkPattern(String text, double width, double height) {
