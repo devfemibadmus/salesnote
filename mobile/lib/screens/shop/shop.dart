@@ -15,6 +15,7 @@ import '../../services/phone.dart';
 import '../../services/region.dart';
 import '../../services/token_store.dart';
 import '../../services/validators.dart';
+import '../../widgets/add_signature_sheet.dart';
 import '../../widgets/app_bottom_nav.dart';
 import 'content.dart';
 import 'states.dart';
@@ -588,72 +589,29 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   Future<void> _addSignature() async {
-    final nameController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final ok = await showDialog<bool>(
+    final result = await showAddSignatureSheet(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Add Signature'),
-        content: Form(
-          key: formKey,
-          autovalidateMode: AutovalidateMode.onUserInteraction,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameController,
-                decoration: const InputDecoration(hintText: 'Signature name'),
-                onChanged: (value) {
-                  formKey.currentState?.validate();
-                },
-                validator: (v) {
-                  final text = (v ?? '').trim();
-                  if (text.isEmpty) return 'Name is required.';
-                  if (!Validators.isValidSignatureName(text)) {
-                    return 'Use letters only, max 10 letters.';
-                  }
-                  return null;
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() != true) return;
-              Navigator.pop(context, true);
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
+      onUpload: (name, imagePath) async {
+        setState(() => _busy = true);
+        try {
+          return await _api.uploadSignature(name: name, imagePath: imagePath);
+        } finally {
+          if (mounted) setState(() => _busy = false);
+        }
+      },
     );
 
-    if (ok != true) return;
-    final image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 92,
-    );
-    if (image == null) {
-      if (!mounted) return;
+    if (!mounted || result == null) return;
+    if (result.errorMessage != null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('No image selected.')));
+      ).showSnackBar(SnackBar(content: Text(result.errorMessage!)));
       return;
     }
+    if (result.signature == null) return;
+    final created = result.signature!;
 
-    setState(() => _busy = true);
     try {
-      final created = await _api.uploadSignature(
-        name: nameController.text.trim(),
-        imagePath: image.path,
-      );
-      if (!mounted) return;
       setState(() {
         _signatures = [created, ..._signatures];
       });
@@ -669,8 +627,6 @@ class _ShopScreenState extends State<ShopScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 

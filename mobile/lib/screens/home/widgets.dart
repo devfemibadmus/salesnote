@@ -20,12 +20,16 @@ class _MetricCard extends StatelessWidget {
     return Container(
       width: screenWidth * 0.76,
       height: 132,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE5EAF1)),
+        border: isNegative
+            ? Border.all(color: const Color(0xFFE5EAF1))
+            : Border.all(color: Colors.white),
       ),
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
           Positioned(
             right: -12,
@@ -33,8 +37,8 @@ class _MetricCard extends StatelessWidget {
             child: Container(
               width: 86,
               height: 86,
-              decoration: const BoxDecoration(
-                color: Color(0xFFF1F5F9),
+              decoration: BoxDecoration(
+                color: isNegative ? Color(0xFFF1F5F9) : Colors.white,
                 shape: BoxShape.circle,
               ),
             ),

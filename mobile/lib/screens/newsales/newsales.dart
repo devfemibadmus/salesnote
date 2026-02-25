@@ -1,10 +1,8 @@
-import 'dart:io';
 import 'dart:async';
 
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/models.dart';
@@ -18,6 +16,7 @@ import '../../services/phone.dart';
 import '../../services/region.dart';
 import '../../services/token_store.dart';
 import '../../services/validators.dart';
+import '../../widgets/add_signature_sheet.dart';
 
 part 'states.dart';
 part 'widgets/steps.dart';
@@ -841,40 +840,29 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   }
 
   Future<void> _openAddSignatureSheet() async {
-    final result = await showModalBottomSheet<Object>(
+    final result = await showAddSignatureSheet(
       context: context,
-      isScrollControlled: true,
-      isDismissible: true,
-      enableDrag: true,
-      barrierColor: const Color(0x8A000000),
-      backgroundColor: Colors.transparent,
-      builder: (context) => _AddSignatureSheet(
-        onUpload: (name, imagePath) async {
-          setState(() => _uploadingSignature = true);
-          try {
-            final signature = await _api.uploadSignature(
-              name: name,
-              imagePath: imagePath,
-            );
-            return signature;
-          } finally {
-            if (mounted) {
-              setState(() => _uploadingSignature = false);
-            }
+      onUpload: (name, imagePath) async {
+        setState(() => _uploadingSignature = true);
+        try {
+          return await _api.uploadSignature(name: name, imagePath: imagePath);
+        } finally {
+          if (mounted) {
+            setState(() => _uploadingSignature = false);
           }
-        },
-      ),
+        }
+      },
     );
 
     if (!mounted || result == null) return;
-    if (result is _SignatureSheetError) {
-      _showSnackBar(result.message);
+    if (result.errorMessage != null) {
+      _showSnackBar(result.errorMessage!);
       return;
     }
-    if (result is! SignatureItem) {
+    if (result.signature == null) {
       return;
     }
-    final created = result;
+    final created = result.signature!;
     setState(() {
       _signatures.insert(0, created);
       _selectedSignatureId = created.id;
