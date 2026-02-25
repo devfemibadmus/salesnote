@@ -17,6 +17,58 @@ use crate::models::{
 
 const MAX_ITEM_NAME_CHARS: usize = 20;
 const MAX_SALE_TOTAL: f64 = 9_999_999_999.99;
+const MIN_SALE_TOTAL: f64 = 0.0;
+
+fn compute_grand_total(
+    subtotal: f64,
+    discount_amount: f64,
+    vat_amount: f64,
+    service_fee_amount: f64,
+    delivery_fee_amount: f64,
+    rounding_amount: f64,
+    other_amount: f64,
+) -> f64 {
+    subtotal - discount_amount
+        + vat_amount
+        + service_fee_amount
+        + delivery_fee_amount
+        + rounding_amount
+        + other_amount
+}
+
+fn validate_adjustments(
+    discount_amount: f64,
+    vat_amount: f64,
+    service_fee_amount: f64,
+    delivery_fee_amount: f64,
+    rounding_amount: f64,
+    other_amount: f64,
+) -> Result<(), &'static str> {
+    let values = [
+        discount_amount,
+        vat_amount,
+        service_fee_amount,
+        delivery_fee_amount,
+        rounding_amount,
+        other_amount,
+    ];
+    if values.iter().any(|v| !v.is_finite()) {
+        return Err("invalid adjustment amount");
+    }
+    if discount_amount < 0.0 {
+        return Err("discount must be zero or greater");
+    }
+    if vat_amount < 0.0 {
+        return Err("vat must be zero or greater");
+    }
+    if service_fee_amount < 0.0 {
+        return Err("service fee must be zero or greater");
+    }
+    if delivery_fee_amount < 0.0 {
+        return Err("delivery fee must be zero or greater");
+    }
+    Ok(())
+}
 
 fn validate_sale_items_and_total(input: &SaleInput) -> Result<(), &'static str> {
     if input.items.is_empty() {
@@ -37,6 +89,36 @@ fn validate_sale_items_and_total(input: &SaleInput) -> Result<(), &'static str> 
         if !total.is_finite() || total > MAX_SALE_TOTAL {
             return Err("sale total must not be more than 9,999,999,999.99");
         }
+    }
+
+    if let Err(message) = validate_adjustments(
+        input.discount_amount,
+        input.vat_amount,
+        input.service_fee_amount,
+        input.delivery_fee_amount,
+        input.rounding_amount,
+        input.other_amount,
+    ) {
+        return Err(message);
+    }
+
+    let grand_total = compute_grand_total(
+        total,
+        input.discount_amount,
+        input.vat_amount,
+        input.service_fee_amount,
+        input.delivery_fee_amount,
+        input.rounding_amount,
+        input.other_amount,
+    );
+    if !grand_total.is_finite() {
+        return Err("sale total must be a valid number");
+    }
+    if grand_total < MIN_SALE_TOTAL {
+        return Err("sale total must be zero or greater");
+    }
+    if grand_total > MAX_SALE_TOTAL {
+        return Err("sale total must not be more than 9,999,999,999.99");
     }
 
     Ok(())
@@ -196,6 +278,42 @@ pub async fn update_sale(
     if let Some(customer_contact) = &input.customer_contact {
         if customer_contact.trim().is_empty() {
             return json_error(StatusCode::BAD_REQUEST, "customer contact cannot be empty");
+        }
+    }
+    if let Some(discount_amount) = input.discount_amount {
+        if !discount_amount.is_finite() || discount_amount < 0.0 {
+            return json_error(StatusCode::BAD_REQUEST, "discount must be zero or greater");
+        }
+    }
+    if let Some(vat_amount) = input.vat_amount {
+        if !vat_amount.is_finite() || vat_amount < 0.0 {
+            return json_error(StatusCode::BAD_REQUEST, "vat must be zero or greater");
+        }
+    }
+    if let Some(service_fee_amount) = input.service_fee_amount {
+        if !service_fee_amount.is_finite() || service_fee_amount < 0.0 {
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "service fee must be zero or greater",
+            );
+        }
+    }
+    if let Some(delivery_fee_amount) = input.delivery_fee_amount {
+        if !delivery_fee_amount.is_finite() || delivery_fee_amount < 0.0 {
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "delivery fee must be zero or greater",
+            );
+        }
+    }
+    if let Some(rounding_amount) = input.rounding_amount {
+        if !rounding_amount.is_finite() {
+            return json_error(StatusCode::BAD_REQUEST, "invalid adjustment amount");
+        }
+    }
+    if let Some(other_amount) = input.other_amount {
+        if !other_amount.is_finite() {
+            return json_error(StatusCode::BAD_REQUEST, "invalid adjustment amount");
         }
     }
     match Sale::update_authorized(

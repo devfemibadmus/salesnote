@@ -1,10 +1,10 @@
-use actix_web::{http::StatusCode, web, Responder};
 use actix_web::web::ReqData;
+use actix_web::{http::StatusCode, web, Responder};
 
 use crate::api::middlewares::auth::AuthDeviceId;
-use crate::models::AnalyticsSummary;
-use crate::api::state::AppState;
 use crate::api::response::{json_error, json_ok};
+use crate::api::state::AppState;
+use crate::models::AnalyticsSummary;
 
 pub async fn analytics_summary(
     state: web::Data<AppState>,
@@ -16,7 +16,10 @@ pub async fn analytics_summary(
         Ok(None) => json_error(StatusCode::UNAUTHORIZED, "unauthorized"),
         Err(e) => {
             tracing::error!("analytics error: {}", e);
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Server error. Please try again.")
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
         }
     }
 }

@@ -19,6 +19,20 @@ pub struct SaleInput {
     pub customer_name: String,
     pub customer_contact: String,
     pub created_at: Option<String>,
+    #[serde(default)]
+    pub discount_amount: f64,
+    #[serde(default, alias = "tax_amount")]
+    pub vat_amount: f64,
+    #[serde(default)]
+    pub service_fee_amount: f64,
+    #[serde(default)]
+    pub delivery_fee_amount: f64,
+    #[serde(default)]
+    pub rounding_amount: f64,
+    #[serde(default)]
+    pub other_amount: f64,
+    #[serde(default)]
+    pub other_label: String,
     pub items: Vec<SaleItemInput>,
 }
 
@@ -28,6 +42,14 @@ pub struct SaleUpdateInput {
     pub customer_name: Option<String>,
     pub customer_contact: Option<String>,
     pub items: Option<Vec<SaleItemInput>>,
+    pub discount_amount: Option<f64>,
+    #[serde(alias = "tax_amount")]
+    pub vat_amount: Option<f64>,
+    pub service_fee_amount: Option<f64>,
+    pub delivery_fee_amount: Option<f64>,
+    pub rounding_amount: Option<f64>,
+    pub other_amount: Option<f64>,
+    pub other_label: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,6 +69,22 @@ pub struct Sale {
     pub signature_id: i64,
     pub customer_name: Option<String>,
     pub customer_contact: Option<String>,
+    #[serde(default)]
+    pub subtotal: f64,
+    #[serde(default)]
+    pub discount_amount: f64,
+    #[serde(default)]
+    pub vat_amount: f64,
+    #[serde(default)]
+    pub service_fee_amount: f64,
+    #[serde(default)]
+    pub delivery_fee_amount: f64,
+    #[serde(default)]
+    pub rounding_amount: f64,
+    #[serde(default)]
+    pub other_amount: f64,
+    #[serde(default)]
+    pub other_label: String,
     pub total: f64,
     pub created_at: String,
     pub items: Vec<SaleItem>,
@@ -146,7 +184,10 @@ impl Sale {
             r#"
             WITH {},
             sale_row AS (
-              SELECT id, shop_id, signature_id, customer_name, customer_contact, total, created_at
+              SELECT id, shop_id, signature_id, customer_name, customer_contact,
+                     subtotal, discount_amount, vat_amount, service_fee_amount,
+                     delivery_fee_amount, rounding_amount, other_amount, other_label,
+                     total, created_at
               FROM sales
               WHERE id = $3
                 AND shop_id = $1
@@ -161,6 +202,14 @@ impl Sale {
                   'signature_id', s.signature_id,
                   'customer_name', s.customer_name,
                   'customer_contact', s.customer_contact,
+                  'subtotal', s.subtotal,
+                  'discount_amount', s.discount_amount,
+                  'vat_amount', s.vat_amount,
+                  'service_fee_amount', s.service_fee_amount,
+                  'delivery_fee_amount', s.delivery_fee_amount,
+                  'rounding_amount', s.rounding_amount,
+                  'other_amount', s.other_amount,
+                  'other_label', s.other_label,
                   'total', s.total,
                   'created_at', s.created_at::text,
                   'items', COALESCE((
@@ -212,7 +261,10 @@ impl Sale {
             r#"
             WITH {},
             paged_sales AS (
-              SELECT id, shop_id, signature_id, customer_name, customer_contact, total, created_at
+              SELECT id, shop_id, signature_id, customer_name, customer_contact,
+                     subtotal, discount_amount, vat_amount, service_fee_amount,
+                     delivery_fee_amount, rounding_amount, other_amount, other_label,
+                     total, created_at
               FROM sales
               WHERE shop_id = $1
                 AND EXISTS (SELECT 1 FROM auth_active)
@@ -228,6 +280,14 @@ impl Sale {
                   'signature_id', s.signature_id,
                   'customer_name', s.customer_name,
                   'customer_contact', s.customer_contact,
+                  'subtotal', s.subtotal,
+                  'discount_amount', s.discount_amount,
+                  'vat_amount', s.vat_amount,
+                  'service_fee_amount', s.service_fee_amount,
+                  'delivery_fee_amount', s.delivery_fee_amount,
+                  'rounding_amount', s.rounding_amount,
+                  'other_amount', s.other_amount,
+                  'other_label', s.other_label,
                   'total', s.total,
                   'created_at', s.created_at::text,
                   'items',
@@ -289,7 +349,10 @@ impl Sale {
             r#"
             WITH {},
             sale_row AS (
-              SELECT id, shop_id, signature_id, customer_name, customer_contact, total, created_at, created_at::date AS day
+              SELECT id, shop_id, signature_id, customer_name, customer_contact,
+                     subtotal, discount_amount, vat_amount, service_fee_amount,
+                     delivery_fee_amount, rounding_amount, other_amount, other_label,
+                     total, created_at, created_at::date AS day
               FROM sales
               WHERE id = $3
                 AND shop_id = $1
@@ -343,18 +406,48 @@ impl Sale {
               SELECT
                 CASE
                   WHEN $5::bool THEN COALESCE((SELECT SUM(line_total)::float8 FROM input_items), 0.0)
-                  ELSE COALESCE((SELECT total FROM sale_row), 0.0)
-                END AS total
+                  ELSE COALESCE((SELECT subtotal FROM sale_row), 0.0)
+                END AS subtotal,
+                COALESCE($12::float8, (SELECT discount_amount FROM sale_row)) AS discount_amount,
+                COALESCE($13::float8, (SELECT vat_amount FROM sale_row)) AS vat_amount,
+                COALESCE($14::float8, (SELECT service_fee_amount FROM sale_row)) AS service_fee_amount,
+                COALESCE($15::float8, (SELECT delivery_fee_amount FROM sale_row)) AS delivery_fee_amount,
+                COALESCE($16::float8, (SELECT rounding_amount FROM sale_row)) AS rounding_amount,
+                COALESCE($17::float8, (SELECT other_amount FROM sale_row)) AS other_amount,
+                COALESCE($18::text, (SELECT other_label FROM sale_row)) AS other_label,
+                (
+                  CASE
+                    WHEN $5::bool THEN COALESCE((SELECT SUM(line_total)::float8 FROM input_items), 0.0)
+                    ELSE COALESCE((SELECT subtotal FROM sale_row), 0.0)
+                  END
+                  - COALESCE($12::float8, (SELECT discount_amount FROM sale_row))
+                  + COALESCE($13::float8, (SELECT vat_amount FROM sale_row))
+                  + COALESCE($14::float8, (SELECT service_fee_amount FROM sale_row))
+                  + COALESCE($15::float8, (SELECT delivery_fee_amount FROM sale_row))
+                  + COALESCE($16::float8, (SELECT rounding_amount FROM sale_row))
+                  + COALESCE($17::float8, (SELECT other_amount FROM sale_row))
+                ) AS total
             ),
             updated_sale AS (
               UPDATE sales s
               SET signature_id = COALESCE($4, s.signature_id),
                   customer_name = COALESCE($10, s.customer_name),
                   customer_contact = COALESCE($11, s.customer_contact),
+                  subtotal = (SELECT subtotal FROM new_total),
+                  discount_amount = (SELECT discount_amount FROM new_total),
+                  vat_amount = (SELECT vat_amount FROM new_total),
+                  service_fee_amount = (SELECT service_fee_amount FROM new_total),
+                  delivery_fee_amount = (SELECT delivery_fee_amount FROM new_total),
+                  rounding_amount = (SELECT rounding_amount FROM new_total),
+                  other_amount = (SELECT other_amount FROM new_total),
+                  other_label = (SELECT other_label FROM new_total),
                   total = (SELECT total FROM new_total)
               WHERE s.id IN (SELECT id FROM window_ok)
                 AND (SELECT ok FROM sig_ok)
-              RETURNING s.id, s.shop_id, s.signature_id, s.customer_name, s.customer_contact, s.total,
+              RETURNING s.id, s.shop_id, s.signature_id, s.customer_name, s.customer_contact,
+                        s.subtotal, s.discount_amount, s.vat_amount, s.service_fee_amount,
+                        s.delivery_fee_amount, s.rounding_amount, s.other_amount, s.other_label,
+                        s.total,
                         s.created_at::text AS created_at, s.created_at::date AS day,
                         (SELECT total FROM sale_row) AS old_total
             ),
@@ -419,6 +512,14 @@ impl Sale {
                   'signature_id', u.signature_id,
                   'customer_name', u.customer_name,
                   'customer_contact', u.customer_contact,
+                  'subtotal', u.subtotal,
+                  'discount_amount', u.discount_amount,
+                  'vat_amount', u.vat_amount,
+                  'service_fee_amount', u.service_fee_amount,
+                  'delivery_fee_amount', u.delivery_fee_amount,
+                  'rounding_amount', u.rounding_amount,
+                  'other_amount', u.other_amount,
+                  'other_label', u.other_label,
                   'total', u.total,
                   'created_at', u.created_at,
                   'items',
@@ -472,6 +573,13 @@ impl Sale {
             .bind(&line_totals)
             .bind(input.customer_name)
             .bind(input.customer_contact)
+            .bind(input.discount_amount)
+            .bind(input.vat_amount)
+            .bind(input.service_fee_amount)
+            .bind(input.delivery_fee_amount)
+            .bind(input.rounding_amount)
+            .bind(input.other_amount)
+            .bind(input.other_label)
             .fetch_one(pool)
             .await?;
 
@@ -784,6 +892,8 @@ impl Sale {
 
         let sales_rows = sqlx::query(
             "SELECT id, shop_id, signature_id, customer_name, customer_contact,
+                    subtotal, discount_amount, vat_amount, service_fee_amount,
+                    delivery_fee_amount, rounding_amount, other_amount, other_label,
                     total, created_at::text as created_at
              FROM sales
              WHERE shop_id = $1
@@ -835,6 +945,14 @@ impl Sale {
                 signature_id: row.get("signature_id"),
                 customer_name: row.get("customer_name"),
                 customer_contact: row.get("customer_contact"),
+                subtotal: row.get("subtotal"),
+                discount_amount: row.get("discount_amount"),
+                vat_amount: row.get("vat_amount"),
+                service_fee_amount: row.get("service_fee_amount"),
+                delivery_fee_amount: row.get("delivery_fee_amount"),
+                rounding_amount: row.get("rounding_amount"),
+                other_amount: row.get("other_amount"),
+                other_label: row.get("other_label"),
                 total: row.get("total"),
                 created_at: row.get("created_at"),
                 items: if include_items {
@@ -885,27 +1003,53 @@ impl Sale {
             "WITH input_items AS (
                SELECT *
                FROM unnest(
-                 $6::text[],
-                 $7::float8[],
-                 $8::float8[],
-                 $9::float8[]
+                 $13::text[],
+                 $14::float8[],
+                 $15::float8[],
+                 $16::float8[]
                ) WITH ORDINALITY AS i(product_name, quantity, unit_price, line_total, ord)
              ),
-             sale_total AS (
-               SELECT COALESCE(SUM(line_total), 0.0)::float8 AS total
+             sale_totals AS (
+               SELECT
+                 COALESCE(SUM(line_total), 0.0)::float8 AS subtotal,
+                 (
+                   COALESCE(SUM(line_total), 0.0)::float8
+                   - $6::float8
+                   + $7::float8
+                   + $8::float8
+                   + $9::float8
+                   + $10::float8
+                   + $11::float8
+                 )::float8 AS total
                FROM input_items
              ),
              inserted_sale AS (
-               INSERT INTO sales (shop_id, signature_id, customer_name, customer_contact, total, created_at)
+               INSERT INTO sales (
+                 shop_id, signature_id, customer_name, customer_contact,
+                 subtotal, discount_amount, vat_amount, service_fee_amount,
+                 delivery_fee_amount, rounding_amount, other_amount, other_label,
+                 total, created_at
+               )
                SELECT
                  $1,
                  $2,
                  $3,
                  $4,
+                 st.subtotal,
+                 $6,
+                 $7,
+                 $8,
+                 $9,
+                 $10,
+                 $11,
+                 $12,
                  st.total,
                  COALESCE($5, NOW())
-               FROM sale_total st
-               RETURNING id, shop_id, signature_id, customer_name, customer_contact, total, created_at, created_at::date AS created_day
+               FROM sale_totals st
+               RETURNING id, shop_id, signature_id, customer_name, customer_contact,
+                         subtotal, discount_amount, vat_amount, service_fee_amount,
+                         delivery_fee_amount, rounding_amount, other_amount, other_label,
+                         total, created_at, created_at::date AS created_day
              ),
              inserted_items AS (
                INSERT INTO sale_items (sale_id, product_name, quantity, unit_price, line_total)
@@ -958,11 +1102,19 @@ impl Sale {
              SELECT
                s.id,
                s.shop_id,
-               s.signature_id,
-               s.customer_name,
-               s.customer_contact,
-               s.total,
-               s.created_at::text AS created_at,
+              s.signature_id,
+              s.customer_name,
+              s.customer_contact,
+              s.subtotal,
+              s.discount_amount,
+              s.vat_amount,
+              s.service_fee_amount,
+              s.delivery_fee_amount,
+              s.rounding_amount,
+              s.other_amount,
+              s.other_label,
+              s.total,
+              s.created_at::text AS created_at,
                COALESCE(
                  (
                    SELECT json_agg(
@@ -987,6 +1139,13 @@ impl Sale {
         .bind(&payload.input.customer_name)
         .bind(&payload.input.customer_contact)
         .bind(payload.created_at)
+        .bind(payload.input.discount_amount)
+        .bind(payload.input.vat_amount)
+        .bind(payload.input.service_fee_amount)
+        .bind(payload.input.delivery_fee_amount)
+        .bind(payload.input.rounding_amount)
+        .bind(payload.input.other_amount)
+        .bind(&payload.input.other_label)
         .bind(&product_names)
         .bind(&quantities)
         .bind(&unit_prices)
@@ -1006,6 +1165,14 @@ impl Sale {
             signature_id: payload.input.signature_id,
             customer_name: Some(payload.input.customer_name.clone()),
             customer_contact: Some(payload.input.customer_contact.clone()),
+            subtotal: row.get("subtotal"),
+            discount_amount: row.get("discount_amount"),
+            vat_amount: row.get("vat_amount"),
+            service_fee_amount: row.get("service_fee_amount"),
+            delivery_fee_amount: row.get("delivery_fee_amount"),
+            rounding_amount: row.get("rounding_amount"),
+            other_amount: row.get("other_amount"),
+            other_label: row.get("other_label"),
             total,
             created_at,
             items,
@@ -1017,6 +1184,8 @@ impl Sale {
 
         let sale_row = sqlx::query(
             "SELECT id, shop_id, signature_id, customer_name, customer_contact,
+                    subtotal, discount_amount, vat_amount, service_fee_amount,
+                    delivery_fee_amount, rounding_amount, other_amount, other_label,
                     total, created_at::text as created_at, created_at::date AS created_day
              FROM sales
              WHERE id = $1
@@ -1032,7 +1201,7 @@ impl Sale {
 
         let mut items_result: Vec<SaleItem> = Vec::new();
         let mut product_delta_map: HashMap<String, f64> = HashMap::new();
-        let total = if let Some(items) = &payload.input.items {
+        let subtotal = if let Some(items) = &payload.input.items {
             let old_item_rows = sqlx::query(
                 "SELECT product_name, SUM(quantity)::float8 AS quantity
                  FROM sale_items
@@ -1043,7 +1212,7 @@ impl Sale {
             .fetch_all(&mut *tx)
             .await?;
 
-            let total: f64 = items.iter().map(|i| i.quantity * i.unit_price).sum();
+            let subtotal: f64 = items.iter().map(|i| i.quantity * i.unit_price).sum();
 
             sqlx::query("DELETE FROM sale_items WHERE sale_id = $1")
                 .bind(payload.sale_id)
@@ -1101,22 +1270,74 @@ impl Sale {
                     .or_insert(0.0) += item.quantity;
             }
 
-            total
+            subtotal
         } else {
-            sale_row.get::<f64, _>("total")
+            sale_row.get::<f64, _>("subtotal")
         };
+
+        let discount_amount = payload
+            .input
+            .discount_amount
+            .unwrap_or_else(|| sale_row.get("discount_amount"));
+        let vat_amount = payload
+            .input
+            .vat_amount
+            .unwrap_or_else(|| sale_row.get("vat_amount"));
+        let service_fee_amount = payload
+            .input
+            .service_fee_amount
+            .unwrap_or_else(|| sale_row.get("service_fee_amount"));
+        let delivery_fee_amount = payload
+            .input
+            .delivery_fee_amount
+            .unwrap_or_else(|| sale_row.get("delivery_fee_amount"));
+        let rounding_amount = payload
+            .input
+            .rounding_amount
+            .unwrap_or_else(|| sale_row.get("rounding_amount"));
+        let other_amount = payload
+            .input
+            .other_amount
+            .unwrap_or_else(|| sale_row.get("other_amount"));
+        let other_label = payload
+            .input
+            .other_label
+            .clone()
+            .unwrap_or_else(|| sale_row.get("other_label"));
+        let total = subtotal - discount_amount
+            + vat_amount
+            + service_fee_amount
+            + delivery_fee_amount
+            + rounding_amount
+            + other_amount;
 
         sqlx::query(
             "UPDATE sales SET
                 signature_id = COALESCE($1, signature_id),
                 customer_name = COALESCE($2, customer_name),
                 customer_contact = COALESCE($3, customer_contact),
-                total = $4
-             WHERE id = $5",
+                subtotal = $4,
+                discount_amount = $5,
+                vat_amount = $6,
+                service_fee_amount = $7,
+                delivery_fee_amount = $8,
+                rounding_amount = $9,
+                other_amount = $10,
+                other_label = $11,
+                total = $12
+             WHERE id = $13",
         )
         .bind(&payload.input.signature_id)
         .bind(&payload.input.customer_name)
         .bind(&payload.input.customer_contact)
+        .bind(subtotal)
+        .bind(discount_amount)
+        .bind(vat_amount)
+        .bind(service_fee_amount)
+        .bind(delivery_fee_amount)
+        .bind(rounding_amount)
+        .bind(other_amount)
+        .bind(&other_label)
         .bind(total)
         .bind(payload.sale_id)
         .execute(&mut *tx)
@@ -1127,8 +1348,13 @@ impl Sale {
             Self::upsert_shop_sales_daily(&mut tx, shop_id, created_day, total_delta, 0).await?;
         }
         if !product_delta_map.is_empty() {
-            Self::upsert_shop_product_daily_batch(&mut tx, shop_id, created_day, &product_delta_map)
-                .await?;
+            Self::upsert_shop_product_daily_batch(
+                &mut tx,
+                shop_id,
+                created_day,
+                &product_delta_map,
+            )
+            .await?;
         }
 
         tx.commit().await?;
@@ -1156,6 +1382,14 @@ impl Sale {
                 .customer_contact
                 .clone()
                 .or_else(|| sale_row.get::<Option<String>, _>("customer_contact")),
+            subtotal,
+            discount_amount,
+            vat_amount,
+            service_fee_amount,
+            delivery_fee_amount,
+            rounding_amount,
+            other_amount,
+            other_label,
             total,
             created_at: sale_row.get("created_at"),
             items,
@@ -1249,7 +1483,12 @@ impl Sale {
         payload: &IdPayload,
     ) -> Result<Option<Sale>, sqlx::Error> {
         let sale_row = sqlx::query(
-            "SELECT id, shop_id, signature_id, customer_name, customer_contact, total, created_at::text as created_at FROM sales WHERE id = $1",
+            "SELECT id, shop_id, signature_id, customer_name, customer_contact,
+                    subtotal, discount_amount, vat_amount, service_fee_amount,
+                    delivery_fee_amount, rounding_amount, other_amount, other_label,
+                    total, created_at::text as created_at
+             FROM sales
+             WHERE id = $1",
         )
         .bind(payload.id)
         .fetch_optional(pool)
@@ -1268,6 +1507,14 @@ impl Sale {
             signature_id: sale_row.get("signature_id"),
             customer_name: sale_row.get("customer_name"),
             customer_contact: sale_row.get("customer_contact"),
+            subtotal: sale_row.get("subtotal"),
+            discount_amount: sale_row.get("discount_amount"),
+            vat_amount: sale_row.get("vat_amount"),
+            service_fee_amount: sale_row.get("service_fee_amount"),
+            delivery_fee_amount: sale_row.get("delivery_fee_amount"),
+            rounding_amount: sale_row.get("rounding_amount"),
+            other_amount: sale_row.get("other_amount"),
+            other_label: sale_row.get("other_label"),
             total: sale_row.get("total"),
             created_at: sale_row.get("created_at"),
             items,

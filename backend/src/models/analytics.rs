@@ -176,7 +176,10 @@ impl AnalyticsSummary {
             ),
             recent_sales AS (
               SELECT
-                id, shop_id, signature_id, customer_name, customer_contact, total,
+                id, shop_id, signature_id, customer_name, customer_contact,
+                subtotal, discount_amount, vat_amount, service_fee_amount,
+                delivery_fee_amount, rounding_amount, other_amount, other_label,
+                total,
                 created_at::text AS created_at
               FROM sales
               WHERE shop_id = $1
@@ -260,6 +263,14 @@ impl AnalyticsSummary {
                     'signature_id', s.signature_id,
                     'customer_name', s.customer_name,
                     'customer_contact', s.customer_contact,
+                    'subtotal', s.subtotal,
+                    'discount_amount', s.discount_amount,
+                    'vat_amount', s.vat_amount,
+                    'service_fee_amount', s.service_fee_amount,
+                    'delivery_fee_amount', s.delivery_fee_amount,
+                    'rounding_amount', s.rounding_amount,
+                    'other_amount', s.other_amount,
+                    'other_label', s.other_label,
                     'total', s.total,
                     'created_at', s.created_at,
                     'items', '[]'::json
@@ -300,8 +311,9 @@ impl AnalyticsSummary {
             "slow_moving": slow_json
         }))
         .map_err(|e| sqlx::Error::Protocol(format!("invalid home analytics json: {}", e).into()))?;
-        let recent_sales: Vec<Sale> = serde_json::from_value(recent_sales_json)
-            .map_err(|e| sqlx::Error::Protocol(format!("invalid home recent sales json: {}", e).into()))?;
+        let recent_sales: Vec<Sale> = serde_json::from_value(recent_sales_json).map_err(|e| {
+            sqlx::Error::Protocol(format!("invalid home recent sales json: {}", e).into())
+        })?;
 
         Ok(Some(HomeSummaryData {
             shop,
