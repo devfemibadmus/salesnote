@@ -4,15 +4,14 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 use crate::api::handlers::auth;
-use crate::api::handlers::auth::require_active_session;
 use crate::api::middlewares::auth::AuthDeviceId;
 use crate::api::response::{json_created, json_empty, json_error, json_ok};
 use crate::api::state::AppState;
 use crate::models::{
+    AuthorizedSaleCreatePayload, AuthorizedSaleCreateResult,
     AuthorizedSaleDeletePayload, AuthorizedSaleDeleteResult, AuthorizedSaleGetPayload,
     AuthorizedSaleGetResult, AuthorizedSaleListPayload, AuthorizedSaleListResult,
-    AuthorizedSaleUpdatePayload, AuthorizedSaleUpdateResult, IdPayload, Sale, SaleCreatePayload,
-    SaleInput, SaleUpdateInput, Signature,
+    AuthorizedSaleUpdatePayload, AuthorizedSaleUpdateResult, Sale, SaleInput, SaleUpdateInput,
 };
 
 const MAX_ITEM_NAME_CHARS: usize = 20;
@@ -175,8 +174,8 @@ pub async fn list_sales(
 
 pub async fn create_sale(
     state: web::Data<AppState>,
-    req: HttpRequest,
     shop_id: ReqData<i64>,
+    device_id: ReqData<AuthDeviceId>,
     payload: web::Json<SaleInput>,
 ) -> impl Responder {
     if let Err(message) = validate_sale_items_and_total(&payload) {
@@ -188,10 +187,6 @@ pub async fn create_sale(
             StatusCode::BAD_REQUEST,
             "customer name and contact are required",
         );
-    }
-
-    if let Err(resp) = require_active_session(&state, &req, *shop_id).await {
-        return resp;
     }
 
     let input = payload.into_inner();
@@ -209,39 +204,27 @@ pub async fn create_sale(
         None
     };
 
-    let signature = match Signature::get(
+    match Sale::create_authorized(
         &state.pool,
-        &IdPayload {
-            id: input.signature_id,
-        },
-    )
-    .await
-    {
-        Ok(Some(sig)) => sig,
-        Ok(None) => return json_error(StatusCode::NOT_FOUND, "signature not found"),
-        Err(e) => {
-            tracing::error!("get signature error: {}", e);
-            return json_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Server error. Please try again.",
-            );
-        }
-    };
-    if signature.shop_id != *shop_id {
-        return json_error(StatusCode::FORBIDDEN, "shop mismatch");
-    }
-
-    match Sale::create(
-        &state.pool,
-        &SaleCreatePayload {
+        &AuthorizedSaleCreatePayload {
             shop_id: *shop_id,
+            device_id: (*device_id).0,
             input,
             created_at: custom_created_at,
         },
     )
     .await
     {
-        Ok(sale) => json_created(sale),
+        Ok(AuthorizedSaleCreateResult::Unauthorized) => {
+            json_error(StatusCode::UNAUTHORIZED, "unauthorized")
+        }
+        Ok(AuthorizedSaleCreateResult::SignatureNotFound) => {
+            json_error(StatusCode::NOT_FOUND, "signature not found")
+        }
+        Ok(AuthorizedSaleCreateResult::ShopMismatch) => {
+            json_error(StatusCode::FORBIDDEN, "shop mismatch")
+        }
+        Ok(AuthorizedSaleCreateResult::Created(sale)) => json_created(sale),
         Err(e) => {
             tracing::error!("create sale error: {}", e);
             json_error(

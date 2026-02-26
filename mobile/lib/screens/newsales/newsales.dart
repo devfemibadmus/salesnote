@@ -51,6 +51,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   static const String _defaultDraftLabel = 'New Sale';
   static const String _defaultOtherLabel = 'Others';
   static const double _maxAmount = 9_999_999_999.99;
+  static const int _salesRefreshPerPage = 20;
 
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _customerContactController =
@@ -740,7 +741,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
       final createdSale = await _api.createSale(input);
       await _updateLocalCachesAfterSaleCreate(createdSale);
-      await _refreshHomeSummaryCacheAfterSaleCreate();
+      unawaited(_refreshPostCreateCachesAfterSaleCreate());
       await _clearActiveDraftAfterSubmit();
       if (!mounted) return null;
       _showSnackBar('Sale created successfully.');
@@ -804,11 +805,22 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     await CacheLoader.saveItemSuggestionsCache(merged.toList());
   }
 
-  Future<void> _refreshHomeSummaryCacheAfterSaleCreate() async {
+  Future<void> _refreshPostCreateCachesAfterSaleCreate() async {
+    final bgApi = ApiClient(TokenStore());
     try {
-      await CacheLoader.fetchAndCacheHomeSummary(_api);
+      await Future.wait<void>([
+        CacheLoader.fetchAndCacheHomeSummary(bgApi),
+        CacheLoader.fetchAndCacheSalesPage(
+          bgApi,
+          includeItems: false,
+          page: 1,
+          perPage: _salesRefreshPerPage,
+        ).then((_) {}),
+      ]);
     } catch (_) {
       // Ignore refresh failure; local optimistic caches are already updated.
+    } finally {
+      bgApi.dispose();
     }
   }
 
@@ -890,7 +902,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       (_) => false,
       arguments: SalesRouteArgs(
         openSaleId: createdSaleId.trim(),
-        refreshFirst: true,
+        refreshFirst: false,
       ),
     );
   }

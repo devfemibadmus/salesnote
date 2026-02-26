@@ -102,8 +102,9 @@ pub struct SaleMetaPayload {
 }
 
 #[derive(Debug, Clone)]
-pub struct SaleCreatePayload {
+pub struct AuthorizedSaleCreatePayload {
     pub shop_id: i64,
+    pub device_id: i64,
     pub input: SaleInput,
     pub created_at: Option<DateTime<Utc>>,
 }
@@ -173,6 +174,14 @@ pub enum AuthorizedSaleGetResult {
     Unauthorized,
     NotFound,
     Sale(Sale),
+}
+
+#[derive(Debug)]
+pub enum AuthorizedSaleCreateResult {
+    Unauthorized,
+    SignatureNotFound,
+    ShopMismatch,
+    Created(Sale),
 }
 
 impl Sale {
@@ -983,7 +992,10 @@ impl Sale {
         }))
     }
 
-    pub async fn create(pool: &PgPool, payload: &SaleCreatePayload) -> Result<Sale, sqlx::Error> {
+    pub async fn create_authorized(
+        pool: &PgPool,
+        payload: &AuthorizedSaleCreatePayload,
+    ) -> Result<AuthorizedSaleCreateResult, sqlx::Error> {
         let product_names: Vec<String> = payload
             .input
             .items
@@ -999,145 +1011,173 @@ impl Sale {
             .map(|i| i.quantity * i.unit_price)
             .collect();
 
-        let row = sqlx::query(
-            "WITH input_items AS (
-               SELECT *
-               FROM unnest(
-                 $13::text[],
-                 $14::float8[],
-                 $15::float8[],
-                 $16::float8[]
-               ) WITH ORDINALITY AS i(product_name, quantity, unit_price, line_total, ord)
-             ),
-             sale_totals AS (
-               SELECT
-                 COALESCE(SUM(line_total), 0.0)::float8 AS subtotal,
-                 (
-                   COALESCE(SUM(line_total), 0.0)::float8
-                   - $6::float8
-                   + $7::float8
-                   + $8::float8
-                   + $9::float8
-                   + $10::float8
-                   + $11::float8
-                 )::float8 AS total
-               FROM input_items
-             ),
-             inserted_sale AS (
-               INSERT INTO sales (
-                 shop_id, signature_id, customer_name, customer_contact,
-                 subtotal, discount_amount, vat_amount, service_fee_amount,
-                 delivery_fee_amount, rounding_amount, other_amount, other_label,
-                 total, created_at
-               )
-               SELECT
-                 $1,
-                 $2,
-                 $3,
-                 $4,
-                 st.subtotal,
-                 $6,
-                 $7,
-                 $8,
-                 $9,
-                 $10,
-                 $11,
-                 $12,
-                 st.total,
-                 COALESCE($5, NOW())
-               FROM sale_totals st
-               RETURNING id, shop_id, signature_id, customer_name, customer_contact,
-                         subtotal, discount_amount, vat_amount, service_fee_amount,
-                         delivery_fee_amount, rounding_amount, other_amount, other_label,
-                         total, created_at, created_at::date AS created_day
-             ),
-             inserted_items AS (
-               INSERT INTO sale_items (sale_id, product_name, quantity, unit_price, line_total)
-               SELECT s.id, i.product_name, i.quantity, i.unit_price, i.line_total
-               FROM inserted_sale s
-               JOIN input_items i ON TRUE
-               ORDER BY i.ord
-               RETURNING id, sale_id, product_name, quantity, unit_price, line_total
-             ),
-             update_shop AS (
-               UPDATE shops sh
-               SET total_revenue = sh.total_revenue + s.total,
-                   total_orders = sh.total_orders + 1,
-                   total_customers = sh.total_customers + 1
-               FROM inserted_sale s
-               WHERE sh.id = s.shop_id
-               RETURNING sh.id
-             ),
-             upsert_sales_daily AS (
-               INSERT INTO shop_sales_daily (shop_id, day, total, orders)
-               SELECT s.shop_id, s.created_day, s.total, 1
-               FROM inserted_sale s
-               ON CONFLICT (shop_id, day)
-               DO UPDATE
-               SET total = shop_sales_daily.total + EXCLUDED.total,
-                   orders = shop_sales_daily.orders + EXCLUDED.orders,
-                   updated_at = NOW()
-               RETURNING shop_id
-             ),
-             product_rollup AS (
-               SELECT
-                 s.shop_id AS shop_id,
-                 s.created_day AS day,
-                 i.product_name AS product_name,
-                 SUM(i.quantity)::float8 AS quantity
-               FROM inserted_sale s
-               JOIN input_items i ON TRUE
-               GROUP BY s.shop_id, s.created_day, i.product_name
-             ),
-             upsert_product_daily AS (
-               INSERT INTO shop_product_daily (shop_id, product_name, day, quantity)
-               SELECT p.shop_id, p.product_name, p.day, p.quantity
-               FROM product_rollup p
-               ON CONFLICT (shop_id, product_name, day)
-               DO UPDATE
-               SET quantity = shop_product_daily.quantity + EXCLUDED.quantity,
-                   updated_at = NOW()
-               RETURNING shop_id
-             )
-             SELECT
-               s.id,
-               s.shop_id,
-              s.signature_id,
-              s.customer_name,
-              s.customer_contact,
-              s.subtotal,
-              s.discount_amount,
-              s.vat_amount,
-              s.service_fee_amount,
-              s.delivery_fee_amount,
-              s.rounding_amount,
-              s.other_amount,
-              s.other_label,
-              s.total,
-              s.created_at::text AS created_at,
-               COALESCE(
-                 (
-                   SELECT json_agg(
-                     json_build_object(
-                       'id', ii.id,
-                       'sale_id', ii.sale_id,
-                       'product_name', ii.product_name,
-                       'quantity', ii.quantity,
-                       'unit_price', ii.unit_price,
-                       'line_total', ii.line_total
-                     )
-                     ORDER BY ii.id ASC
-                   )
-                   FROM inserted_items ii
-                 ),
-                 '[]'::json
-               ) AS items_json
-             FROM inserted_sale s",
-        )
-        .bind(payload.shop_id)
-        .bind(payload.input.signature_id)
-        .bind(&payload.input.customer_name)
-        .bind(&payload.input.customer_contact)
+        let sql = format!(
+            r#"
+            WITH {},
+            signature_row AS (
+              SELECT id, shop_id
+              FROM signatures
+              WHERE id = $3
+            ),
+            signature_ok AS (
+              SELECT id
+              FROM signature_row
+              WHERE shop_id = $1
+            ),
+            input_items AS (
+              SELECT *
+              FROM unnest(
+                $14::text[],
+                $15::float8[],
+                $16::float8[],
+                $17::float8[]
+              ) WITH ORDINALITY AS i(product_name, quantity, unit_price, line_total, ord)
+            ),
+            sale_totals AS (
+              SELECT
+                COALESCE(SUM(line_total), 0.0)::float8 AS subtotal,
+                (
+                  COALESCE(SUM(line_total), 0.0)::float8
+                  - $7::float8
+                  + $8::float8
+                  + $9::float8
+                  + $10::float8
+                  + $11::float8
+                  + $12::float8
+                )::float8 AS total
+              FROM input_items
+            ),
+            inserted_sale AS (
+              INSERT INTO sales (
+                shop_id, signature_id, customer_name, customer_contact,
+                subtotal, discount_amount, vat_amount, service_fee_amount,
+                delivery_fee_amount, rounding_amount, other_amount, other_label,
+                total, created_at
+              )
+              SELECT
+                $1,
+                $3,
+                $4,
+                $5,
+                st.subtotal,
+                $7,
+                $8,
+                $9,
+                $10,
+                $11,
+                $12,
+                $13,
+                st.total,
+                COALESCE($6, NOW())
+              FROM sale_totals st
+              WHERE EXISTS (SELECT 1 FROM auth_active)
+                AND EXISTS (SELECT 1 FROM signature_ok)
+              RETURNING id, shop_id, signature_id, customer_name, customer_contact,
+                        subtotal, discount_amount, vat_amount, service_fee_amount,
+                        delivery_fee_amount, rounding_amount, other_amount, other_label,
+                        total, created_at, created_at::date AS created_day
+            ),
+            inserted_items AS (
+              INSERT INTO sale_items (sale_id, product_name, quantity, unit_price, line_total)
+              SELECT s.id, i.product_name, i.quantity, i.unit_price, i.line_total
+              FROM inserted_sale s
+              JOIN input_items i ON TRUE
+              ORDER BY i.ord
+              RETURNING id, sale_id, product_name, quantity, unit_price, line_total
+            ),
+            update_shop AS (
+              UPDATE shops sh
+              SET total_revenue = sh.total_revenue + s.total,
+                  total_orders = sh.total_orders + 1,
+                  total_customers = sh.total_customers + 1
+              FROM inserted_sale s
+              WHERE sh.id = s.shop_id
+              RETURNING sh.id
+            ),
+            upsert_sales_daily AS (
+              INSERT INTO shop_sales_daily (shop_id, day, total, orders)
+              SELECT s.shop_id, s.created_day, s.total, 1
+              FROM inserted_sale s
+              ON CONFLICT (shop_id, day)
+              DO UPDATE
+              SET total = shop_sales_daily.total + EXCLUDED.total,
+                  orders = shop_sales_daily.orders + EXCLUDED.orders,
+                  updated_at = NOW()
+              RETURNING shop_id
+            ),
+            product_rollup AS (
+              SELECT
+                s.shop_id AS shop_id,
+                s.created_day AS day,
+                i.product_name AS product_name,
+                SUM(i.quantity)::float8 AS quantity
+              FROM inserted_sale s
+              JOIN input_items i ON TRUE
+              GROUP BY s.shop_id, s.created_day, i.product_name
+            ),
+            upsert_product_daily AS (
+              INSERT INTO shop_product_daily (shop_id, product_name, day, quantity)
+              SELECT p.shop_id, p.product_name, p.day, p.quantity
+              FROM product_rollup p
+              ON CONFLICT (shop_id, product_name, day)
+              DO UPDATE
+              SET quantity = shop_product_daily.quantity + EXCLUDED.quantity,
+                  updated_at = NOW()
+              RETURNING shop_id
+            ),
+            sale_json AS (
+              SELECT json_build_object(
+                'id', s.id,
+                'shop_id', s.shop_id,
+                'signature_id', s.signature_id,
+                'customer_name', s.customer_name,
+                'customer_contact', s.customer_contact,
+                'subtotal', s.subtotal,
+                'discount_amount', s.discount_amount,
+                'vat_amount', s.vat_amount,
+                'service_fee_amount', s.service_fee_amount,
+                'delivery_fee_amount', s.delivery_fee_amount,
+                'rounding_amount', s.rounding_amount,
+                'other_amount', s.other_amount,
+                'other_label', s.other_label,
+                'total', s.total,
+                'created_at', s.created_at::text,
+                'items',
+                  COALESCE(
+                    (
+                      SELECT json_agg(
+                        json_build_object(
+                          'id', ii.id,
+                          'sale_id', ii.sale_id,
+                          'product_name', ii.product_name,
+                          'quantity', ii.quantity,
+                          'unit_price', ii.unit_price,
+                          'line_total', ii.line_total
+                        )
+                        ORDER BY ii.id ASC
+                      )
+                      FROM inserted_items ii
+                    ),
+                    '[]'::json
+                  )
+              ) AS sale_json
+              FROM inserted_sale s
+            )
+            SELECT
+              EXISTS(SELECT 1 FROM auth_active) AS is_active,
+              EXISTS(SELECT 1 FROM signature_row) AS signature_exists,
+              EXISTS(SELECT 1 FROM signature_ok) AS signature_for_shop,
+              (SELECT sale_json FROM sale_json) AS sale_json
+            "#,
+            AUTH_CTE
+        );
+
+        let row = sqlx::query(&sql)
+            .bind(payload.shop_id)
+            .bind(payload.device_id)
+            .bind(payload.input.signature_id)
+            .bind(&payload.input.customer_name)
+            .bind(&payload.input.customer_contact)
         .bind(payload.created_at)
         .bind(payload.input.discount_amount)
         .bind(payload.input.vat_amount)
@@ -1153,30 +1193,31 @@ impl Sale {
         .fetch_one(pool)
         .await?;
 
-        let items_json: serde_json::Value = row.get("items_json");
-        let items: Vec<SaleItem> = serde_json::from_value(items_json).unwrap_or_default();
-        let sale_id: i64 = row.get("id");
-        let total: f64 = row.get("total");
-        let created_at: String = row.get("created_at");
+        let is_active: bool = row.get("is_active");
+        if !is_active {
+            return Ok(AuthorizedSaleCreateResult::Unauthorized);
+        }
 
-        Ok(Sale {
-            id: sale_id,
-            shop_id: payload.shop_id,
-            signature_id: payload.input.signature_id,
-            customer_name: Some(payload.input.customer_name.clone()),
-            customer_contact: Some(payload.input.customer_contact.clone()),
-            subtotal: row.get("subtotal"),
-            discount_amount: row.get("discount_amount"),
-            vat_amount: row.get("vat_amount"),
-            service_fee_amount: row.get("service_fee_amount"),
-            delivery_fee_amount: row.get("delivery_fee_amount"),
-            rounding_amount: row.get("rounding_amount"),
-            other_amount: row.get("other_amount"),
-            other_label: row.get("other_label"),
-            total,
-            created_at,
-            items,
-        })
+        let signature_exists: bool = row.get("signature_exists");
+        if !signature_exists {
+            return Ok(AuthorizedSaleCreateResult::SignatureNotFound);
+        }
+
+        let signature_for_shop: bool = row.get("signature_for_shop");
+        if !signature_for_shop {
+            return Ok(AuthorizedSaleCreateResult::ShopMismatch);
+        }
+
+        let sale_json: Option<serde_json::Value> = row.try_get("sale_json").ok();
+        let Some(sale_json) = sale_json else {
+            return Err(sqlx::Error::Protocol(
+                "sale create returned no row despite valid auth/signature".into(),
+            ));
+        };
+
+        let sale = serde_json::from_value::<Sale>(sale_json)
+            .map_err(|e| sqlx::Error::Protocol(format!("invalid sale json: {}", e).into()))?;
+        Ok(AuthorizedSaleCreateResult::Created(sale))
     }
 
     pub async fn update(pool: &PgPool, payload: &SaleUpdatePayload) -> Result<Sale, sqlx::Error> {

@@ -49,6 +49,7 @@ class SalePreviewScreen extends StatefulWidget {
 }
 
 class _SalePreviewScreenState extends State<SalePreviewScreen> {
+  static const double _singlePageOverflowTolerancePx = 28;
   bool _busy = false;
   bool _fitsSinglePage = false;
   late final String _currencySymbol;
@@ -62,12 +63,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     final ctx = CurrencyService.resolveContext();
     _currencyLocale = ctx.locale;
     _currencySymbol = ctx.symbol;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_receiptScrollController.hasClients) return;
-      _updateSinglePageFlag(
-        _receiptScrollController.position.maxScrollExtent <= 1,
-      );
-    });
+    _syncSinglePageFlagWithRetry();
   }
 
   @override
@@ -258,6 +254,25 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     setState(() => _fitsSinglePage = next);
   }
 
+  bool _isSinglePageFromMetrics(ScrollMetrics metrics) {
+    return metrics.maxScrollExtent <= _singlePageOverflowTolerancePx;
+  }
+
+  void _syncSinglePageFlagWithRetry([int retry = 0]) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!_receiptScrollController.hasClients) {
+        if (retry < 6) {
+          _syncSinglePageFlagWithRetry(retry + 1);
+        }
+        return;
+      }
+      _updateSinglePageFlag(
+        _isSinglePageFromMetrics(_receiptScrollController.position),
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final timestamp = widget.createdAt ?? DateTime.now();
@@ -313,7 +328,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                 child: NotificationListener<ScrollMetricsNotification>(
                   onNotification: (notification) {
                     _updateSinglePageFlag(
-                      notification.metrics.maxScrollExtent <= 1,
+                      _isSinglePageFromMetrics(notification.metrics),
                     );
                     return false;
                   },
