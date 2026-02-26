@@ -8,3 +8,10 @@ class AppRoutes {
   static const shop = '/shop';
   static const notification = '/notification';
 }
+
+class SalesRouteArgs {
+  const SalesRouteArgs({this.openSaleId, this.refreshFirst = false});
+
+  final String? openSaleId;
+  final bool refreshFirst;
+}

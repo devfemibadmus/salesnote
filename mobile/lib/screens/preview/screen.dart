@@ -41,7 +41,7 @@ class SalePreviewScreen extends StatefulWidget {
   final double total;
   final String? receiptNumber;
   final DateTime? createdAt;
-  final Future<bool> Function()? onCreate;
+  final Future<String?> Function()? onCreate;
   final Future<void> Function()? onDownloadPdf;
 
   @override
@@ -94,11 +94,11 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
   Future<void> _handleCreate() async {
     if (_busy || widget.onCreate == null) return;
     setState(() => _busy = true);
-    final ok = await widget.onCreate!.call();
+    final createdSaleId = await widget.onCreate!.call();
     if (!mounted) return;
     setState(() => _busy = false);
-    if (ok) {
-      Navigator.of(context).pop();
+    if (createdSaleId != null && createdSaleId.isNotEmpty) {
+      Navigator.of(context).pop(createdSaleId);
     }
   }
 

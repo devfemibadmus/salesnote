@@ -14,7 +14,9 @@ part 'states.dart';
 part 'widgets.dart';
 
 class SalesScreen extends StatefulWidget {
-  const SalesScreen({super.key});
+  const SalesScreen({super.key, this.routeArgs});
+
+  final SalesRouteArgs? routeArgs;
 
   @override
   State<SalesScreen> createState() => _SalesScreenState();
@@ -35,6 +37,7 @@ class _SalesScreenState extends State<SalesScreen> {
   String _query = '';
   int _page = 1;
   bool _openingPreview = false;
+  bool _launchIntentHandled = false;
 
   void _goTo(String route, {bool reset = false}) {
     _api.cancelInFlight();
@@ -79,9 +82,44 @@ class _SalesScreenState extends State<SalesScreen> {
         _error = null;
         _loading = false;
       });
+      await _handleLaunchIntent();
       return;
     }
     await _loadSales();
+    await _handleLaunchIntent();
+  }
+
+  Future<void> _handleLaunchIntent() async {
+    if (_launchIntentHandled) return;
+    final saleId = widget.routeArgs?.openSaleId?.trim() ?? '';
+    if (saleId.isEmpty) {
+      _launchIntentHandled = true;
+      return;
+    }
+    _launchIntentHandled = true;
+
+    if (widget.routeArgs?.refreshFirst == true) {
+      try {
+        final loaded = await CacheLoader.fetchAndCacheSalesPage(
+          _api,
+          includeItems: false,
+          page: 1,
+          perPage: _perPage,
+        );
+        if (mounted) {
+          setState(() {
+            _sales = loaded.sales;
+            _page = loaded.page;
+            _hasMore = loaded.hasMore;
+            _error = null;
+            _loading = false;
+          });
+        }
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    await _openSalePreviewById(saleId);
   }
 
   @override
@@ -210,7 +248,7 @@ class _SalesScreenState extends State<SalesScreen> {
 
   bool get _isDataEmpty => !_loading && _sales.isEmpty;
 
-  Future<void> _openSalePreview(Sale sale) async {
+  Future<void> _openSalePreviewById(String saleId) async {
     if (_openingPreview) return;
     setState(() => _openingPreview = true);
     try {
@@ -221,10 +259,7 @@ class _SalesScreenState extends State<SalesScreen> {
         Navigator.of(context).push(loadingRoute);
       }
 
-      final saleDetail = await CacheLoader.loadOrFetchSalePreview(
-        _api,
-        sale.id,
-      );
+      final saleDetail = await CacheLoader.loadOrFetchSalePreview(_api, saleId);
       if (saleDetail == null) {
         if (loadingRoute.isActive && mounted) {
           Navigator.of(context).pop();
@@ -287,7 +322,7 @@ class _SalesScreenState extends State<SalesScreen> {
           otherAmount: detail.otherAmount,
           otherLabel: detail.otherLabel,
           total: total,
-          receiptNumber: '#REC-${sale.id}',
+          receiptNumber: '#REC-$saleId',
           createdAt: createdAt,
         ),
       );
@@ -322,7 +357,7 @@ class _SalesScreenState extends State<SalesScreen> {
         hasMore: _hasMore,
         formatAmount: _formatSalesAmount,
         onLoadMore: _loadMoreSales,
-        onOpenSale: _openSalePreview,
+        onOpenSale: (sale) => _openSalePreviewById(sale.id),
       );
     }
 

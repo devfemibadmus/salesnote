@@ -20,7 +20,11 @@ class AppRouter {
       case AppRoutes.home:
         return MaterialPageRoute(builder: (_) => const HomeScreen());
       case AppRoutes.sales:
-        return MaterialPageRoute(builder: (_) => const SalesScreen());
+        final args = settings.arguments;
+        final salesArgs = args is SalesRouteArgs ? args : null;
+        return MaterialPageRoute(
+          builder: (_) => SalesScreen(routeArgs: salesArgs),
+        );
       case AppRoutes.items:
         return MaterialPageRoute(builder: (_) => const ItemsScreen());
       case AppRoutes.newSale:

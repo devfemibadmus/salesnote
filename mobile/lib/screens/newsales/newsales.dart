@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../preview/preview.dart';
 import '../../services/api_client.dart';
@@ -672,8 +673,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     unawaited(_saveDraft());
   }
 
-  Future<bool> _submitSale() async {
-    if (_submitting) return false;
+  Future<String?> _submitSale() async {
+    if (_submitting) return null;
     setState(() {
       _customerNameTouched = true;
       _customerContactTouched = true;
@@ -693,11 +694,11 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       } else if (_items.isEmpty) {
         _showSnackBar('Add at least one item.');
       }
-      return false;
+      return null;
     }
     if (!_pricingValid) {
       _showSnackBar('Grand total must be between 0 and 9,999,999,999.99.');
-      return false;
+      return null;
     }
 
     setState(() => _submitting = true);
@@ -713,7 +714,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
           _customerContactTouched = true;
           _submitting = false;
         });
-        return false;
+        return null;
       }
       final input = SaleInput(
         signatureId: _selectedSignatureId!,
@@ -741,13 +742,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       await _updateLocalCachesAfterSaleCreate(createdSale);
       await _refreshHomeSummaryCacheAfterSaleCreate();
       await _clearActiveDraftAfterSubmit();
-      if (!mounted) return false;
+      if (!mounted) return null;
       _showSnackBar('Sale created successfully.');
-      return true;
+      return createdSale.id;
     } catch (e) {
-      if (!mounted) return false;
+      if (!mounted) return null;
       _showSnackBar(e is ApiException ? e.message : 'Unable to create sale.');
-      return false;
+      return null;
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -850,8 +851,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       }
     }
     final shop = _previewShop();
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final createdSaleId = await Navigator.of(context).push<String?>(
+      MaterialPageRoute<String?>(
         builder: (_) => SalePreviewScreen(
           isCreatedSale: false,
           shop: shop,
@@ -878,6 +879,18 @@ class _NewSaleScreenState extends State<NewSaleScreen>
           total: _saleTotal,
           onCreate: _submitSale,
         ),
+      ),
+    );
+    if (!mounted || createdSaleId == null || createdSaleId.trim().isEmpty) {
+      return;
+    }
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      AppRoutes.sales,
+      (_) => false,
+      arguments: SalesRouteArgs(
+        openSaleId: createdSaleId.trim(),
+        refreshFirst: true,
       ),
     );
   }
