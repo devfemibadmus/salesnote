@@ -77,6 +77,7 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   envs: API_ENV_FILE,API_ENV_FILE_B64
                   script: |
+                      mkdir -p /home/salesnote
                       if [ -n "$API_ENV_FILE_B64" ]; then
                         printf '%s' "$API_ENV_FILE_B64" | base64 -d > /home/salesnote/.env
                       elif [ -n "$API_ENV_FILE" ]; then
@@ -122,6 +123,7 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   envs: API_FIREBASE_ADMINSDK_JSON,API_FIREBASE_ADMINSDK_JSON_B64
                   script: |
+                      mkdir -p /home/salesnote
                       if [ -n "$API_FIREBASE_ADMINSDK_JSON_B64" ]; then
                         printf '%s' "$API_FIREBASE_ADMINSDK_JSON_B64" | base64 -d > /home/salesnote/firebase-adminsdk.json
                       elif [ -n "$API_FIREBASE_ADMINSDK_JSON" ]; then
