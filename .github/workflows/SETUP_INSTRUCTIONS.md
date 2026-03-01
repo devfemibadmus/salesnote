@@ -150,6 +150,181 @@ Resolve-DnsName api.salesnote.online | Select-Object Name,Type,IPAddress
 
 ---
 
+## k6 Load Testing Setup
+
+### Workflow
+
+Manual workflow:
+
+- `SalesNote k6 Load Test`
+
+File:
+
+- [.github/workflows/test.yml](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/.github/workflows/test.yml)
+
+Run it from:
+
+1. GitHub `Actions`
+2. Open `SalesNote k6 Load Test`
+3. Click `Run workflow`
+
+### Workflow Inputs
+
+`script` choices:
+
+- `login-only.js`
+- `home-gets.js`
+- `sales-list.js`
+- `item-list.js`
+- `sales-create.js`
+
+`local_config_js`:
+
+- paste the full contents of `backend/k6/local.config.js` directly into the workflow input
+
+If `local_config_js` is empty, the workflow falls back to:
+
+- `K6_LOCAL_CONFIG_B64`
+
+### Optional Secret Fallback
+
+GitHub secret:
+
+- `K6_LOCAL_CONFIG_B64`
+
+Copy local config to clipboard as base64 on Windows:
+
+```powershell
+[Convert]::ToBase64String([System.IO.File]::ReadAllBytes("C:\Users\Femi.Badmus\Desktop\Sales Note\backend\k6\local.config.js")) | Set-Clipboard
+```
+
+### Example `local_config_js`
+
+```js
+/** @format */
+
+const localConfig = {
+	baseUrl: "https://api.salesnote.online",
+	loginId: "+0000",
+	password: "0000",
+	vus: 100,
+	duration: "30s",
+	executionMode: "duration",
+	perVuIterations: 1,
+	thinkTimeSecs: 1,
+	includeItems: false,
+	signatureName: "Amanda",
+	signatureImageUrl: "https://aisignator.com/wp-content/uploads/2025/05/Amanda-signature.jpg",
+};
+
+export default localConfig;
+```
+
+### Meaning Of Main k6 Config Fields
+
+- `vus`: concurrent virtual users
+- `duration`: how long the test runs in `duration` mode
+- `executionMode: "duration"`: run for a fixed time
+- `executionMode: "iterations"`: each VU runs a fixed number of iterations
+- `perVuIterations`: used when `executionMode` is `iterations`
+- `thinkTimeSecs`: pause between iterations
+
+For a real concurrency test, use:
+
+```js
+vus: 1000,
+executionMode: "duration",
+duration: "30s",
+```
+
+### Local Scripts
+
+Main k6 scripts:
+
+- [login-only.js](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/backend/k6/login-only.js)
+- [home-gets.js](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/backend/k6/home-gets.js)
+- [sales-list.js](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/backend/k6/sales-list.js)
+- [item-list.js](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/backend/k6/item-list.js)
+- [sales-create.js](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/backend/k6/sales-create.js)
+
+### Local Usage
+
+```powershell
+k6 run backend/k6/login-only.js
+k6 run backend/k6/home-gets.js
+k6 run backend/k6/sales-list.js
+k6 run backend/k6/item-list.js
+k6 run backend/k6/sales-create.js
+```
+
+### Important Behavior
+
+In `sales-create.js`:
+
+1. login happens once in `setup()`
+2. signature fetch/create happens once in `setup()`
+3. the actual loop is sale creation
+
+So create-sale timing is not inflated by repeated login/signature setup per iteration.
+
+### How To Read Results
+
+Important metrics:
+
+- `http_reqs`: total HTTP requests, not total sales
+- `iterations`: total flow loops completed
+- `http_req_failed`: request failure rate
+- `http_req_duration p(95)`: tail latency
+
+For `sales-create.js`:
+
+- successful sale creates come from:
+    - `create sale status is expected`
+- not from `http_reqs`
+
+Example:
+
+- `http_reqs = 7115` does not mean `7115` sales created
+- if `create sale status is expected` shows `✓ 6059 / ✗ 1054`, then:
+    - successful sales created = `6059`
+    - failed sale creates = `1054`
+
+### Server Checks During k6
+
+Track app logs:
+
+```bash
+tail -F /home/salesnote/logs/error-*.log
+tail -F /home/salesnote/logs/*.log
+```
+
+Check non-201 sale creates in app logs:
+
+```bash
+grep 'POST /sales' /home/salesnote/logs/access-*.log | grep -v ' 201 ' | tail -n 200
+```
+
+Check nginx upstream failures:
+
+```bash
+sudo grep -iE "upstream|timed out|reset|refused|502|503|504|worker_connections" /var/log/nginx/error.log | tail -n 200
+sudo grep 'POST /sales' /var/log/nginx/access.log | grep -v ' 201 ' | tail -n 200
+```
+
+### Known k6 Finding From Current Production Setup
+
+If you see nginx errors like:
+
+```text
+worker_connections are not enough while connecting to upstream
+```
+
+that means failures are happening at nginx under load, before the request fully reaches Actix.
+
+Current deploy now updates nginx worker tuning through [manage.sh](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/backend/manage.sh) during `scale`.
+
+---
+
 ## iOS Deployment Setup
 
 > ✅ **Works 100% from Windows!** No Mac needed after initial setup.
