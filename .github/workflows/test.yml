@@ -24,7 +24,11 @@ jobs:
         runs-on: ubuntu-latest
         env:
             API_INSTANCE_COUNT: ${{ github.event.inputs.instance_count || '2' }}
-        steps:`r`n            - name: Checkout code`r`n              uses: actions/checkout@v4`r`n            - name: Upload deployment assets
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Upload deployment assets
               uses: appleboy/scp-action@master
               with:
                   host: ${{ secrets.API_SSH_HOST }}
@@ -47,4 +51,3 @@ jobs:
                       chmod +x "/home/salesnote/manage.sh"
                       sudo bash /home/salesnote/manage.sh scale "${{ env.API_INSTANCE_COUNT }}"
                       echo "Deployment complete!"
-
