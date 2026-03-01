@@ -16,6 +16,11 @@ on:
                     - sales-list.js
                     - item-list.js
                     - sales-create.js
+            local_config_js:
+                description: "Paste full backend/k6/local.config.js content"
+                required: false
+                default: ""
+                type: string
 
 jobs:
     run-k6:
@@ -30,12 +35,20 @@ jobs:
             - name: Restore local k6 config
               env:
                   K6_LOCAL_CONFIG_B64: ${{ secrets.K6_LOCAL_CONFIG_B64 }}
+                  INPUT_LOCAL_CONFIG_JS: ${{ github.event.inputs.local_config_js }}
               run: |
-                  if [ -z "$K6_LOCAL_CONFIG_B64" ]; then
-                    echo "Missing repository secret: K6_LOCAL_CONFIG_B64"
-                    exit 1
+                  if [ -n "$INPUT_LOCAL_CONFIG_JS" ]; then
+                    printf '%s' "$INPUT_LOCAL_CONFIG_JS" > backend/k6/local.config.js
+                    exit 0
                   fi
-                  printf '%s' "$K6_LOCAL_CONFIG_B64" | base64 -d > backend/k6/local.config.js
+
+                  if [ -n "$K6_LOCAL_CONFIG_B64" ]; then
+                    printf '%s' "$K6_LOCAL_CONFIG_B64" | base64 -d > backend/k6/local.config.js
+                    exit 0
+                  fi
+
+                  echo "Missing local config. Paste local_config_js or set K6_LOCAL_CONFIG_B64 secret."
+                  exit 1
 
             - name: Run selected k6 script
               run: |
