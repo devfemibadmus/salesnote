@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 EnvironmentFile=/home/salesnote/.env
 Environment=SALESNOTE__BIND=0.0.0.0:%i
+Environment=SALESNOTE__INSTANCE_ID=%i
 WorkingDirectory=/home/salesnote
 ExecStart=/home/salesnote/api
 Restart=always

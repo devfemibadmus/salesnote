@@ -22,6 +22,8 @@ on:
 jobs:
     build-and-deploy:
         runs-on: ubuntu-latest
+        env:
+            API_INSTANCE_COUNT: ${{ github.event.inputs.instance_count || '2' }}
         steps:
             - name: Checkout code
               uses: actions/checkout@v3
@@ -56,7 +58,28 @@ jobs:
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
                   script: |
+                      mkdir -p /home/salesnote
                       sudo systemctl stop 'salesnote@*' || true
+
+            - name: Write API env file on VPS
+              uses: appleboy/ssh-action@master
+              env:
+                  API_ENV_FILE: ${{ secrets.API_ENV_FILE }}
+                  API_ENV_FILE_B64: ${{ secrets.API_ENV_FILE_B64 }}
+              with:
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
+                  envs: API_ENV_FILE,API_ENV_FILE_B64
+                  script: |
+                      if [ -n "$API_ENV_FILE_B64" ]; then
+                        printf '%s' "$API_ENV_FILE_B64" | base64 -d > /home/salesnote/.env
+                      elif [ -n "$API_ENV_FILE" ]; then
+                        printf '%s' "$API_ENV_FILE" > /home/salesnote/.env
+                      else
+                        echo "Missing API env secret. Set API_ENV_FILE or API_ENV_FILE_B64."
+                        exit 1
+                      fi
 
             - name: Upload binary to VPS
               uses: appleboy/scp-action@master
@@ -80,13 +103,35 @@ jobs:
                       backend/nginx.conf.template
                       backend/salesnote@.service
                       backend/salesnote.service
-                      backend/firebase-adminsdk.json
                   target: "/home/salesnote/"
                   overwrite: true
+
+            - name: Write Firebase admin SDK file on VPS
+              uses: appleboy/ssh-action@master
+              env:
+                  API_FIREBASE_ADMINSDK_JSON: ${{ secrets.API_FIREBASE_ADMINSDK_JSON }}
+                  API_FIREBASE_ADMINSDK_JSON_B64: ${{ secrets.API_FIREBASE_ADMINSDK_JSON_B64 }}
+              with:
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
+                  envs: API_FIREBASE_ADMINSDK_JSON,API_FIREBASE_ADMINSDK_JSON_B64
+                  script: |
+                      if [ -n "$API_FIREBASE_ADMINSDK_JSON_B64" ]; then
+                        printf '%s' "$API_FIREBASE_ADMINSDK_JSON_B64" | base64 -d > /home/salesnote/firebase-adminsdk.json
+                      elif [ -n "$API_FIREBASE_ADMINSDK_JSON" ]; then
+                        printf '%s' "$API_FIREBASE_ADMINSDK_JSON" > /home/salesnote/firebase-adminsdk.json
+                      else
+                        echo "Missing Firebase admin SDK secret. Set API_FIREBASE_ADMINSDK_JSON or API_FIREBASE_ADMINSDK_JSON_B64."
+                        exit 1
+                      fi
 
             - name: Upload SSL certs (if provided)
               uses: appleboy/ssh-action@master
               if: contains(github.event.head_commit.message, 'SSL')
+              env:
+                  SSL_CERT_B64: ${{ secrets.SSL_CERT_B64 }}
+                  SSL_KEY_B64: ${{ secrets.SSL_KEY_B64 }}
               with:
                   host: ${{ secrets.API_SSH_HOST }}
                   username: ${{ secrets.API_SSH_USER }}
@@ -116,5 +161,5 @@ jobs:
                   script: |
                       chmod +x "/home/salesnote/api"
                       chmod +x "/home/salesnote/manage.sh"
-                      sudo bash /home/salesnote/manage.sh scale ${{ inputs.instance_count }}
+                      sudo bash /home/salesnote/manage.sh scale "${{ env.API_INSTANCE_COUNT }}"
                       echo "Deployment complete!"

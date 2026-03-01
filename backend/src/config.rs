@@ -215,6 +215,8 @@ fn build_settings() -> Settings {
         settings.error_log_file.clone(),
     );
 
+    apply_instance_log_suffixes(&mut settings);
+
     settings
 }
 
@@ -329,6 +331,36 @@ fn env_u32_any(keys: &[&str], default: u32) -> u32 {
         }
     }
     default
+}
+
+fn apply_instance_log_suffixes(settings: &mut Settings) {
+    let Some(instance_id) = env_optional_string(&["SALESNOTE__INSTANCE_ID", "INSTANCE_ID"]) else {
+        return;
+    };
+
+    settings.access_log_file = with_instance_suffix(&settings.access_log_file, &instance_id);
+    settings.info_log_file = with_instance_suffix(&settings.info_log_file, &instance_id);
+    settings.error_log_file = with_instance_suffix(&settings.error_log_file, &instance_id);
+}
+
+fn env_optional_string(keys: &[&str]) -> Option<String> {
+    for key in keys {
+        if let Ok(value) = env::var(key) {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn with_instance_suffix(filename: &str, instance_id: &str) -> String {
+    if let Some((name, ext)) = filename.rsplit_once('.') {
+        format!("{name}-{instance_id}.{ext}")
+    } else {
+        format!("{filename}-{instance_id}")
+    }
 }
 
 fn profile_file_path() -> PathBuf {

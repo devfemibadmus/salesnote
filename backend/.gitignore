@@ -6,6 +6,7 @@ data/env.profile
 z.py
 backups
 firebase-adminsdk.json
+k6/local.config.js
 
 # Build artifacts
 **/target/
@@ -21,3 +22,4 @@ uploads
 Thumbs.db
 __pycache__/
 target_local
+k6

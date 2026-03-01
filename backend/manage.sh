@@ -6,6 +6,7 @@ UNIT_TEMPLATE="/etc/systemd/system/salesnote@.service"
 UNIT_GROUP="/etc/systemd/system/salesnote.service"
 NGINX_TEMPLATE="${APP_DIR}/nginx.conf.template"
 NGINX_OUT="${APP_DIR}/nginx.conf"
+DATABASE_URL=""
 
 usage() {
   cat <<EOF
@@ -17,6 +18,7 @@ Commands:
 
 Env overrides:
   APP_DIR=/path/to/backend
+  SALESNOTE__DATABASE_URL=postgres://user:password@127.0.0.1:5432/dbname
   NGINX_SERVER_NAME=example.com
   SSL_CERT_PATH=/etc/letsencrypt/live/example.com/fullchain.pem
   SSL_KEY_PATH=/etc/letsencrypt/live/example.com/privkey.pem
@@ -29,6 +31,7 @@ load_env() {
     . "${APP_DIR}/.env"
     set +a
   fi
+  DATABASE_URL="${SALESNOTE__DATABASE_URL:-${DATABASE_URL:-}}"
   if [ -n "${NGINX_SERVER_NAME:-}" ]; then
     SSL_CERT_PATH="/etc/letsencrypt/live/${NGINX_SERVER_NAME}/fullchain.pem"
     SSL_KEY_PATH="/etc/letsencrypt/live/${NGINX_SERVER_NAME}/privkey.pem"
@@ -64,6 +67,121 @@ ensure_redis() {
   systemctl enable redis-server
   systemctl start redis-server
 }
+
+sql_escape_literal() {
+  printf "%s" "$1" | sed "s/'/''/g"
+}
+
+sql_escape_ident() {
+  printf "%s" "$1" | sed 's/"/""/g'
+}
+
+parse_database_url() {
+  load_env
+
+  if [ -z "${DATABASE_URL}" ]; then
+    echo "DATABASE_URL not set. Skipping PostgreSQL bootstrap."
+    return 1
+  fi
+
+  local url="${DATABASE_URL#postgres://}"
+  url="${url#postgresql://}"
+
+  local creds_host="${url%%/*}"
+  DB_NAME="${url#*/}"
+  DB_NAME="${DB_NAME%%\?*}"
+
+  if [ "${creds_host}" = "${url}" ] || [ -z "${DB_NAME}" ]; then
+    echo "Unsupported DATABASE_URL format: ${DATABASE_URL}" >&2
+    exit 1
+  fi
+
+  local creds="${creds_host%@*}"
+  local host_port="${creds_host#*@}"
+
+  if [ "${creds}" = "${creds_host}" ] || [ -z "${creds}" ] || [ -z "${host_port}" ]; then
+    echo "Unsupported DATABASE_URL format: ${DATABASE_URL}" >&2
+    exit 1
+  fi
+
+  DB_USER="${creds%%:*}"
+  DB_PASS="${creds#*:}"
+  DB_HOST="${host_port%%:*}"
+  DB_PORT="${host_port##*:}"
+
+  if [ "${DB_USER}" = "${creds}" ] || [ -z "${DB_PASS}" ]; then
+    echo "DATABASE_URL must include username and password." >&2
+    exit 1
+  fi
+
+  if [ "${DB_HOST}" = "${host_port}" ]; then
+    DB_PORT="5432"
+  fi
+
+  if [ -z "${DB_USER}" ] || [ -z "${DB_NAME}" ] || [ -z "${DB_HOST}" ]; then
+    echo "DATABASE_URL is missing required parts." >&2
+    exit 1
+  fi
+}
+
+ensure_postgres() {
+  require_root
+  parse_database_url || return 0
+
+  case "${DB_HOST}" in
+    127.0.0.1|localhost|::1)
+      ;;
+    *)
+      echo "DATABASE_URL host is ${DB_HOST}; skipping local PostgreSQL install/setup."
+      return 0
+      ;;
+  esac
+
+  if ! command -v psql >/dev/null 2>&1 || \
+     ! systemctl list-unit-files postgresql.service 2>/dev/null | grep -q '^postgresql\.service'; then
+    echo "PostgreSQL not found. Installing..."
+    timeout 300 apt-get update || { echo "apt-get update timed out"; exit 1; }
+    timeout 300 apt-get install -y postgresql postgresql-contrib || {
+      echo "apt-get install postgresql timed out"
+      exit 1
+    }
+  fi
+
+  systemctl enable postgresql
+  systemctl start postgresql
+
+  local role_ident
+  local db_ident
+  local role_lit
+  local db_lit
+  local pass_lit
+
+  role_ident="$(sql_escape_ident "${DB_USER}")"
+  db_ident="$(sql_escape_ident "${DB_NAME}")"
+  role_lit="$(sql_escape_literal "${DB_USER}")"
+  db_lit="$(sql_escape_literal "${DB_NAME}")"
+  pass_lit="$(sql_escape_literal "${DB_PASS}")"
+
+  sudo -u postgres psql -v ON_ERROR_STOP=1 postgres <<EOF
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${role_lit}') THEN
+        CREATE ROLE "${role_ident}" LOGIN PASSWORD '${pass_lit}';
+    ELSE
+        ALTER ROLE "${role_ident}" WITH LOGIN PASSWORD '${pass_lit}';
+    END IF;
+END
+\$\$;
+EOF
+
+  if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname = '${db_lit}'" postgres | grep -q 1; then
+    sudo -u postgres createdb -O "${DB_USER}" "${DB_NAME}"
+  else
+    sudo -u postgres psql -v ON_ERROR_STOP=1 postgres \
+      -c "ALTER DATABASE \"${db_ident}\" OWNER TO \"${role_ident}\";"
+  fi
+}
+
 require_count() {
   if [ "${1:-}" = "" ]; then
     echo "Missing instance count." >&2
@@ -214,6 +332,7 @@ case "$cmd" in
   scale)
     require_count "${2:-}"
     local_count="$2"
+    ensure_postgres
     ensure_nginx
     ensure_redis
     install_units
