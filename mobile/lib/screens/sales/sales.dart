@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -68,11 +70,7 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   Future<void> _loadSalesFromCacheOrApi() async {
-    final cached = await CacheLoader.loadOrFetchSalesPage(
-      _api,
-      includeItems: false,
-      perPage: _perPage,
-    );
+    final cached = CacheLoader.loadSalesPageCache(includeItems: false);
     if (cached != null) {
       if (!mounted) return;
       setState(() {
@@ -82,10 +80,22 @@ class _SalesScreenState extends State<SalesScreen> {
         _error = null;
         _loading = false;
       });
+      if (_sales.isEmpty) {
+        unawaited(_refreshSalesInBackground());
+      }
       await _handleLaunchIntent();
       return;
     }
-    await _loadSales();
+
+    if (!mounted) return;
+    setState(() {
+      _sales = [];
+      _page = 1;
+      _hasMore = true;
+      _error = null;
+      _loading = false;
+    });
+    unawaited(_refreshSalesInBackground());
     await _handleLaunchIntent();
   }
 
@@ -136,40 +146,6 @@ class _SalesScreenState extends State<SalesScreen> {
     setState(() => _query = next);
   }
 
-  Future<void> _loadSales() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final loaded = await CacheLoader.fetchAndCacheSalesPage(
-        _api,
-        includeItems: false,
-        page: 1,
-        perPage: _perPage,
-      );
-      if (!mounted) return;
-      setState(() {
-        _sales = loaded.sales;
-        _page = loaded.page;
-        _hasMore = loaded.hasMore;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e is ApiException
-            ? e.message
-            : 'Unable to load sales history.';
-        _sales = <Sale>[];
-        _hasMore = false;
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
-  }
-
   Future<void> _refreshSales() async {
     try {
       final loaded = await CacheLoader.fetchAndCacheSalesPage(
@@ -193,6 +169,24 @@ class _SalesScreenState extends State<SalesScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     }
+  }
+
+  Future<void> _refreshSalesInBackground() async {
+    try {
+      final loaded = await CacheLoader.fetchAndCacheSalesPage(
+        _api,
+        includeItems: false,
+        page: 1,
+        perPage: _perPage,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sales = loaded.sales;
+        _page = loaded.page;
+        _hasMore = loaded.hasMore;
+        _error = null;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadMoreSales() async {

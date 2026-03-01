@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:image_picker/image_picker.dart';
@@ -60,19 +62,20 @@ class _ShopScreenState extends State<ShopScreen> {
 
   Future<void> _loadSettingsFromCacheOrApi() async {
     final settings = await CacheLoader.loadOrFetchSettingsSummary(_api);
-    final signatures = await CacheLoader.loadOrFetchSignatures(_api);
+    final cachedSignatures = CacheLoader.loadSignaturesCache();
     if (settings != null) {
       final packageInfo = await PackageInfo.fromPlatform();
       if (!mounted) return;
       setState(() {
         _shop = settings.shop;
         _devices = settings.devices;
-        _signatures = signatures;
+        _signatures = cachedSignatures;
         _pushEnabled = settings.currentDevicePushEnabled;
         _appVersion = packageInfo.version;
         _loading = false;
         _error = null;
       });
+      unawaited(_loadSignaturesInBackground(refresh: true));
       return;
     }
     await _loadSettings();
@@ -82,31 +85,32 @@ class _ShopScreenState extends State<ShopScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _signatures = CacheLoader.loadSignaturesCache();
     });
     try {
       final results = await Future.wait([
         CacheLoader.fetchAndCacheSettingsSummary(_api),
-        CacheLoader.fetchAndCacheSignatures(_api),
         PackageInfo.fromPlatform(),
       ]);
       if (!mounted) return;
       final settings = results[0] as SettingsSummary;
-      final signatures = results[1] as List<SignatureItem>;
-      final packageInfo = results[2] as PackageInfo;
+      final packageInfo = results[1] as PackageInfo;
       setState(() {
         _shop = settings.shop;
         _devices = settings.devices;
-        _signatures = signatures;
         _pushEnabled = settings.currentDevicePushEnabled;
         _appVersion = packageInfo.version;
+        _error = null;
+        _loading = false;
       });
+      unawaited(_loadSignaturesInBackground(refresh: true));
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e is ApiException ? e.message : 'Unable to load settings.';
       });
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && _loading) setState(() => _loading = false);
     }
   }
 
@@ -114,20 +118,18 @@ class _ShopScreenState extends State<ShopScreen> {
     try {
       final results = await Future.wait([
         CacheLoader.fetchAndCacheSettingsSummary(_api),
-        CacheLoader.fetchAndCacheSignatures(_api),
         PackageInfo.fromPlatform(),
       ]);
       if (!mounted) return;
       final settings = results[0] as SettingsSummary;
-      final signatures = results[1] as List<SignatureItem>;
-      final packageInfo = results[2] as PackageInfo;
+      final packageInfo = results[1] as PackageInfo;
       setState(() {
         _shop = settings.shop;
         _devices = settings.devices;
-        _signatures = signatures;
         _pushEnabled = settings.currentDevicePushEnabled;
         _appVersion = packageInfo.version;
       });
+      unawaited(_loadSignaturesInBackground(refresh: true));
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException
@@ -630,6 +632,18 @@ class _ShopScreenState extends State<ShopScreen> {
     }
   }
 
+  Future<void> _loadSignaturesInBackground({bool refresh = false}) async {
+    try {
+      final signatures = refresh
+          ? await CacheLoader.fetchAndCacheSignatures(_api)
+          : await CacheLoader.loadOrFetchSignatures(_api);
+      if (!mounted) return;
+      setState(() {
+        _signatures = signatures;
+      });
+    } catch (_) {}
+  }
+
   Future<void> _deleteSignature(SignatureItem signature) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -793,6 +807,7 @@ class _ShopScreenState extends State<ShopScreen> {
     if (leave != true) return;
     await _tokenStore.clear();
     await LocalCache.clearAll();
+    await NotificationService.clearLocalState();
     if (!mounted) return;
     _api.cancelInFlight();
     Navigator.pushNamedAndRemoveUntil(context, AppRoutes.auth, (_) => false);

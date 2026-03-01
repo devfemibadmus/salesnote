@@ -147,6 +147,11 @@ class NotificationService {
     return token;
   }
 
+  static Future<void> clearLocalState() async {
+    unreadCount.value = 0;
+    await _localNotifications.cancelAll();
+  }
+
   static List<InAppNotification> loadInbox() {
     final raw = LocalCache.loadNotifications();
     return raw.map(InAppNotification.fromJson).toList();

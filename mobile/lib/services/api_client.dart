@@ -8,6 +8,7 @@ import '../app/routes.dart';
 import '../app/config.dart';
 import '../data/models.dart';
 import 'cache/local.dart';
+import 'notification.dart';
 import 'token_store.dart';
 
 class ApiClient {
@@ -120,6 +121,7 @@ class ApiClient {
     if (_isAuthEndpoint(path)) return;
     await _tokenStore.clear();
     await LocalCache.clearAll();
+    await NotificationService.clearLocalState();
     final navigator = AppNavigator.key.currentState;
     if (navigator == null) return;
     navigator.pushNamedAndRemoveUntil(AppRoutes.auth, (_) => false);

@@ -85,9 +85,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _loadHomeFromCacheOrApi() async {
-    final data = await CacheLoader.loadOrFetchHomeSummary(_api);
+    final data = CacheLoader.loadHomeSummaryCache();
     if (data == null) {
-      await _loadHome();
+      if (!mounted) return;
+      setState(() {
+        _shop = null;
+        _analytics = null;
+        _sales = [];
+        _error = null;
+        _loading = false;
+      });
+      unawaited(_refreshHomeInBackground());
       return;
     }
 
@@ -100,6 +108,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _error = null;
       _loading = false;
     });
+    if (_isEmpty) {
+      unawaited(_refreshHomeInBackground());
+    }
   }
 
   Future<void> _loadHome({bool refresh = false}) async {
@@ -154,6 +165,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _refreshHomeInBackground() async {
+    try {
+      final data = await CacheLoader.fetchAndCacheHomeSummary(_api);
+      final mergedShop = _mergeShopWithSettingsCache(data.shop);
+      if (!mounted) return;
+      setState(() {
+        _shop = mergedShop;
+        _analytics = data.analytics;
+        _sales = data.recentSales;
+        _error = null;
+      });
+    } catch (_) {}
+  }
+
   Future<void> _setupNotifications() async {
     try {
       final optedOut = await LocalCache.isNotificationOptedOut();
@@ -163,10 +188,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final status = await NotificationService.getPermissionStatus();
       if (_isGranted(status)) {
         await LocalCache.setNotificationPromptCooldown(0);
-        await _subscribeFcm();
         return;
-      } else {
-        await _unsubscribeFcm();
       }
       final cooldown = await LocalCache.getNotificationPromptCooldown();
       if (cooldown > 0) {
@@ -180,7 +202,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return;
       }
 
-      // Immediate permission flow after user explicitly taps "Allow".
       var permissionStatus = await NotificationService.getPermissionStatus();
       if (!_isGranted(permissionStatus)) {
         permissionStatus = await NotificationService.requestPermission();
@@ -188,9 +209,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       if (_isGranted(permissionStatus)) {
         await LocalCache.setNotificationPromptCooldown(0);
-        await _subscribeFcm();
       } else {
-        await _unsubscribeFcm();
         await LocalCache.setNotificationPromptCooldown(2);
       }
     } catch (_) {}
@@ -200,41 +219,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       status == AuthorizationStatus.authorized ||
       status == AuthorizationStatus.provisional;
 
-  Future<void> _subscribeFcm() async {
-    for (var i = 0; i < 3; i++) {
-      final token = await NotificationService.getDeviceToken();
-      if (token != null && token.trim().isNotEmpty) {
-        await _api.subscribeFcm(token);
-        await _updateSettingsPushCache(true);
-        return;
-      }
-      await Future.delayed(const Duration(milliseconds: 450));
-    }
-  }
-
-  Future<void> _unsubscribeFcm() async {
-    await _api.unsubscribeFcm();
-    await _updateSettingsPushCache(false);
-  }
-
-  Future<void> _updateSettingsPushCache(bool enabled) async {
-    final settings = CacheLoader.loadSettingsSummaryCache();
-    if (settings == null) return;
-    final updated = SettingsSummary(
-      shop: settings.shop,
-      devices: settings.devices,
-      currentDevicePushEnabled: enabled,
-    );
-    await CacheLoader.saveSettingsSummaryCache(updated);
-  }
-
   bool get _isEmpty {
     final a = _analytics;
     if (a == null) return true;
-    return _sales.isEmpty &&
-        a.daily.isEmpty &&
-        a.weekly.isEmpty &&
-        a.monthly.isEmpty;
+    final hasChartData =
+        _hasNonZeroAnalytics(a.daily) ||
+        _hasNonZeroAnalytics(a.weekly) ||
+        _hasNonZeroAnalytics(a.monthly);
+    final hasMovementData = a.fastMoving.isNotEmpty || a.slowMoving.isNotEmpty;
+    return _sales.isEmpty && !hasChartData && !hasMovementData;
+  }
+
+  bool _hasNonZeroAnalytics(List<AnalyticsPoint> points) {
+    return points.any((point) => point.total != 0 || point.units != 0);
   }
 
   ShopProfile _mergeShopWithSettingsCache(ShopProfile homeShop) {

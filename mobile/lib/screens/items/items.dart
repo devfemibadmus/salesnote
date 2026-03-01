@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -63,11 +65,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
   }
 
   Future<void> _loadItemsFromCacheOrApi() async {
-    final cached = await CacheLoader.loadOrFetchSalesPage(
-      _api,
-      includeItems: true,
-      perPage: _perPage,
-    );
+    final cached = CacheLoader.loadSalesPageCache(includeItems: true);
     if (cached != null) {
       if (!mounted) return;
       setState(() {
@@ -77,9 +75,20 @@ class _ItemsScreenState extends State<ItemsScreen> {
         _error = null;
         _loading = false;
       });
+      if (_sales.isEmpty) {
+        unawaited(_refreshItemsInBackground());
+      }
       return;
     }
-    await _loadItems();
+    if (!mounted) return;
+    setState(() {
+      _sales = [];
+      _page = 1;
+      _hasMore = true;
+      _error = null;
+      _loading = false;
+    });
+    unawaited(_refreshItemsInBackground());
   }
 
   @override
@@ -94,38 +103,6 @@ class _ItemsScreenState extends State<ItemsScreen> {
     final next = _searchController.text.trim();
     if (next == _query) return;
     setState(() => _query = next);
-  }
-
-  Future<void> _loadItems() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final loaded = await CacheLoader.fetchAndCacheSalesPage(
-        _api,
-        includeItems: true,
-        page: 1,
-        perPage: _perPage,
-      );
-      if (!mounted) return;
-      setState(() {
-        _sales = loaded.sales;
-        _page = loaded.page;
-        _hasMore = loaded.hasMore;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e is ApiException ? e.message : 'Unable to load items.';
-        _sales = <Sale>[];
-        _hasMore = false;
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
   }
 
   Future<void> _refreshItems() async {
@@ -151,6 +128,24 @@ class _ItemsScreenState extends State<ItemsScreen> {
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     }
+  }
+
+  Future<void> _refreshItemsInBackground() async {
+    try {
+      final loaded = await CacheLoader.fetchAndCacheSalesPage(
+        _api,
+        includeItems: true,
+        page: 1,
+        perPage: _perPage,
+      );
+      if (!mounted) return;
+      setState(() {
+        _sales = loaded.sales;
+        _page = loaded.page;
+        _hasMore = loaded.hasMore;
+        _error = null;
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadMore() async {
