@@ -9,6 +9,7 @@ NGINX_OUT="${APP_DIR}/nginx.conf"
 NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/salesnote"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/salesnote"
 NGINX_DEFAULT_SITE="/etc/nginx/sites-enabled/default"
+NGINX_MAIN_CONF="/etc/nginx/nginx.conf"
 DATABASE_URL=""
 
 usage() {
@@ -25,6 +26,8 @@ Env overrides:
   NGINX_SERVER_NAME=example.com
   SSL_CERT_PATH=/etc/letsencrypt/live/example.com/fullchain.pem
   SSL_KEY_PATH=/etc/letsencrypt/live/example.com/privkey.pem
+  NGINX_WORKER_PROCESSES=auto
+  NGINX_WORKER_CONNECTIONS=8192
 EOF
 }
 
@@ -325,6 +328,17 @@ EOF
 
 reload_nginx() {
   require_root
+  local worker_processes="${NGINX_WORKER_PROCESSES:-auto}"
+  local worker_connections="${NGINX_WORKER_CONNECTIONS:-8192}"
+  if [ ! -f "${NGINX_MAIN_CONF}" ]; then
+    echo "Missing nginx main config: ${NGINX_MAIN_CONF}" >&2
+    exit 1
+  fi
+  WORKER_PROCESSES="${worker_processes}" WORKER_CONNECTIONS="${worker_connections}" \
+    perl -0pi -e '
+      s/^\s*worker_processes\s+\S+;/worker_processes $ENV{WORKER_PROCESSES};/m;
+      s/events\s*\{.*?\}/events {\n    worker_connections $ENV{WORKER_CONNECTIONS};\n    multi_accept on;\n}/s;
+    ' "${NGINX_MAIN_CONF}"
   cp "${NGINX_OUT}" "${NGINX_SITE_AVAILABLE}"
   ln -sf "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_ENABLED}"
   rm -f "${NGINX_DEFAULT_SITE}"
