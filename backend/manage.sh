@@ -6,6 +6,9 @@ UNIT_TEMPLATE="/etc/systemd/system/salesnote@.service"
 UNIT_GROUP="/etc/systemd/system/salesnote.service"
 NGINX_TEMPLATE="${APP_DIR}/nginx.conf.template"
 NGINX_OUT="${APP_DIR}/nginx.conf"
+NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/salesnote"
+NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/salesnote"
+NGINX_DEFAULT_SITE="/etc/nginx/sites-enabled/default"
 DATABASE_URL=""
 
 usage() {
@@ -322,6 +325,10 @@ EOF
 
 reload_nginx() {
   require_root
+  cp "${NGINX_OUT}" "${NGINX_SITE_AVAILABLE}"
+  ln -sf "${NGINX_SITE_AVAILABLE}" "${NGINX_SITE_ENABLED}"
+  rm -f "${NGINX_DEFAULT_SITE}"
+  nginx -t
   if command -v systemctl >/dev/null 2>&1; then
     systemctl reload nginx
   else
