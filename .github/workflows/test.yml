@@ -1,6 +1,6 @@
 # @format
 
-name: SalesNote API Deploy
+name: SalesNote k6 Load Test
 
 on:
     push:
@@ -8,46 +8,38 @@ on:
             - test
     workflow_dispatch:
         inputs:
-            deploy_to_backend:
-                description: "Deploy to backend server"
+            script:
+                description: "k6 script to run"
                 required: true
-                default: "true"
-                type: boolean
-            instance_count:
-                description: "Number of API instances"
-                required: true
-                default: "2"
-                type: string
+                default: "sales-create.js"
+                type: choice
+                options:
+                    - login-only.js
+                    - home-gets.js
+                    - sales-list.js
+                    - item-list.js
+                    - sales-create.js
 
 jobs:
-    build-and-deploy:
+    run-k6:
         runs-on: ubuntu-latest
-        env:
-            API_INSTANCE_COUNT: ${{ github.event.inputs.instance_count || '2' }}
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
 
-            - name: Upload deployment assets
-              uses: appleboy/scp-action@master
-              with:
-                  host: ${{ secrets.API_SSH_HOST }}
-                  username: ${{ secrets.API_SSH_USER }}
-                  key: ${{ secrets.API_SSH_KEY }}
-                  source: "backend/manage.sh,backend/nginx.conf,backend/nginx.conf.template,backend/salesnote@.service,backend/salesnote.service"
-                  target: "/home/salesnote/"
-                  strip_components: 1
-                  overwrite: true
+            - name: Setup k6
+              uses: grafana/setup-k6-action@v1
 
-            - name: Restart service
-              uses: appleboy/ssh-action@master
-              with:
-                  host: ${{ secrets.API_SSH_HOST }}
-                  username: ${{ secrets.API_SSH_USER }}
-                  key: ${{ secrets.API_SSH_KEY }}
-                  script: |
-                      set -e
-                      chmod +x "/home/salesnote/api"
-                      chmod +x "/home/salesnote/manage.sh"
-                      sudo bash /home/salesnote/manage.sh scale "${{ env.API_INSTANCE_COUNT }}"
-                      echo "Deployment complete!"
+            - name: Restore local k6 config
+              env:
+                  K6_LOCAL_CONFIG_B64: ${{ secrets.K6_LOCAL_CONFIG_B64 }}
+              run: |
+                  if [ -z "$K6_LOCAL_CONFIG_B64" ]; then
+                    echo "Missing repository secret: K6_LOCAL_CONFIG_B64"
+                    exit 1
+                  fi
+                  printf '%s' "$K6_LOCAL_CONFIG_B64" | base64 -d > backend/k6/local.config.js
+
+            - name: Run selected k6 script
+              run: |
+                  k6 run "backend/k6/${{ github.event.inputs.script }}" | tee k6-output.txt
