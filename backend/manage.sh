@@ -314,7 +314,9 @@ server {
 EOF
 )
   fi
-  sed "s|{{UPSTREAM_SERVERS}}|${servers}|g; s|{{SSL_BLOCK}}|${ssl_block}|g" "${NGINX_TEMPLATE}" > "${NGINX_OUT}"
+  UPSTREAM_SERVERS="${servers}" SSL_BLOCK="${ssl_block}" \
+    perl -0pe 's/\{\{UPSTREAM_SERVERS\}\}/$ENV{UPSTREAM_SERVERS}/g; s/\{\{SSL_BLOCK\}\}/$ENV{SSL_BLOCK}/g' \
+    "${NGINX_TEMPLATE}" > "${NGINX_OUT}"
   echo "Generated ${NGINX_OUT}"
 }
 
