@@ -28,7 +28,7 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v3
 
-            - name: Test SSH connection to VPS
+            - name: Test SSH connection
               uses: appleboy/ssh-action@master
               with:
                   host: ${{ secrets.API_SSH_HOST }}
@@ -66,7 +66,7 @@ jobs:
                       mkdir -p /home/salesnote
                       sudo systemctl stop 'salesnote@*' || true
 
-            - name: Write API env file on VPS
+            - name: Write API env file
               uses: appleboy/ssh-action@master
               env:
                   API_ENV_FILE: ${{ secrets.API_ENV_FILE }}
@@ -87,7 +87,7 @@ jobs:
                         exit 1
                       fi
 
-            - name: Upload binary to VPS
+            - name: Upload binary
               uses: appleboy/scp-action@master
               with:
                   host: ${{ secrets.API_SSH_HOST }}
@@ -103,16 +103,11 @@ jobs:
                   host: ${{ secrets.API_SSH_HOST }}
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
-                  source: |
-                      backend/manage.sh
-                      backend/nginx.conf
-                      backend/nginx.conf.template
-                      backend/salesnote@.service
-                      backend/salesnote.service
+                  source: "backend/manage.sh,backend/nginx.conf,backend/nginx.conf.template,backend/salesnote@.service,backend/salesnote.service"
                   target: "/home/salesnote/"
                   overwrite: true
 
-            - name: Write Firebase admin SDK file on VPS
+            - name: Write Firebase admin SDK file
               uses: appleboy/ssh-action@master
               env:
                   API_FIREBASE_ADMINSDK_JSON: ${{ secrets.API_FIREBASE_ADMINSDK_JSON }}
@@ -159,7 +154,7 @@ jobs:
                         echo "SSL cert secrets not provided; skipping SSL upload."
                       fi
 
-            - name: Restart service on VPS
+            - name: Restart service
               uses: appleboy/ssh-action@master
               with:
                   host: ${{ secrets.API_SSH_HOST }}
