@@ -95,6 +95,7 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   source: "backend/target/release/api"
                   target: "/home/salesnote/"
+                  strip_components: 3
                   overwrite: true
 
             - name: Upload deployment assets
@@ -105,6 +106,7 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   source: "backend/manage.sh,backend/nginx.conf,backend/nginx.conf.template,backend/salesnote@.service,backend/salesnote.service"
                   target: "/home/salesnote/"
+                  strip_components: 1
                   overwrite: true
 
             - name: Write Firebase admin SDK file
@@ -161,6 +163,7 @@ jobs:
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
                   script: |
+                      set -e
                       chmod +x "/home/salesnote/api"
                       chmod +x "/home/salesnote/manage.sh"
                       sudo bash /home/salesnote/manage.sh scale "${{ env.API_INSTANCE_COUNT }}"
