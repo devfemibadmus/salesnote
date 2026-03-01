@@ -67,6 +67,28 @@ The bind port must come from systemd instance units:
 Environment=SALESNOTE__BIND=0.0.0.0:%i
 ```
 
+### PostgreSQL Connection Limit
+
+Current deploy behavior through [manage.sh](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/backend/manage.sh):
+
+- local PostgreSQL bootstrap enforces:
+    - `max_connections = 152`
+
+Why:
+
+- app pool is currently planned around:
+    - `5` API instances
+    - `SALESNOTE__POOL_MAX_SIZE=28`
+- total possible DB connections:
+    - `5 x 30 = 150`
+
+Useful PostgreSQL commands:
+
+```bash
+sudo -u postgres psql -tAc "SHOW max_connections;"
+sudo -u postgres psql -tAc "SELECT count(*) FROM pg_stat_activity;"
+```
+
 ### Useful Server Commands
 
 Check all API instances:
