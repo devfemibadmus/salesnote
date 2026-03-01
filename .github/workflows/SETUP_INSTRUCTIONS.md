@@ -1,6 +1,156 @@
 <!-- @format -->
 
-# iOS Deployment Setup - Complete Guide
+# Deployment Setup - Complete Guide
+
+## API Deployment Setup
+
+### GitHub Secrets
+
+- `API_SSH_HOST`
+- `API_SSH_USER`
+- `API_SSH_KEY`
+- `API_ENV_FILE_B64`
+- `API_FIREBASE_ADMINSDK_JSON_B64`
+- `SSL_CERT_B64`
+- `SSL_KEY_B64`
+
+### Generate Base64 Secrets on Windows
+
+```powershell
+[Convert]::ToBase64String([System.IO.File]::ReadAllBytes("C:\Users\Femi.Badmus\Desktop\Sales Note\backend\.env.production")) | Set-Clipboard
+```
+
+```powershell
+[Convert]::ToBase64String([System.IO.File]::ReadAllBytes("C:\Users\Femi.Badmus\Desktop\Sales Note\backend\firebase-adminsdk.json")) | Set-Clipboard
+```
+
+### Generate Deploy SSH Key on Windows
+
+```powershell
+ssh-keygen -t ed25519 -C "github-actions-salesnote-api" -f $env:USERPROFILE\.ssh\salesnote_api_actions_nopass -N ""
+Get-Content $env:USERPROFILE\.ssh\salesnote_api_actions_nopass.pub
+Get-Content $env:USERPROFILE\.ssh\salesnote_api_actions_nopass -Raw | Set-Clipboard
+```
+
+### Server Paths
+
+Everything for the API deploy is expected directly inside:
+
+```text
+/home/salesnote
+```
+
+Main files:
+
+- `/home/salesnote/api`
+- `/home/salesnote/.env`
+- `/home/salesnote/firebase-adminsdk.json`
+- `/home/salesnote/manage.sh`
+- `/home/salesnote/nginx.conf`
+- `/home/salesnote/nginx.conf.template`
+- `/home/salesnote/salesnote@.service`
+- `/home/salesnote/salesnote.service`
+
+### Important Env Rules
+
+Do not set a fixed bind port in production `.env`.
+
+Remove this if present:
+
+```env
+SALESNOTE__BIND=0.0.0.0:80
+```
+
+The bind port must come from systemd instance units:
+
+```text
+Environment=SALESNOTE__BIND=0.0.0.0:%i
+```
+
+### Useful Server Commands
+
+Check all API instances:
+
+```bash
+systemctl list-units --type=service | grep salesnote
+sudo systemctl status salesnote@8081
+sudo systemctl status salesnote@8082
+sudo bash /home/salesnote/manage.sh status 2
+```
+
+Check logs:
+
+```bash
+journalctl -u salesnote@8081 -n 100 --no-pager
+journalctl -u salesnote@8082 -n 100 --no-pager
+```
+
+Check port usage:
+
+```bash
+sudo ss -ltnp | grep -E '8081|8082|8083|8084|8085'
+sudo ss -ltnp | grep ':80'
+sudo ss -ltnp | grep ':443'
+```
+
+Kill a stray process on a port:
+
+```bash
+sudo fuser -k 8081/tcp
+sudo fuser -k 8082/tcp
+```
+
+### Nginx Commands
+
+Check generated config:
+
+```bash
+cat /home/salesnote/nginx.conf
+```
+
+Check live nginx config:
+
+```bash
+sudo nginx -t
+sudo nginx -T | grep -A20 -B5 'listen 443'
+sudo nginx -T | grep -A20 -B5 salesnote_api
+```
+
+### Health Checks
+
+Use `GET`, not `HEAD`.
+
+```bash
+curl http://127.0.0.1:8081/health
+curl http://127.0.0.1:8082/health
+curl https://api.salesnote.online/health
+```
+
+`curl -I` returns `405` because `/health` allows `GET`.
+
+### Firewall Commands
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ufw
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw --force enable
+sudo ufw status
+```
+
+### DNS Check
+
+On Windows:
+
+```powershell
+Resolve-DnsName api.salesnote.online | Select-Object Name,Type,IPAddress
+```
+
+---
+
+## iOS Deployment Setup
 
 > ✅ **Works 100% from Windows!** No Mac needed after initial setup.
 
