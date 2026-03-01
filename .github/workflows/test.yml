@@ -3,9 +3,6 @@
 name: SalesNote k6 Load Test
 
 on:
-    push:
-        branches:
-            - test
     workflow_dispatch:
         inputs:
             script:
@@ -42,4 +39,8 @@ jobs:
 
             - name: Run selected k6 script
               run: |
-                  k6 run "backend/k6/${{ github.event.inputs.script }}" | tee k6-output.txt
+                  SCRIPT="${{ github.event.inputs.script }}"
+                  if [ -z "$SCRIPT" ]; then
+                    SCRIPT="sales-create.js"
+                  fi
+                  k6 run "backend/k6/$SCRIPT"
