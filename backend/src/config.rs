@@ -148,11 +148,11 @@ pub fn active_env_profile() -> String {
 
 pub fn active_env_file() -> String {
     let profile = resolve_profile();
-    let preferred = manifest_dir().join(format!(".env.{profile}"));
+    let preferred = runtime_dir().join(format!(".env.{profile}"));
     if preferred.exists() {
         preferred.to_string_lossy().to_string()
     } else {
-        manifest_dir().join(".env").to_string_lossy().to_string()
+        runtime_dir().join(".env").to_string_lossy().to_string()
     }
 }
 
@@ -224,10 +224,7 @@ fn bootstrap_env() {
     ENV_BOOTSTRAPPED.get_or_init(|| {
         let env_file = resolve_env_file_path();
         if !env_file.exists() {
-            panic!(
-                "missing env file in backend/: {}",
-                env_file.to_string_lossy()
-            );
+            panic!("missing env file: {}", env_file.to_string_lossy());
         }
 
         if let Err(err) = dotenvy::from_path_override(&env_file) {
@@ -242,11 +239,11 @@ fn bootstrap_env() {
 
 fn resolve_env_file_path() -> PathBuf {
     let profile = resolve_profile();
-    let preferred = manifest_dir().join(format!(".env.{profile}"));
+    let preferred = runtime_dir().join(format!(".env.{profile}"));
     if preferred.exists() {
         preferred
     } else {
-        manifest_dir().join(".env")
+        runtime_dir().join(".env")
     }
 }
 
@@ -269,11 +266,11 @@ fn resolve_profile() -> &'static str {
         }
     }
 
-    if manifest_dir().join(".env.test").exists() {
+    if runtime_dir().join(".env.test").exists() {
         return ENV_PROFILE_TEST;
     }
 
-    if manifest_dir().join(".env.production").exists() {
+    if runtime_dir().join(".env.production").exists() {
         return ENV_PROFILE_PRODUCTION;
     }
 
@@ -364,11 +361,11 @@ fn with_instance_suffix(filename: &str, instance_id: &str) -> String {
 }
 
 fn profile_file_path() -> PathBuf {
-    manifest_dir().join(ENV_PROFILE_FILE)
+    runtime_dir().join(ENV_PROFILE_FILE)
 }
 
-fn manifest_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+fn runtime_dir() -> PathBuf {
+    env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
 }
 
 fn is_access_target(target: &str) -> bool {
