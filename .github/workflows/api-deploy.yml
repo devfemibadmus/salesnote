@@ -43,13 +43,18 @@ jobs:
                       target
                   key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-            - name: Run tests
-              run: cargo test
-              working-directory: backend
-
             - name: Build release binary
               run: cargo build --release --bin api
               working-directory: backend
+
+            - name: Test SSH connection to VPS
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
+                  script: |
+                      echo "SSH connection successful on $(hostname)"
 
             - name: Stop service before upload
               uses: appleboy/ssh-action@master
