@@ -781,8 +781,8 @@ impl ShopAuthRecord {
                    WHEN EXISTS(SELECT 1 FROM shop_row) THEN (
                      SELECT COUNT(*)::int
                      FROM password_reset_codes
-                     WHERE shop_id = (SELECT id FROM shop_row)
-                       AND created_at >= NOW() - make_interval(mins => $4)
+                      WHERE shop_id = (SELECT id FROM shop_row)
+                        AND created_at >= NOW() - ($4 * interval '1 minute')
                    )
                    ELSE 0
                  END AS cnt
