@@ -10,6 +10,7 @@ NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/salesnote"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/salesnote"
 NGINX_DEFAULT_SITE="/etc/nginx/sites-enabled/default"
 NGINX_MAIN_CONF="/etc/nginx/nginx.conf"
+POSTGRES_MAX_CONNECTIONS="${POSTGRES_MAX_CONNECTIONS:-152}"
 DATABASE_URL=""
 
 usage() {
@@ -28,6 +29,7 @@ Env overrides:
   SSL_KEY_PATH=/etc/letsencrypt/live/example.com/privkey.pem
   NGINX_WORKER_PROCESSES=auto
   NGINX_WORKER_CONNECTIONS=8192
+  POSTGRES_MAX_CONNECTIONS=152
 EOF
 }
 
@@ -132,6 +134,13 @@ parse_database_url() {
 
 ensure_postgres() {
   require_root
+
+  if command -v psql >/dev/null 2>&1 || \
+     systemctl list-unit-files postgresql.service 2>/dev/null | grep -q '^postgresql\.service'; then
+    echo "PostgreSQL already present on server; skipping PostgreSQL management."
+    return 0
+  fi
+
   parse_database_url || return 0
 
   case "${DB_HOST}" in
@@ -143,18 +152,36 @@ ensure_postgres() {
       ;;
   esac
 
-  if ! command -v psql >/dev/null 2>&1 || \
-     ! systemctl list-unit-files postgresql.service 2>/dev/null | grep -q '^postgresql\.service'; then
-    echo "PostgreSQL not found. Installing..."
-    timeout 300 apt-get update || { echo "apt-get update timed out"; exit 1; }
-    timeout 300 apt-get install -y postgresql postgresql-contrib || {
-      echo "apt-get install postgresql timed out"
-      exit 1
-    }
+  echo "PostgreSQL not found. Installing..."
+  timeout 300 apt-get update || { echo "apt-get update timed out"; exit 1; }
+  timeout 300 apt-get install -y postgresql postgresql-contrib || {
+    echo "apt-get install postgresql timed out"
+    exit 1
+  }
+
+  if ! systemctl start postgresql; then
+    echo "Warning: could not start postgresql service. Skipping PostgreSQL management."
+    return 0
   fi
 
-  systemctl enable postgresql
-  systemctl start postgresql
+  local postgres_conf
+  postgres_conf="$(find /etc/postgresql -path '*/main/postgresql.conf' | head -n 1)"
+  if [ -z "${postgres_conf}" ]; then
+    echo "Warning: could not find postgresql.conf under /etc/postgresql. Skipping PostgreSQL management."
+    return 0
+  fi
+
+  perl -0pi -e '
+    if (s/^[#\s]*max_connections\s*=.*$/max_connections = '"${POSTGRES_MAX_CONNECTIONS}"'/m) {
+      exit 0;
+    }
+    s/\n\z/\nmax_connections = '"${POSTGRES_MAX_CONNECTIONS}"'\n/s;
+  ' "${postgres_conf}"
+
+  if ! systemctl restart postgresql; then
+    echo "Warning: could not restart postgresql service after config update. Skipping PostgreSQL management."
+    return 0
+  fi
 
   local role_ident
   local db_ident
@@ -194,6 +221,12 @@ require_count() {
     usage
     exit 1
   fi
+  case "$1" in
+    ''|*[!0-9]*)
+      echo "Instance count must be a non-negative integer." >&2
+      exit 1
+      ;;
+  esac
 }
 
 instance_ports() {
@@ -355,6 +388,15 @@ case "$cmd" in
   scale)
     require_count "${2:-}"
     local_count="$2"
+    if [ "$local_count" -eq 0 ]; then
+      for unit in $(systemctl list-units --all --type=service --no-legend "salesnote@*.service" | awk '{print $1}'); do
+        port="${unit#salesnote@}"
+        port="${port%.service}"
+        systemctl stop "salesnote@${port}" || true
+        systemctl disable "salesnote@${port}" || true
+      done
+      exit 0
+    fi
     ensure_postgres
     ensure_nginx
     ensure_redis
