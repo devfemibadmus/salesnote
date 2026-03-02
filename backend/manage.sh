@@ -10,6 +10,8 @@ NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/salesnote"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/salesnote"
 NGINX_DEFAULT_SITE="/etc/nginx/sites-enabled/default"
 NGINX_MAIN_CONF="/etc/nginx/nginx.conf"
+NGINX_SYSTEMD_OVERRIDE_DIR="/etc/systemd/system/nginx.service.d"
+NGINX_SYSTEMD_OVERRIDE_FILE="${NGINX_SYSTEMD_OVERRIDE_DIR}/limits.conf"
 POSTGRES_MAX_CONNECTIONS="${POSTGRES_MAX_CONNECTIONS:-152}"
 DATABASE_URL=""
 
@@ -29,6 +31,7 @@ Env overrides:
   SSL_KEY_PATH=/etc/letsencrypt/live/example.com/privkey.pem
   NGINX_WORKER_PROCESSES=auto
   NGINX_WORKER_CONNECTIONS=8192
+  NGINX_LIMIT_NOFILE=65535
   POSTGRES_MAX_CONNECTIONS=152
 EOF
 }
@@ -355,10 +358,17 @@ reload_nginx() {
   require_root
   local worker_processes="${NGINX_WORKER_PROCESSES:-auto}"
   local worker_connections="${NGINX_WORKER_CONNECTIONS:-8192}"
+  local limit_nofile="${NGINX_LIMIT_NOFILE:-65535}"
   if [ ! -f "${NGINX_MAIN_CONF}" ]; then
     echo "Missing nginx main config: ${NGINX_MAIN_CONF}" >&2
     exit 1
   fi
+  mkdir -p "${NGINX_SYSTEMD_OVERRIDE_DIR}"
+  cat > "${NGINX_SYSTEMD_OVERRIDE_FILE}" <<EOF
+[Service]
+LimitNOFILE=${limit_nofile}
+EOF
+  systemctl daemon-reload
   WORKER_PROCESSES="${worker_processes}" WORKER_CONNECTIONS="${worker_connections}" \
     perl -0pi -e '
       s/^\s*worker_processes\s+\S+;/worker_processes $ENV{WORKER_PROCESSES};/m;
@@ -369,7 +379,7 @@ reload_nginx() {
   rm -f "${NGINX_DEFAULT_SITE}"
   nginx -t
   if command -v systemctl >/dev/null 2>&1; then
-    systemctl reload nginx
+    systemctl restart nginx
   else
     nginx -s reload
   fi
