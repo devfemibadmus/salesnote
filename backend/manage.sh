@@ -153,11 +153,8 @@ ensure_postgres() {
   esac
 
   echo "PostgreSQL not found. Installing..."
-  timeout 300 apt-get update || { echo "apt-get update timed out"; exit 1; }
-  timeout 300 apt-get install -y postgresql postgresql-contrib || {
-    echo "apt-get install postgresql timed out"
-    exit 1
-  }
+  apt-get update
+  apt-get install -y postgresql postgresql-contrib
 
   if ! systemctl start postgresql; then
     echo "Warning: could not start postgresql service. Skipping PostgreSQL management."
@@ -171,12 +168,7 @@ ensure_postgres() {
     return 0
   fi
 
-  perl -0pi -e '
-    if (s/^[#\s]*max_connections\s*=.*$/max_connections = '"${POSTGRES_MAX_CONNECTIONS}"'/m) {
-      exit 0;
-    }
-    s/\n\z/\nmax_connections = '"${POSTGRES_MAX_CONNECTIONS}"'\n/s;
-  ' "${postgres_conf}"
+  sed -i "s/^[#[:space:]]*max_connections[[:space:]]*=.*/max_connections = ${POSTGRES_MAX_CONNECTIONS}/" "${postgres_conf}"
 
   if ! systemctl restart postgresql; then
     echo "Warning: could not restart postgresql service after config update. Skipping PostgreSQL management."
