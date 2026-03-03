@@ -58,6 +58,8 @@ jobs:
                       WEBSITE_ROOT="/var/www/salesnote-site"
                       WEBSITE_SITE="/etc/nginx/sites-available/salesnote-website"
                       WEBSITE_ENABLED="/etc/nginx/sites-enabled/salesnote-website"
+                      WEBSITE_HTTP_TEMPLATE="${WEBSITE_SRC}/nginx.http.conf.template"
+                      WEBSITE_HTTPS_TEMPLATE="${WEBSITE_SRC}/nginx.https.conf.template"
                       DOWNLOAD_URL="${WEBSITE_APP_DOWNLOAD_URL:-https://play.google.com/store/apps/details?id=com.blackstackhub.salesnote}"
 
                       sudo rm -rf "$WEBSITE_ROOT"
@@ -69,6 +71,8 @@ jobs:
                         sudo mkdir -p "$(dirname "$dest_path")"
 
                         case "$source_path" in
+                          *.conf.template)
+                            ;;
                           *.html|*.txt|*.xml)
                             WEBSITE_NAME="$NGINX_WEBSITE_NAME" APP_DOWNLOAD_URL="$DOWNLOAD_URL" \
                               perl -0pe 's/\{\{WEBSITE_NAME\}\}/$ENV{WEBSITE_NAME}/g; s/\{\{APP_DOWNLOAD_URL\}\}/$ENV{APP_DOWNLOAD_URL}/g' \
@@ -84,62 +88,13 @@ jobs:
                       WEBSITE_SSL_KEY="/etc/letsencrypt/live/${NGINX_WEBSITE_NAME}/privkey.pem"
 
                       if [ -f "$WEBSITE_SSL_CERT" ] && [ -f "$WEBSITE_SSL_KEY" ]; then
-                        cat <<EOF | sudo tee "$WEBSITE_SITE" >/dev/null
-                        server {
-                            listen 80;
-                            server_name ${NGINX_WEBSITE_NAME};
-                            return 301 https://\$host\$request_uri;
-                        }
-
-                        server {
-                            listen 443 ssl http2;
-                            server_name ${NGINX_WEBSITE_NAME};
-
-                            ssl_certificate     ${WEBSITE_SSL_CERT};
-                            ssl_certificate_key ${WEBSITE_SSL_KEY};
-
-                            root ${WEBSITE_ROOT};
-                            index index.html;
-
-                            location = /robots.txt {
-                                try_files \$uri =404;
-                                access_log off;
-                                log_not_found off;
-                            }
-
-                            location /assets/ {
-                                try_files \$uri =404;
-                            }
-
-                            location / {
-                                try_files \$uri /index.html;
-                            }
-                        }
-                        EOF
+                        WEBSITE_NAME="$NGINX_WEBSITE_NAME" WEBSITE_ROOT="$WEBSITE_ROOT" WEBSITE_SSL_CERT="$WEBSITE_SSL_CERT" WEBSITE_SSL_KEY="$WEBSITE_SSL_KEY" \
+                          perl -0pe 's/\{\{WEBSITE_NAME\}\}/$ENV{WEBSITE_NAME}/g; s/\{\{WEBSITE_ROOT\}\}/$ENV{WEBSITE_ROOT}/g; s/\{\{WEBSITE_SSL_CERT\}\}/$ENV{WEBSITE_SSL_CERT}/g; s/\{\{WEBSITE_SSL_KEY\}\}/$ENV{WEBSITE_SSL_KEY}/g' \
+                          "$WEBSITE_HTTPS_TEMPLATE" | sudo tee "$WEBSITE_SITE" >/dev/null
                       else
-                        cat <<EOF | sudo tee "$WEBSITE_SITE" >/dev/null
-                        server {
-                            listen 80;
-                            server_name ${NGINX_WEBSITE_NAME};
-
-                            root ${WEBSITE_ROOT};
-                            index index.html;
-
-                            location = /robots.txt {
-                                try_files \$uri =404;
-                                access_log off;
-                                log_not_found off;
-                            }
-
-                            location /assets/ {
-                                try_files \$uri =404;
-                            }
-
-                            location / {
-                                try_files \$uri /index.html;
-                            }
-                        }
-                        EOF
+                        WEBSITE_NAME="$NGINX_WEBSITE_NAME" WEBSITE_ROOT="$WEBSITE_ROOT" \
+                          perl -0pe 's/\{\{WEBSITE_NAME\}\}/$ENV{WEBSITE_NAME}/g; s/\{\{WEBSITE_ROOT\}\}/$ENV{WEBSITE_ROOT}/g' \
+                          "$WEBSITE_HTTP_TEMPLATE" | sudo tee "$WEBSITE_SITE" >/dev/null
                       fi
 
                       sudo ln -sf "$WEBSITE_SITE" "$WEBSITE_ENABLED"
