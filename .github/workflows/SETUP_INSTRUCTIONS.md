@@ -28,8 +28,68 @@
 
 ```powershell
 ssh-keygen -t ed25519 -C "github-actions-salesnote-api" -f $env:USERPROFILE\.ssh\salesnote_api_actions_nopass -N ""
+```
+
+```powershell
 Get-Content $env:USERPROFILE\.ssh\salesnote_api_actions_nopass.pub
+```
+
+```powershell
 Get-Content $env:USERPROFILE\.ssh\salesnote_api_actions_nopass -Raw | Set-Clipboard
+```
+
+### Add Public Key on Server
+
+Show the `.pub` key on Windows:
+
+```powershell
+Get-Content $env:USERPROFILE\.ssh\salesnote_api_actions_nopass.pub
+```
+
+Copy the `.pub` key to clipboard on Windows:
+
+```powershell
+Get-Content $env:USERPROFILE\.ssh\salesnote_api_actions_nopass.pub -Raw | Set-Clipboard
+```
+
+Check on the VM if `authorized_keys` already exists:
+
+```bash
+ls -l ~/.ssh/authorized_keys
+```
+
+Check existing contents before appending:
+
+```bash
+cat ~/.ssh/authorized_keys
+```
+
+Append the new public key on the VM:
+
+```bash
+mkdir -p ~/.ssh
+```
+
+```bash
+chmod 700 ~/.ssh
+```
+
+```bash
+printf '%s\n' 'PASTE_PUBLIC_KEY_HERE' >> ~/.ssh/authorized_keys
+```
+
+```bash
+chmod 600 ~/.ssh/authorized_keys
+```
+
+```bash
+sudo systemctl reload ssh || sudo systemctl reload sshd
+```
+
+Then test from Windows:
+
+```powershell
+ssh -i $env:USERPROFILE\.ssh\salesnote_api_actions_nopass <server-user>@<server-ip>
 ```
 
 ### Server Paths

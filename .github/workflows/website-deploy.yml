@@ -23,6 +23,7 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   script: |
                       echo "SSH connection successful on $(hostname)"
+                      sudo mkdir -p /home/salesnote/website
 
             - name: Upload website source
               uses: appleboy/scp-action@master
@@ -31,7 +32,7 @@ jobs:
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
                   source: "backend/website"
-                  target: "/home/salesnote-website-src/"
+                  target: "/home/salesnote/website/"
                   strip_components: 2
                   overwrite: true
 
@@ -52,7 +53,7 @@ jobs:
                         exit 1
                       fi
 
-                      WEBSITE_SRC="/home/salesnote-website-src"
+                      WEBSITE_SRC="/home/salesnote/website"
                       WEBSITE_ROOT="/var/www/salesnote-site"
                       WEBSITE_SITE="/etc/nginx/sites-available/salesnote-website"
                       WEBSITE_ENABLED="/etc/nginx/sites-enabled/salesnote-website"
