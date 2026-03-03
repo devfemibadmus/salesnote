@@ -24,6 +24,7 @@ jobs:
                   script: |
                       echo "SSH connection successful on $(hostname)"
                       sudo mkdir -p /home/salesnote/website
+                      sudo chown -R "$(whoami):$(id -gn)" /home/salesnote/website
 
             - name: Upload website source
               uses: appleboy/scp-action@master
