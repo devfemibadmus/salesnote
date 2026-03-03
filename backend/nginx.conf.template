@@ -4,5 +4,3 @@ upstream salesnote_api {
 }
 
 {{SSL_BLOCK}}
-
-{{WEBSITE_BLOCK}}

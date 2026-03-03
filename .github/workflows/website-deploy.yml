@@ -1,0 +1,145 @@
+# @format
+
+name: SalesNote Website Deploy
+
+on:
+    push:
+        branches:
+            - website
+    workflow_dispatch:
+
+jobs:
+    deploy-website:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Test SSH connection
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
+                  script: |
+                      echo "SSH connection successful on $(hostname)"
+
+            - name: Upload website source
+              uses: appleboy/scp-action@master
+              with:
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
+                  source: "backend/website"
+                  target: "/home/salesnote-website-src/"
+                  strip_components: 2
+                  overwrite: true
+
+            - name: Deploy website
+              uses: appleboy/ssh-action@master
+              env:
+                  NGINX_WEBSITE_NAME: ${{ secrets.NGINX_WEBSITE_NAME }}
+                  WEBSITE_APP_DOWNLOAD_URL: ${{ secrets.WEBSITE_APP_DOWNLOAD_URL }}
+              with:
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
+                  envs: NGINX_WEBSITE_NAME,WEBSITE_APP_DOWNLOAD_URL
+                  script: |
+                      set -e
+                      if [ -z "$NGINX_WEBSITE_NAME" ]; then
+                        echo "Missing NGINX_WEBSITE_NAME secret."
+                        exit 1
+                      fi
+
+                      WEBSITE_SRC="/home/salesnote-website-src"
+                      WEBSITE_ROOT="/var/www/salesnote-site"
+                      WEBSITE_SITE="/etc/nginx/sites-available/salesnote-website"
+                      WEBSITE_ENABLED="/etc/nginx/sites-enabled/salesnote-website"
+                      DOWNLOAD_URL="${WEBSITE_APP_DOWNLOAD_URL:-https://play.google.com/store/apps/details?id=com.blackstackhub.salesnote}"
+
+                      sudo rm -rf "$WEBSITE_ROOT"
+                      sudo mkdir -p "$WEBSITE_ROOT"
+
+                      while IFS= read -r -d '' source_path; do
+                        rel_path="${source_path#${WEBSITE_SRC}/}"
+                        dest_path="${WEBSITE_ROOT}/${rel_path}"
+                        sudo mkdir -p "$(dirname "$dest_path")"
+
+                        case "$source_path" in
+                          *.html|*.txt|*.xml)
+                            WEBSITE_NAME="$NGINX_WEBSITE_NAME" APP_DOWNLOAD_URL="$DOWNLOAD_URL" \
+                              perl -0pe 's/\{\{WEBSITE_NAME\}\}/$ENV{WEBSITE_NAME}/g; s/\{\{APP_DOWNLOAD_URL\}\}/$ENV{APP_DOWNLOAD_URL}/g' \
+                              "$source_path" | sudo tee "$dest_path" >/dev/null
+                            ;;
+                          *)
+                            sudo cp "$source_path" "$dest_path"
+                            ;;
+                        esac
+                      done < <(find "$WEBSITE_SRC" -type f -print0)
+
+                      WEBSITE_SSL_CERT="/etc/letsencrypt/live/${NGINX_WEBSITE_NAME}/fullchain.pem"
+                      WEBSITE_SSL_KEY="/etc/letsencrypt/live/${NGINX_WEBSITE_NAME}/privkey.pem"
+
+                      if [ -f "$WEBSITE_SSL_CERT" ] && [ -f "$WEBSITE_SSL_KEY" ]; then
+                        cat <<EOF | sudo tee "$WEBSITE_SITE" >/dev/null
+                        server {
+                            listen 80;
+                            server_name ${NGINX_WEBSITE_NAME};
+                            return 301 https://\$host\$request_uri;
+                        }
+
+                        server {
+                            listen 443 ssl http2;
+                            server_name ${NGINX_WEBSITE_NAME};
+
+                            ssl_certificate     ${WEBSITE_SSL_CERT};
+                            ssl_certificate_key ${WEBSITE_SSL_KEY};
+
+                            root ${WEBSITE_ROOT};
+                            index index.html;
+
+                            location = /robots.txt {
+                                try_files \$uri =404;
+                                access_log off;
+                                log_not_found off;
+                            }
+
+                            location /assets/ {
+                                try_files \$uri =404;
+                            }
+
+                            location / {
+                                try_files \$uri /index.html;
+                            }
+                        }
+                        EOF
+                      else
+                        cat <<EOF | sudo tee "$WEBSITE_SITE" >/dev/null
+                        server {
+                            listen 80;
+                            server_name ${NGINX_WEBSITE_NAME};
+
+                            root ${WEBSITE_ROOT};
+                            index index.html;
+
+                            location = /robots.txt {
+                                try_files \$uri =404;
+                                access_log off;
+                                log_not_found off;
+                            }
+
+                            location /assets/ {
+                                try_files \$uri =404;
+                            }
+
+                            location / {
+                                try_files \$uri /index.html;
+                            }
+                        }
+                        EOF
+                      fi
+
+                      sudo ln -sf "$WEBSITE_SITE" "$WEBSITE_ENABLED"
+                      sudo nginx -t
+                      sudo systemctl reload nginx
