@@ -87,7 +87,7 @@ jobs:
                       WEBSITE_SSL_CERT="/etc/letsencrypt/live/${NGINX_WEBSITE_NAME}/fullchain.pem"
                       WEBSITE_SSL_KEY="/etc/letsencrypt/live/${NGINX_WEBSITE_NAME}/privkey.pem"
 
-                      if [ -f "$WEBSITE_SSL_CERT" ] && [ -f "$WEBSITE_SSL_KEY" ]; then
+                      if sudo test -f "$WEBSITE_SSL_CERT" && sudo test -f "$WEBSITE_SSL_KEY"; then
                         WEBSITE_NAME="$NGINX_WEBSITE_NAME" WEBSITE_ROOT="$WEBSITE_ROOT" WEBSITE_SSL_CERT="$WEBSITE_SSL_CERT" WEBSITE_SSL_KEY="$WEBSITE_SSL_KEY" \
                           perl -0pe 's/\{\{WEBSITE_NAME\}\}/$ENV{WEBSITE_NAME}/g; s/\{\{WEBSITE_ROOT\}\}/$ENV{WEBSITE_ROOT}/g; s/\{\{WEBSITE_SSL_CERT\}\}/$ENV{WEBSITE_SSL_CERT}/g; s/\{\{WEBSITE_SSL_KEY\}\}/$ENV{WEBSITE_SSL_KEY}/g' \
                           "$WEBSITE_HTTPS_TEMPLATE" | sudo tee "$WEBSITE_SITE" >/dev/null
