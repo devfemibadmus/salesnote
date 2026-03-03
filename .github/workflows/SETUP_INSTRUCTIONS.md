@@ -347,6 +347,62 @@ Current deploy now updates nginx worker tuning through [manage.sh](/c:/Users/Fem
 
 ---
 
+## Android Deployment Setup
+
+### GitHub Secrets
+
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+- `ANDROID_GOOGLE_SERVICES_JSON`
+- `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`
+
+### Generate Base64 Secrets On Windows
+
+Keystore:
+
+```powershell
+[Convert]::ToBase64String([System.IO.File]::ReadAllBytes("C:\Users\Femi.Badmus\Desktop\Sales Note\mobile\android\app\salesnote-release.keystore")) | Set-Clipboard
+```
+
+### Workflow Notes
+
+File:
+
+- [.github/workflows/android-deploy.yml](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/.github/workflows/android-deploy.yml)
+
+What the workflow now does:
+
+1. builds from the `mobile` app directory
+2. restores `android/app/google-services.json` from GitHub Secrets
+3. restores signing keystore and `key.properties`
+4. builds the release `.aab`
+5. uploads to Google Play internal testing
+
+### Important Values
+
+Current Android package name:
+
+- `com.blackstackhub.salesnote`
+
+Current bundle upload path:
+
+- `mobile/build/app/outputs/bundle/release/app-release.aab`
+
+### Manual Local Build
+
+From repo root:
+
+```powershell
+cd mobile
+flutter clean
+flutter pub get
+flutter build appbundle --release
+```
+
+---
+
 ## iOS Deployment Setup
 
 > ✅ **Works 100% from Windows!** No Mac needed after initial setup.
