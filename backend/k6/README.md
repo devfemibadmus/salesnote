@@ -123,7 +123,7 @@ For local testing, focus on:
 
 1. `http_req_duration`
 2. `http_req_failed`
-3. p95 latency
+3. p95 latency against the current `3s` target
 4. whether `sales-create.js` starts failing under small load
 
 If `sales-create.js` breaks early locally, do not size a VM yet. Fix the bottleneck first.

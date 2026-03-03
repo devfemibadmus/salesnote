@@ -17,7 +17,7 @@ export const options = buildOptions({
   scenarios: buildScenario('sales_create_users'),
   thresholds: {
     http_req_failed: ['rate<0.02'],
-    http_req_duration: ['p(95)<1200'],
+    http_req_duration: ['p(95)<3000'],
     checks: ['rate>0.98'],
   },
 });

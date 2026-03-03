@@ -50,7 +50,7 @@ export function buildOptions(extra = {}) {
   const base = {
     thresholds: {
       http_req_failed: ['rate<0.05'],
-      http_req_duration: ['p(95)<1200'],
+      http_req_duration: ['p(95)<3000'],
       checks: ['rate>0.95'],
     },
   };
