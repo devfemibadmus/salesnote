@@ -1,0 +1,826 @@
+<!-- @format -->
+
+<!doctype html>
+<html lang="en" class="scroll-smooth">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>SalesNote | Premium Sales & Receipt Management</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script src="https://unpkg.com/lucide@latest"></script>
+		<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+		<script>
+			tailwind.config = {
+				theme: {
+					extend: {
+						fontFamily: {
+							sans: ['"Plus Jakarta Sans"', "sans-serif"],
+						},
+						colors: {
+							dark: "#ffffff",
+							surface: "#f8fafc",
+							brand: {
+								100: "#e0f0ff",
+								200: "#baddff",
+								300: "#8ac4ff",
+								400: "#52a9ff",
+								500: "#007BFF",
+								600: "#0062cc",
+							},
+							accent: {
+								500: "#8b5cf6", // Purple
+							},
+						},
+						animation: {
+							"fade-in-up": "fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+							float: "float 6s ease-in-out infinite",
+							"float-delayed": "float 6s ease-in-out 3s infinite",
+							"pulse-slow": "pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+						},
+						keyframes: {
+							fadeUp: {
+								"0%": { opacity: "0", transform: "translateY(30px)" },
+								"100%": { opacity: "1", transform: "translateY(0)" },
+							},
+							float: {
+								"0%, 100%": { transform: "translateY(0)" },
+								"50%": { transform: "translateY(-15px)" },
+							},
+						},
+					},
+				},
+			};
+		</script>
+		<style>
+			body {
+				background-color: #f8fafc;
+				color: #0f172a;
+			}
+			.page-section {
+				display: none;
+				opacity: 0;
+				transition: opacity 0.4s ease;
+			}
+			.page-section.active {
+				display: block;
+				opacity: 1;
+			}
+
+			/* Glassmorphism utilities - Light Theme */
+			.glass {
+				background: rgba(255, 255, 255, 0.85);
+				backdrop-filter: blur(16px);
+				border: 1px solid rgba(0, 0, 0, 0.05);
+			}
+			.glass-nav {
+				background: rgba(255, 255, 255, 0.9);
+				backdrop-filter: blur(20px);
+				border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+			}
+			.glass-card {
+				background: rgba(255, 255, 255, 0.95);
+				backdrop-filter: blur(20px);
+				border: 1px solid rgba(0, 0, 0, 0.06);
+				box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.06);
+			}
+
+			/* Gradients */
+			.text-gradient {
+				background: linear-gradient(135deg, #0f172a 0%, #475569 100%);
+				-webkit-background-clip: text;
+				-webkit-text-fill-color: transparent;
+			}
+			.text-gradient-brand {
+				background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+				-webkit-background-clip: text;
+				-webkit-text-fill-color: transparent;
+			}
+			.bg-mesh {
+				background-image:
+					radial-gradient(at 40% 20%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
+					radial-gradient(at 80% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
+					radial-gradient(at 0% 50%, rgba(59, 130, 246, 0.05) 0px, transparent 50%);
+			}
+
+			/* Scroll Animations */
+			.reveal {
+				opacity: 0;
+				transform: translateY(40px);
+				transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+			}
+			.reveal.active {
+				opacity: 1;
+				transform: translateY(0);
+			}
+
+			/* Hide scrollbar for clean look */
+			::-webkit-scrollbar {
+				width: 8px;
+			}
+			::-webkit-scrollbar-track {
+				background: #f8fafc;
+			}
+			::-webkit-scrollbar-thumb {
+				background: #cbd5e1;
+				border-radius: 4px;
+			}
+			::-webkit-scrollbar-thumb:hover {
+				background: #94a3b8;
+			}
+
+			/* Custom Live Feature Animations */
+			@keyframes printReceipt {
+				0% {
+					transform: translateY(100%);
+					opacity: 0;
+				}
+				15% {
+					transform: translateY(0);
+					opacity: 1;
+				}
+				85% {
+					transform: translateY(0);
+					opacity: 1;
+				}
+				100% {
+					transform: translateY(-10%);
+					opacity: 0;
+				}
+			}
+			@keyframes barGrow1 {
+				0%,
+				100% {
+					height: 30%;
+				}
+				50% {
+					height: 70%;
+				}
+			}
+			@keyframes barGrow2 {
+				0%,
+				100% {
+					height: 40%;
+				}
+				50% {
+					height: 90%;
+				}
+			}
+			@keyframes barGrow3 {
+				0%,
+				100% {
+					height: 20%;
+				}
+				50% {
+					height: 50%;
+				}
+			}
+			@keyframes slideAvatar {
+				0% {
+					transform: translateX(30px);
+					opacity: 0;
+				}
+				15% {
+					transform: translateX(0);
+					opacity: 1;
+				}
+				85% {
+					transform: translateX(0);
+					opacity: 1;
+				}
+				100% {
+					transform: translateX(-30px);
+					opacity: 0;
+				}
+			}
+			@keyframes pulseShield {
+				0% {
+					box-shadow: 0 0 0 0 rgba(15, 23, 42, 0.15);
+				}
+				70% {
+					box-shadow: 0 0 0 20px rgba(15, 23, 42, 0);
+				}
+				100% {
+					box-shadow: 0 0 0 0 rgba(15, 23, 42, 0);
+				}
+			}
+
+			.delay-100 {
+				transition-delay: 100ms;
+				animation-delay: 100ms;
+			}
+			.delay-200 {
+				transition-delay: 200ms;
+				animation-delay: 200ms;
+			}
+			.delay-300 {
+				transition-delay: 300ms;
+				animation-delay: 300ms;
+			}
+			.delay-400 {
+				transition-delay: 400ms;
+				animation-delay: 400ms;
+			}
+		</style>
+	</head>
+	<body class="font-sans antialiased selection:bg-brand-500 selection:text-white overflow-x-hidden">
+		<!-- Navigation -->
+		<nav class="fixed w-full z-50 glass-nav transition-all duration-300">
+			<div class="max-w-7xl mx-auto px-6 lg:px-8">
+				<div class="flex justify-between h-20 items-center">
+					<!-- Logo -->
+					<div class="flex items-center cursor-pointer group" onclick="navigate('home')">
+						<div
+							class="w-10 h-10 rounded-[10px] bg-[#007BFF] flex items-center justify-center mr-3 shadow-lg shadow-brand-500/20 group-hover:shadow-brand-500/40 transition-all duration-300 overflow-hidden"
+						>
+							<!-- Custom SVG matching uploaded logo -->
+							<svg viewBox="0 0 100 100" class="w-8 h-8 text-[#f4f4f4]" fill="currentColor">
+								<path d="M22 20 L32 12 L42 20 L52 12 L62 20 L72 12 V72 C72 80 66 84 58 84 H38 V70 H22 Z" />
+								<path d="M22 72 H36 C36 78 30 84 22 84 Z" fill-opacity="0.7" />
+								<rect x="36" y="32" width="20" height="6" rx="1" fill="#007BFF" />
+								<circle cx="64" cy="35" r="4" fill="#007BFF" />
+								<rect x="36" y="50" width="20" height="6" rx="1" fill="#007BFF" />
+								<circle cx="64" cy="53" r="4" fill="#007BFF" />
+							</svg>
+						</div>
+						<span class="font-bold text-xl tracking-tight text-slate-900">Sales<span class="text-[#007BFF]">Note</span></span>
+					</div>
+
+					<!-- Desktop Menu -->
+					<div class="hidden md:flex items-center space-x-2">
+						<button
+							onclick="navigate('home')"
+							class="text-sm font-semibold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-100 transition-all"
+						>
+							Home
+						</button>
+						<button
+							onclick="navigate('privacy')"
+							class="text-sm font-semibold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-100 transition-all"
+						>
+							Privacy
+						</button>
+						<button
+							onclick="navigate('terms')"
+							class="text-sm font-semibold text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-100 transition-all"
+						>
+							Terms
+						</button>
+					</div>
+
+					<!-- Mobile Menu Button -->
+					<div class="md:hidden flex items-center">
+						<button id="mobile-menu-btn" class="text-slate-600 hover:text-slate-900 p-2">
+							<i data-lucide="menu" class="w-6 h-6"></i>
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<!-- Mobile Menu Panel -->
+			<div id="mobile-menu" class="hidden md:hidden glass border-b border-slate-200 absolute w-full backdrop-blur-3xl shadow-xl">
+				<div class="px-6 py-6 space-y-2">
+					<button
+						onclick="navigate('home')"
+						class="block w-full text-left px-4 py-3 text-slate-600 font-bold hover:bg-slate-100 hover:text-slate-900 rounded-xl transition-colors"
+					>
+						Home
+					</button>
+					<button
+						onclick="navigate('privacy')"
+						class="block w-full text-left px-4 py-3 text-slate-600 font-bold hover:bg-slate-100 hover:text-slate-900 rounded-xl transition-colors"
+					>
+						Privacy Policy
+					</button>
+					<button
+						onclick="navigate('terms')"
+						class="block w-full text-left px-4 py-3 text-slate-600 font-bold hover:bg-slate-100 hover:text-slate-900 rounded-xl transition-colors"
+					>
+						Terms & Conditions
+					</button>
+				</div>
+			</div>
+		</nav>
+
+		<!-- MAIN CONTENT -->
+		<main class="min-h-screen">
+			<!-- ================= LANDING PAGE ================= -->
+			<div id="page-home" class="page-section active">
+				<!-- Hero Section -->
+				<section class="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden bg-mesh">
+					<!-- Grid Background -->
+					<div
+						class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2760%27 height=%2760%27 fill=%27none%27%3E%3Cpath d=%27M59.5_0V60M60_59.5H0%27 stroke=%27%23000%27 stroke-opacity=%270.03%27/%3E%3C/svg%3E')] [mask-image:linear-gradient(to_bottom,white,transparent)]"
+					></div>
+
+					<div class="max-w-7xl mx-auto px-6 lg:px-8 relative z-10 text-center">
+						<div
+							class="inline-flex items-center px-4 py-1.5 rounded-full border border-slate-200 bg-white shadow-sm mb-8 opacity-0 animate-fade-in-up"
+						>
+							<span class="flex h-2 w-2 rounded-full bg-brand-500 mr-2 animate-pulse"></span>
+							<span class="text-xs font-bold text-slate-600 uppercase tracking-wider">The New Standard for Shops</span>
+						</div>
+
+						<h1
+							class="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tighter mb-8 opacity-0 animate-fade-in-up delay-100 leading-[1.05]"
+						>
+							<span class="text-gradient">Close the sale.</span><br />
+							<span class="text-gradient-brand">Send the receipt.</span>
+						</h1>
+
+						<p
+							class="mt-6 text-lg md:text-xl text-slate-600 max-w-2xl mx-auto mb-10 opacity-0 animate-fade-in-up delay-200 font-medium leading-relaxed"
+						>
+							SalesNote is the hyper-efficient mobile app for businesses. Generate clean receipts, track inventory, and manage customers
+							in seconds.
+						</p>
+
+						<div class="flex flex-col sm:flex-row gap-4 justify-center items-center opacity-0 animate-fade-in-up delay-300">
+							<button
+								class="w-full sm:w-auto flex items-center justify-center px-8 py-4 text-base font-bold rounded-full text-white bg-slate-900 hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20 hover:scale-105 transform duration-300"
+							>
+								<i data-lucide="apple" class="w-5 h-5 mr-2"></i>
+								Download for iOS
+							</button>
+							<button
+								class="w-full sm:w-auto flex items-center justify-center px-8 py-4 text-base font-bold rounded-full text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 transition-all hover:scale-105 transform duration-300 shadow-sm"
+							>
+								<i data-lucide="play" class="w-5 h-5 mr-2 fill-current"></i>
+								Get on Android
+							</button>
+						</div>
+
+						<!-- Real Store Image Display -->
+						<div
+							class="mt-24 relative max-w-5xl mx-auto h-[400px] sm:h-[500px] opacity-0 animate-fade-in-up delay-400 hidden md:block rounded-3xl overflow-hidden shadow-2xl border border-slate-200 bg-slate-200 group"
+						>
+							<!-- Glow behind -->
+							<div class="absolute inset-0 bg-[#007BFF]/20 blur-[100px] rounded-full"></div>
+
+							<div
+								class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent z-10 pointer-events-none"
+							></div>
+
+							<!-- High Quality Real Store Photo -->
+							<img
+								src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?q=80&w=2000&auto=format&fit=crop"
+								alt="Small Business Storefront"
+								class="absolute inset-0 w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-1000 ease-out"
+							/>
+
+							<!-- Floating Context Elements -->
+							<div class="absolute bottom-10 left-10 z-20 glass-card p-4 rounded-2xl animate-float text-left">
+								<div class="flex items-center gap-4">
+									<div class="w-12 h-12 bg-[#00C853] rounded-full flex justify-center items-center shadow-lg shadow-green-500/30">
+										<i data-lucide="check" class="w-6 h-6 text-white"></i>
+									</div>
+									<div>
+										<p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Receipt Sent</p>
+										<p class="text-base font-extrabold text-slate-900">#SALE-4092</p>
+									</div>
+								</div>
+							</div>
+
+							<div class="absolute top-10 right-10 z-20 glass-card p-4 rounded-2xl animate-float-delayed text-right">
+								<div class="flex items-center gap-4">
+									<div class="text-right">
+										<p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Today's Sales</p>
+										<p class="text-base font-extrabold text-slate-900">$1,240.00</p>
+									</div>
+									<div class="w-12 h-12 bg-[#007BFF] rounded-full flex justify-center items-center shadow-lg shadow-blue-500/30">
+										<i data-lucide="trending-up" class="w-6 h-6 text-white"></i>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- BENTO BOX FEATURES SECTION -->
+				<section class="py-24 bg-slate-50 relative z-20 overflow-hidden">
+					<div class="max-w-7xl mx-auto px-6 lg:px-8">
+						<div class="mb-16 reveal">
+							<h2 class="text-3xl md:text-5xl font-bold text-slate-900 tracking-tight mb-4">
+								Everything you need.<br /><span class="text-brand-500">Nothing you don't.</span>
+							</h2>
+						</div>
+
+						<!-- Bento Grid -->
+						<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 auto-rows-[280px]">
+							<!-- Box 1: Receipts (Large) -->
+							<div
+								class="reveal md:col-span-2 lg:col-span-2 row-span-2 bg-white border border-slate-100 shadow-sm rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:border-brand-500/30 transition-all duration-300"
+							>
+								<div
+									class="absolute inset-0 bg-gradient-to-br from-brand-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+								></div>
+								<div class="relative z-10 h-full flex flex-col">
+									<div class="w-12 h-12 rounded-2xl bg-brand-100 flex items-center justify-center mb-6 text-brand-600 shadow-sm">
+										<i data-lucide="file-check-2" class="w-6 h-6"></i>
+									</div>
+									<h3 class="text-2xl font-bold text-slate-900 mb-2">Clean, Professional Receipts</h3>
+									<p class="text-slate-600 max-w-md">
+										Generate beautiful receipts instantly in PDF or image format. Add items, calculate VAT, attach your signature,
+										and share directly via WhatsApp or Email.
+									</p>
+
+									<div class="mt-auto pt-8 flex justify-end">
+										<!-- Live Animation: Printing Receipt -->
+										<div
+											class="w-48 h-40 bg-slate-50 border border-slate-200 rounded-tl-xl rounded-tr-xl flex flex-col p-3 shadow-sm overflow-hidden border-b-0 relative"
+										>
+											<div class="absolute top-0 left-0 w-full h-2 bg-slate-200 z-10"></div>
+											<div
+												class="h-full w-full bg-white border border-slate-100 shadow-sm p-3 flex flex-col gap-2.5 animate-[printReceipt_4s_ease-in-out_infinite]"
+											>
+												<div class="flex justify-between items-center border-b border-slate-100 pb-2">
+													<div class="w-4 h-4 rounded-full bg-brand-100 text-brand-500 flex items-center justify-center">
+														<i data-lucide="check" class="w-2.5 h-2.5"></i>
+													</div>
+													<div class="h-1.5 w-12 bg-slate-200 rounded"></div>
+												</div>
+												<div class="h-1.5 w-full bg-slate-100 rounded"></div>
+												<div class="h-1.5 w-3/4 bg-slate-100 rounded"></div>
+												<div class="h-1.5 w-full bg-slate-100 rounded"></div>
+												<div class="mt-auto flex justify-between items-center border-t border-slate-100 pt-2">
+													<div class="h-1.5 w-8 bg-slate-200 rounded"></div>
+													<div class="h-2 w-12 bg-slate-800 rounded"></div>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Box 2: Customer CRM -->
+							<div
+								class="reveal delay-100 md:col-span-1 lg:col-span-2 bg-white border border-slate-100 shadow-sm rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:border-purple-500/30 transition-all duration-300 flex flex-col"
+							>
+								<div
+									class="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-4 text-purple-600 shadow-sm transform group-hover:scale-110 transition-transform"
+								>
+									<i data-lucide="users" class="w-5 h-5"></i>
+								</div>
+								<h3 class="text-xl font-bold text-slate-900 mb-2">Built-in CRM</h3>
+								<p class="text-slate-600 text-sm">
+									Keep customer names and contact details permanently attached to every single sale.
+								</p>
+
+								<!-- Live Animation: Customer Slides -->
+								<div class="mt-auto relative h-16 w-full overflow-hidden">
+									<div
+										class="absolute w-full flex items-center p-2.5 bg-slate-50 rounded-xl border border-slate-100 animate-[slideAvatar_4s_infinite]"
+									>
+										<div class="w-8 h-8 rounded-full bg-purple-200 flex items-center justify-center text-purple-600 mr-3">
+											<i data-lucide="user" class="w-4 h-4"></i>
+										</div>
+										<div>
+											<div class="h-2 w-20 bg-slate-300 rounded mb-1.5"></div>
+											<div class="h-1.5 w-16 bg-slate-200 rounded"></div>
+										</div>
+									</div>
+									<div
+										class="absolute w-full flex items-center p-2.5 bg-slate-50 rounded-xl border border-slate-100 animate-[slideAvatar_4s_infinite_2s] opacity-0 translate-x-[30px]"
+									>
+										<div class="w-8 h-8 rounded-full bg-pink-200 flex items-center justify-center text-pink-600 mr-3">
+											<i data-lucide="user" class="w-4 h-4"></i>
+										</div>
+										<div>
+											<div class="h-2 w-24 bg-slate-300 rounded mb-1.5"></div>
+											<div class="h-1.5 w-12 bg-slate-200 rounded"></div>
+										</div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Box 3: Dashboard -->
+							<div
+								class="reveal delay-200 md:col-span-1 lg:col-span-1 bg-white border border-slate-100 shadow-sm rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:border-green-500/30 transition-all duration-300 flex flex-col"
+							>
+								<div
+									class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mb-4 text-green-600 shadow-sm transform group-hover:scale-110 transition-transform"
+								>
+									<i data-lucide="trending-up" class="w-5 h-5"></i>
+								</div>
+								<h3 class="text-xl font-bold text-slate-900 mb-2">Live Dashboard</h3>
+								<p class="text-slate-600 text-sm mb-4">Track daily, weekly, and monthly sales performance at a glance.</p>
+
+								<!-- Live Animation: Active Chart -->
+								<div class="mt-auto flex items-end justify-between h-16 w-full px-2 gap-1.5 border-b border-slate-100 pb-1">
+									<div class="w-full bg-green-100 rounded-t-sm animate-[barGrow1_2s_ease-in-out_infinite]"></div>
+									<div class="w-full bg-green-200 rounded-t-sm animate-[barGrow2_2.2s_ease-in-out_infinite_0.3s]"></div>
+									<div class="w-full bg-green-100 rounded-t-sm animate-[barGrow3_1.8s_ease-in-out_infinite_0.1s]"></div>
+									<div
+										class="w-full bg-green-500 rounded-t-sm animate-[barGrow2_2.5s_ease-in-out_infinite_0.5s] shadow-[0_0_12px_rgba(34,197,94,0.4)] relative"
+									>
+										<div class="absolute -top-3 left-1/2 -translate-x-1/2 w-1 h-1 bg-green-600 rounded-full animate-ping"></div>
+									</div>
+									<div class="w-full bg-green-200 rounded-t-sm animate-[barGrow1_2.1s_ease-in-out_infinite_0.2s]"></div>
+								</div>
+							</div>
+
+							<!-- Box 4: Item Tracking -->
+							<div
+								class="reveal delay-300 md:col-span-1 lg:col-span-1 bg-white border border-slate-100 shadow-sm rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:border-orange-500/30 transition-all duration-300 flex flex-col"
+							>
+								<div
+									class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center mb-4 text-orange-600 shadow-sm transform group-hover:scale-110 transition-transform"
+								>
+									<i data-lucide="package" class="w-5 h-5"></i>
+								</div>
+								<h3 class="text-xl font-bold text-slate-900 mb-2">Item Insights</h3>
+								<p class="text-slate-600 text-sm">Instantly identify your fast-moving and slow-moving products.</p>
+
+								<!-- Live Animation: Moving Items -->
+								<div class="mt-auto flex flex-col gap-2">
+									<div class="flex items-center justify-between bg-orange-50 px-3 py-2.5 rounded-xl border border-orange-100">
+										<div class="flex items-center gap-2">
+											<i data-lucide="zap" class="w-4 h-4 text-orange-500 fill-current animate-pulse"></i>
+											<div class="h-1.5 w-12 bg-orange-200 rounded"></div>
+										</div>
+										<div class="h-1.5 w-6 bg-orange-400 rounded"></div>
+									</div>
+									<div
+										class="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 opacity-60"
+									>
+										<div class="flex items-center gap-2">
+											<i data-lucide="trending-down" class="w-4 h-4 text-slate-400"></i>
+											<div class="h-1.5 w-16 bg-slate-200 rounded"></div>
+										</div>
+										<div class="h-1.5 w-4 bg-slate-300 rounded"></div>
+									</div>
+								</div>
+							</div>
+
+							<!-- Box 5: Security (Wide) -->
+							<div
+								class="reveal md:col-span-3 lg:col-span-2 bg-gradient-to-r from-white to-slate-50 border border-slate-100 shadow-sm rounded-3xl p-8 relative overflow-hidden group hover:shadow-lg hover:border-slate-300 transition-all duration-300"
+							>
+								<div class="flex items-start justify-between h-full">
+									<div class="relative z-10 flex flex-col h-full">
+										<!-- Live Animation: Pulsing Shield -->
+										<div
+											class="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center mb-4 text-white shadow-md animate-[pulseShield_2s_infinite] relative"
+										>
+											<i data-lucide="shield-check" class="w-6 h-6 relative z-10"></i>
+										</div>
+										<h3 class="text-xl font-bold text-slate-900 mb-2">Enterprise-grade Security</h3>
+										<p class="text-slate-600 text-sm max-w-xs">
+											Track and manage logged-in devices, recover accounts securely, and manage your shop profile with absolute
+											peace of mind.
+										</p>
+									</div>
+									<i
+										data-lucide="lock"
+										class="w-24 h-24 text-slate-900/5 absolute right-4 bottom-4 group-hover:scale-110 transition-transform duration-500"
+									></i>
+								</div>
+							</div>
+						</div>
+					</div>
+				</section>
+
+				<!-- Final CTA -->
+				<section class="reveal py-32 relative overflow-hidden border-t border-slate-200 bg-white">
+					<div class="absolute inset-0 bg-brand-50"></div>
+					<div
+						class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-brand-400/20 blur-[120px] rounded-full pointer-events-none"
+					></div>
+
+					<div class="max-w-4xl mx-auto px-6 text-center relative z-10">
+						<h2 class="text-4xl md:text-6xl font-extrabold text-slate-900 mb-6 tracking-tight">Stop dealing with paper.</h2>
+						<p class="text-xl text-slate-600 mb-10 max-w-2xl mx-auto">
+							Join smart shop owners using SalesNote to professionalize their business and track their growth.
+						</p>
+						<div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+							<button
+								class="w-full sm:w-auto flex items-center justify-center px-10 py-5 text-lg font-bold rounded-full text-white bg-slate-900 hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20 hover:scale-105 transform duration-300"
+							>
+								<i data-lucide="apple" class="w-6 h-6 mr-2"></i>
+								Download for iOS
+							</button>
+							<button
+								class="w-full sm:w-auto flex items-center justify-center px-10 py-5 text-lg font-bold rounded-full text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 transition-all hover:scale-105 transform duration-300 shadow-sm"
+							>
+								<i data-lucide="play" class="w-6 h-6 mr-2 fill-current"></i>
+								Get on Android
+							</button>
+						</div>
+					</div>
+				</section>
+			</div>
+
+			<!-- ================= PRIVACY POLICY PAGE ================= -->
+			<div id="page-privacy" class="page-section pt-32 pb-24 bg-white">
+				<div class="max-w-3xl mx-auto px-6">
+					<div class="mb-12">
+						<h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-4">Privacy Policy</h1>
+						<p class="text-brand-600 font-bold tracking-wide text-sm uppercase">Last Updated: March 3, 2026</p>
+					</div>
+
+					<div class="prose prose-slate max-w-none text-slate-600">
+						<p class="text-lg mb-10 leading-relaxed font-medium">
+							At SalesNote, your privacy and the security of your business data are our highest priority. This policy explains how we
+							collect, use, and protect your information when you use our mobile application.
+						</p>
+
+						<div class="bg-slate-50 border border-slate-200 rounded-2xl p-8 mb-8 border-l-4 border-l-brand-500 shadow-sm">
+							<h3 class="text-xl font-bold text-slate-900 mb-4 mt-0">1. Information We Collect</h3>
+							<ul class="space-y-3 marker:text-brand-500 pl-4">
+								<li>
+									<strong class="text-slate-900">Account Data:</strong> When you create an account or manage your shop settings, we
+									collect your email, password (encrypted), and shop profile information.
+								</li>
+								<li>
+									<strong class="text-slate-900">Transaction Data:</strong> To provide the core functionality of creating sales
+									notes and receipts, we store the data you input. This includes items, totals, VAT, uploaded signatures, and
+									attached customer details.
+								</li>
+								<li>
+									<strong class="text-slate-900">Device & Session Data:</strong> For your security, we track hardware and active
+									sessions to support our device/session management feature.
+								</li>
+							</ul>
+						</div>
+
+						<h3 class="text-xl font-bold text-slate-900 mt-10 mb-4">2. How We Use Your Information</h3>
+						<p class="mb-4">
+							The information collected is strictly used to operate the SalesNote app and provide value to your business. We use it to:
+						</p>
+						<ul class="list-disc pl-5 space-y-2 mb-8">
+							<li>Generate PDF and image receipts for preview and sharing.</li>
+							<li>Populate your business dashboard and calculate analytics.</li>
+							<li>Provide insights on fast-moving and slow-moving items.</li>
+							<li>Maintain your customer record keeping.</li>
+							<li>Send important notifications, account alerts, and verification codes.</li>
+						</ul>
+
+						<h3 class="text-xl font-bold text-slate-900 mt-10 mb-4">3. Data Sharing</h3>
+						<p class="mb-8 p-6 rounded-xl bg-brand-50 border border-brand-100 text-slate-700">
+							<strong class="text-slate-900 block mb-2"
+								>We do not sell your business data, customer records, or sales history to third parties.</strong
+							>
+							Data is only shared externally when you deliberately use the "Share receipts" function to send a document to a customer
+							via your phone's native sharing options.
+						</p>
+
+						<h3 class="text-xl font-bold text-slate-900 mt-10 mb-4">4. Security & Data Retention</h3>
+						<p class="mb-8">
+							Your data is secured using industry-standard encryption protocols. You have complete control over your logged-in devices
+							through the session management settings. We retain your sales history and account data as long as your account is active
+							to ensure you can return to past sales when needed.
+						</p>
+					</div>
+				</div>
+			</div>
+
+			<!-- ================= TERMS & CONDITIONS PAGE ================= -->
+			<div id="page-terms" class="page-section pt-32 pb-24 bg-white">
+				<div class="max-w-3xl mx-auto px-6">
+					<div class="mb-12">
+						<h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight mb-4">Terms & Conditions</h1>
+						<p class="text-brand-600 font-bold tracking-wide text-sm uppercase">Effective Date: March 3, 2026</p>
+					</div>
+
+					<div class="prose prose-slate max-w-none text-slate-600">
+						<p class="text-lg mb-10 leading-relaxed font-medium">
+							Welcome to SalesNote. By downloading, accessing, or using the SalesNote app, you agree to be bound by these Terms and
+							Conditions. Please read them carefully.
+						</p>
+
+						<h3 class="text-xl font-bold text-slate-900 mt-8 mb-4">1. App Purpose and Usage</h3>
+						<p class="mb-8">
+							SalesNote is designed to help shops and businesses create sales notes, organize customer records, and generate receipts
+							for everyday selling. It is not intended to replace certified accounting software or official government tax filing
+							systems.
+						</p>
+
+						<h3 class="text-xl font-bold text-slate-900 mt-8 mb-4">2. User Responsibilities</h3>
+						<ul class="space-y-4 mb-8 list-none pl-0">
+							<li class="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-sm">
+								<strong class="block text-slate-900 mb-1">Data Accuracy</strong>
+								You are solely responsible for the accuracy of all data entered into the app, including item names, totals, tax/VAT
+								calculations, and customer details.
+							</li>
+							<li class="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-sm">
+								<strong class="block text-slate-900 mb-1">Legal Compliance</strong>
+								You agree to use the generated PDF and image receipts in compliance with the local commercial and consumer laws of
+								your jurisdiction.
+							</li>
+							<li class="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-sm">
+								<strong class="block text-slate-900 mb-1">Account Security</strong>
+								You are responsible for maintaining the confidentiality of your password. You must utilize the provided device/session
+								management tools to monitor your account security.
+							</li>
+						</ul>
+
+						<h3 class="text-xl font-bold text-slate-900 mt-8 mb-4">3. Features and Analytics</h3>
+						<p class="mb-8">
+							Features such as the business dashboard, sales history, and fast/slow-moving item insights are provided "as is" based on
+							the data you input. We do not guarantee business success or increased revenue based on these analytics.
+						</p>
+
+						<h3 class="text-xl font-bold text-slate-900 mt-8 mb-4">4. Limitation of Liability</h3>
+						<p class="mb-8">
+							To the maximum extent permitted by law, SalesNote and its developers shall not be liable for any indirect, incidental, or
+							consequential damages, including loss of profits, data loss, or tax discrepancies arising from your use of the app or
+							reliance on the generated receipts and analytics.
+						</p>
+					</div>
+				</div>
+			</div>
+		</main>
+
+		<!-- Footer -->
+		<footer class="border-t border-slate-200 bg-white py-12 mt-auto">
+			<div class="max-w-7xl mx-auto px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-6">
+				<div class="flex items-center">
+					<div class="w-8 h-8 rounded-[8px] bg-[#007BFF] flex items-center justify-center mr-3 shadow-sm overflow-hidden">
+						<svg viewBox="0 0 100 100" class="w-5 h-5 text-[#f4f4f4]" fill="currentColor">
+							<path d="M22 20 L32 12 L42 20 L52 12 L62 20 L72 12 V72 C72 80 66 84 58 84 H38 V70 H22 Z" />
+							<path d="M22 72 H36 C36 78 30 84 22 84 Z" fill-opacity="0.7" />
+							<rect x="36" y="32" width="20" height="6" rx="1" fill="#007BFF" />
+							<circle cx="64" cy="35" r="4" fill="#007BFF" />
+							<rect x="36" y="50" width="20" height="6" rx="1" fill="#007BFF" />
+							<circle cx="64" cy="53" r="4" fill="#007BFF" />
+						</svg>
+					</div>
+					<span class="font-bold text-lg tracking-tight text-slate-900">Sales<span class="text-[#007BFF]">Note</span></span>
+				</div>
+
+				<div class="text-sm font-medium text-slate-400">&copy; 2026 SalesNote. All rights reserved.</div>
+			</div>
+		</footer>
+
+		<!-- Scripts -->
+		<script>
+			lucide.createIcons();
+
+			const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+			const mobileMenu = document.getElementById("mobile-menu");
+
+			mobileMenuBtn.addEventListener("click", () => {
+				mobileMenu.classList.toggle("hidden");
+			});
+
+			function navigate(pageId) {
+				document.querySelectorAll(".page-section").forEach((page) => {
+					page.classList.remove("active");
+				});
+
+				document.getElementById("page-" + pageId).classList.add("active");
+				mobileMenu.classList.add("hidden");
+				window.scrollTo({ top: 0, behavior: "smooth" });
+
+				// Re-trigger reveal animations when switching back to home
+				if (pageId === "home") {
+					setTimeout(() => {
+						document.querySelectorAll(".reveal").forEach((el) => {
+							el.classList.remove("active");
+						});
+						initIntersectionObserver();
+					}, 100);
+				}
+			}
+
+			// Add scroll effect to nav
+			window.addEventListener("scroll", () => {
+				const nav = document.querySelector("nav");
+				if (window.scrollY > 20) {
+					nav.classList.add("shadow-sm");
+					nav.style.backgroundColor = "rgba(255, 255, 255, 0.95)";
+				} else {
+					nav.classList.remove("shadow-sm");
+					nav.style.backgroundColor = "rgba(255, 255, 255, 0.85)";
+				}
+			});
+
+			// Intersection Observer for Scroll Animations
+			function initIntersectionObserver() {
+				const revealElements = document.querySelectorAll(".reveal");
+
+				const revealOptions = {
+					threshold: 0.15,
+					rootMargin: "0px 0px -50px 0px",
+				};
+
+				const revealOnScroll = new IntersectionObserver(function (entries, observer) {
+					entries.forEach((entry) => {
+						if (!entry.isIntersecting) {
+							return;
+						} else {
+							entry.target.classList.add("active");
+							observer.unobserve(entry.target);
+						}
+					});
+				}, revealOptions);
+
+				revealElements.forEach((el) => {
+					revealOnScroll.observe(el);
+				});
+			}
+
+			// Initialize animations on load
+			window.addEventListener("DOMContentLoaded", initIntersectionObserver);
+		</script>
+	</body>
+</html>

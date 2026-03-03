@@ -104,7 +104,7 @@ jobs:
                   host: ${{ secrets.API_SSH_HOST }}
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
-                  source: "backend/manage.sh,backend/nginx.conf,backend/nginx.conf.template,backend/salesnote@.service,backend/salesnote.service"
+                  source: "backend/manage.sh,backend/nginx.conf,backend/nginx.conf.template,backend/salesnote@.service,backend/salesnote.service,backend/website"
                   target: "/home/salesnote/"
                   strip_components: 1
                   overwrite: true

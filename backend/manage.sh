@@ -6,6 +6,8 @@ UNIT_TEMPLATE="/etc/systemd/system/salesnote@.service"
 UNIT_GROUP="/etc/systemd/system/salesnote.service"
 NGINX_TEMPLATE="${APP_DIR}/nginx.conf.template"
 NGINX_OUT="${APP_DIR}/nginx.conf"
+WEBSITE_TEMPLATE_DIR="${APP_DIR}/website"
+WEBSITE_OUT_DIR="/var/www/salesnote-site"
 NGINX_SITE_AVAILABLE="/etc/nginx/sites-available/salesnote"
 NGINX_SITE_ENABLED="/etc/nginx/sites-enabled/salesnote"
 NGINX_DEFAULT_SITE="/etc/nginx/sites-enabled/default"
@@ -27,6 +29,8 @@ Env overrides:
   APP_DIR=/path/to/backend
   SALESNOTE__DATABASE_URL=postgres://user:password@127.0.0.1:5432/dbname
   NGINX_SERVER_NAME=example.com
+  NGINX_WEBSITE_NAME=www.example.com
+  NGINX_APP_DOWNLOAD_URL=https://play.google.com/store/apps/details?id=com.blackstackhub.salesnote
   SSL_CERT_PATH=/etc/letsencrypt/live/example.com/fullchain.pem
   SSL_KEY_PATH=/etc/letsencrypt/live/example.com/privkey.pem
   NGINX_WORKER_PROCESSES=auto
@@ -47,6 +51,7 @@ load_env() {
     SSL_CERT_PATH="/etc/letsencrypt/live/${NGINX_SERVER_NAME}/fullchain.pem"
     SSL_KEY_PATH="/etc/letsencrypt/live/${NGINX_SERVER_NAME}/privkey.pem"
   fi
+  APP_DOWNLOAD_URL="${NGINX_APP_DOWNLOAD_URL:-https://play.google.com/store/apps/details?id=com.blackstackhub.salesnote}"
 }
 
 require_root() {
@@ -286,6 +291,40 @@ uninstall_units() {
   systemctl daemon-reload
 }
 
+render_website() {
+  require_root
+  load_env
+
+  if [ -z "${NGINX_WEBSITE_NAME:-}" ]; then
+    return
+  fi
+
+  if [ ! -d "${WEBSITE_TEMPLATE_DIR}" ]; then
+    echo "Missing website templates: ${WEBSITE_TEMPLATE_DIR}" >&2
+    exit 1
+  fi
+
+  rm -rf "${WEBSITE_OUT_DIR}"
+  mkdir -p "${WEBSITE_OUT_DIR}"
+
+  while IFS= read -r -d '' source_path; do
+    rel_path="${source_path#${WEBSITE_TEMPLATE_DIR}/}"
+    dest_path="${WEBSITE_OUT_DIR}/${rel_path}"
+    mkdir -p "$(dirname "${dest_path}")"
+
+    case "${source_path}" in
+      *.html|*.txt|*.xml)
+        WEBSITE_NAME="${NGINX_WEBSITE_NAME}" APP_DOWNLOAD_URL="${APP_DOWNLOAD_URL}" \
+          perl -0pe 's/\{\{WEBSITE_NAME\}\}/$ENV{WEBSITE_NAME}/g; s/\{\{APP_DOWNLOAD_URL\}\}/$ENV{APP_DOWNLOAD_URL}/g' \
+          "${source_path}" > "${dest_path}"
+        ;;
+      *)
+        cp "${source_path}" "${dest_path}"
+        ;;
+    esac
+  done < <(find "${WEBSITE_TEMPLATE_DIR}" -type f -print0)
+}
+
 gen_nginx() {
   local count="$1"
   if [ ! -f "${NGINX_TEMPLATE}" ]; then
@@ -299,6 +338,7 @@ gen_nginx() {
   done
   local server_name="${NGINX_SERVER_NAME:-_}"
   local ssl_block=""
+  local website_block=""
   if [ -n "${SSL_CERT_PATH:-}" ] && [ -n "${SSL_KEY_PATH:-}" ]; then
     ssl_block=$(cat <<EOF
 server {
@@ -348,8 +388,75 @@ server {
 EOF
 )
   fi
-  UPSTREAM_SERVERS="${servers}" SSL_BLOCK="${ssl_block}" \
-    perl -0pe 's/\{\{UPSTREAM_SERVERS\}\}/$ENV{UPSTREAM_SERVERS}/g; s/\{\{SSL_BLOCK\}\}/$ENV{SSL_BLOCK}/g' \
+
+  if [ -n "${NGINX_WEBSITE_NAME:-}" ]; then
+    local website_ssl_cert="/etc/letsencrypt/live/${NGINX_WEBSITE_NAME}/fullchain.pem"
+    local website_ssl_key="/etc/letsencrypt/live/${NGINX_WEBSITE_NAME}/privkey.pem"
+
+    if [ -f "${website_ssl_cert}" ] && [ -f "${website_ssl_key}" ]; then
+      website_block=$(cat <<EOF
+server {
+    listen 80;
+    server_name ${NGINX_WEBSITE_NAME};
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name ${NGINX_WEBSITE_NAME};
+
+    ssl_certificate     ${website_ssl_cert};
+    ssl_certificate_key ${website_ssl_key};
+
+    root ${WEBSITE_OUT_DIR};
+    index index.html;
+
+    location = /robots.txt {
+        try_files \$uri =404;
+        access_log off;
+        log_not_found off;
+    }
+
+    location /assets/ {
+        try_files \$uri =404;
+    }
+
+    location / {
+        try_files \$uri /index.html;
+    }
+}
+EOF
+)
+    else
+      website_block=$(cat <<EOF
+server {
+    listen 80;
+    server_name ${NGINX_WEBSITE_NAME};
+
+    root ${WEBSITE_OUT_DIR};
+    index index.html;
+
+    location = /robots.txt {
+        try_files \$uri =404;
+        access_log off;
+        log_not_found off;
+    }
+
+    location /assets/ {
+        try_files \$uri =404;
+    }
+
+    location / {
+        try_files \$uri /index.html;
+    }
+}
+EOF
+)
+    fi
+  fi
+
+  UPSTREAM_SERVERS="${servers}" SSL_BLOCK="${ssl_block}" WEBSITE_BLOCK="${website_block}" \
+    perl -0pe 's/\{\{UPSTREAM_SERVERS\}\}/$ENV{UPSTREAM_SERVERS}/g; s/\{\{SSL_BLOCK\}\}/$ENV{SSL_BLOCK}/g; s/\{\{WEBSITE_BLOCK\}\}/$ENV{WEBSITE_BLOCK}/g' \
     "${NGINX_TEMPLATE}" > "${NGINX_OUT}"
   echo "Generated ${NGINX_OUT}"
 }
@@ -417,6 +524,7 @@ case "$cmd" in
         systemctl disable "salesnote@${port}" || true
       fi
     done
+    render_website
     gen_nginx "$local_count"
     reload_nginx
     ;;
