@@ -50,3 +50,9 @@ google-services.json
 integration_test
 test
 screenshots
+ios/*.mobileprovision
+ios/*.key
+ios/*.csr
+ios/*.p12
+ios/*.pem
+ios/*.p8
