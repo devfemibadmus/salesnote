@@ -91,7 +91,7 @@ jobs:
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
                   source: "backend/target/release/api"
-                  target: "/home/salesnote/"
+                  target: "/home/salesnote/.deploy/"
                   strip_components: 3
                   overwrite: true
 
@@ -161,6 +161,13 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   script: |
                       set -e
+                      if [ -f /home/salesnote/manage.sh ]; then
+                        sudo bash /home/salesnote/manage.sh stop || true
+                      else
+                        sudo systemctl stop 'salesnote@*' || true
+                      fi
+                      test -f "/home/salesnote/.deploy/api"
+                      sudo install -m 755 "/home/salesnote/.deploy/api" "/home/salesnote/api"
                       chmod +x "/home/salesnote/api"
                       chmod +x "/home/salesnote/manage.sh"
                       sudo bash /home/salesnote/manage.sh start
