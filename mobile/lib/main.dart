@@ -29,6 +29,13 @@ class SalesNoteApp extends StatelessWidget {
       title: 'Salesnote',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      builder: (context, child) {
+        final mediaQuery = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQuery.copyWith(boldText: false),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       onGenerateRoute: AppRouter.onGenerateRoute,
       navigatorKey: AppNavigator.key,
       home: const AuthGate(),
