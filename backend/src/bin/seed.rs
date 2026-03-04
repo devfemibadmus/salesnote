@@ -531,8 +531,14 @@ async fn main() -> std::io::Result<()> {
 
     let sales_url = format!("{}/sales", base_url);
 
-    let start = NaiveDate::from_ymd_opt(2026, 2, 1).expect("invalid fixed start date");
     let end = Utc::now().date_naive();
+    let (start_year, start_month) = if end.month() == 1 {
+        (end.year() - 1, 12)
+    } else {
+        (end.year(), end.month() - 1)
+    };
+    let start =
+        NaiveDate::from_ymd_opt(start_year, start_month, 1).expect("invalid derived start date");
 
     let mut rng = rand::thread_rng();
     let mut created_sales = 0_i64;
