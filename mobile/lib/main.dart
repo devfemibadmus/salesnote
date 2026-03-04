@@ -27,6 +27,7 @@ class SalesNoteApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Salesnote',
+      debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       onGenerateRoute: AppRouter.onGenerateRoute,
       navigatorKey: AppNavigator.key,

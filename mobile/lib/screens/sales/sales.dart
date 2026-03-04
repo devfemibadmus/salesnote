@@ -40,6 +40,7 @@ class _SalesScreenState extends State<SalesScreen> {
   int _page = 1;
   bool _openingPreview = false;
   bool _launchIntentHandled = false;
+  bool _launchIntentScheduled = false;
 
   void _goTo(String route, {bool reset = false}) {
     _api.cancelInFlight();
@@ -83,7 +84,7 @@ class _SalesScreenState extends State<SalesScreen> {
       if (_sales.isEmpty) {
         unawaited(_refreshSalesInBackground());
       }
-      await _handleLaunchIntent();
+      _scheduleLaunchIntent();
       return;
     }
 
@@ -96,7 +97,17 @@ class _SalesScreenState extends State<SalesScreen> {
       _loading = false;
     });
     unawaited(_refreshSalesInBackground());
-    await _handleLaunchIntent();
+    _scheduleLaunchIntent();
+  }
+
+  void _scheduleLaunchIntent() {
+    if (_launchIntentScheduled || _launchIntentHandled) return;
+    _launchIntentScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _launchIntentScheduled = false;
+      if (!mounted || _launchIntentHandled) return;
+      unawaited(_handleLaunchIntent());
+    });
   }
 
   Future<void> _handleLaunchIntent() async {
