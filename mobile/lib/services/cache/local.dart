@@ -219,11 +219,22 @@ class LocalCache {
   }
 
   static Future<void> clearAll() async {
+    final settingsBox = Hive.box<bool>(_settingsBox);
+    final onboardingComplete = settingsBox.get(_onboardingKey) ?? false;
+    final notificationOptOut = settingsBox.get(_notificationOptOutKey) ?? false;
+
     await Hive.box<String>(_receiptsBox).clear();
     await Hive.box<String>(_receiptDetailBox).clear();
     await Hive.box<String>(_salesDraftBox).clear();
-    await Hive.box<bool>(_settingsBox).clear();
+    await settingsBox.clear();
     await Hive.box<int>(_metaBox).clear();
     await Hive.box<String>(_pageBox).clear();
+
+    if (onboardingComplete) {
+      await settingsBox.put(_onboardingKey, true);
+    }
+    if (notificationOptOut) {
+      await settingsBox.put(_notificationOptOutKey, true);
+    }
   }
 }

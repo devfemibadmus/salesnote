@@ -35,6 +35,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
   int _page = 1;
   late final String _currencySymbol;
   late final String _currencyLocale;
+  Timer? _searchDebounce;
 
   void _goTo(String route, {bool reset = false}) {
     _api.cancelInFlight();
@@ -94,6 +95,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
   @override
   void dispose() {
     _api.dispose();
+    _searchDebounce?.cancel();
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
@@ -103,17 +105,24 @@ class _ItemsScreenState extends State<ItemsScreen> {
     final next = _searchController.text.trim();
     if (next == _query) return;
     setState(() => _query = next);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 320), () {
+      unawaited(_refreshItemsInBackground(searchQuery: next));
+    });
   }
 
   Future<void> _refreshItems() async {
+    final activeQuery = _query.trim();
     try {
       final loaded = await CacheLoader.fetchAndCacheSalesPage(
         _api,
         includeItems: true,
         page: 1,
         perPage: _perPage,
+        searchQuery: activeQuery.isEmpty ? null : activeQuery,
       );
       if (!mounted) return;
+      if (activeQuery != _query.trim()) return;
       setState(() {
         _sales = loaded.sales;
         _page = loaded.page;
@@ -130,15 +139,18 @@ class _ItemsScreenState extends State<ItemsScreen> {
     }
   }
 
-  Future<void> _refreshItemsInBackground() async {
+  Future<void> _refreshItemsInBackground({String? searchQuery}) async {
+    final activeQuery = (searchQuery ?? _query).trim();
     try {
       final loaded = await CacheLoader.fetchAndCacheSalesPage(
         _api,
         includeItems: true,
         page: 1,
         perPage: _perPage,
+        searchQuery: activeQuery.isEmpty ? null : activeQuery,
       );
       if (!mounted) return;
+      if (activeQuery != _query.trim()) return;
       setState(() {
         _sales = loaded.sales;
         _page = loaded.page;
@@ -150,6 +162,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
 
   Future<void> _loadMore() async {
     if (_loadingMore || !_hasMore || _loading) return;
+    final activeQuery = _query.trim();
     setState(() => _loadingMore = true);
     try {
       final nextPage = _page + 1;
@@ -158,9 +171,11 @@ class _ItemsScreenState extends State<ItemsScreen> {
         includeItems: true,
         page: nextPage,
         perPage: _perPage,
+        searchQuery: activeQuery.isEmpty ? null : activeQuery,
       );
       final next = loaded.sales;
       if (!mounted) return;
+      if (activeQuery != _query.trim()) return;
       final existingIds = _sales.map((sale) => sale.id).toSet();
       final deduped = next
           .where((sale) => !existingIds.contains(sale.id))
@@ -170,10 +185,12 @@ class _ItemsScreenState extends State<ItemsScreen> {
         _page = nextPage;
         _hasMore = next.length == _perPage;
       });
-      await CacheLoader.saveSalesPageCache(
-        includeItems: true,
-        data: CachedSalesPage(sales: _sales, page: _page, hasMore: _hasMore),
-      );
+      if (activeQuery.isEmpty) {
+        await CacheLoader.saveSalesPageCache(
+          includeItems: true,
+          data: CachedSalesPage(sales: _sales, page: _page, hasMore: _hasMore),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException

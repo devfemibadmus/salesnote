@@ -128,6 +128,7 @@ pub struct SalesListQuery {
     pub page: Option<i64>,
     pub per_page: Option<i64>,
     pub include_items: Option<bool>,
+    pub q: Option<String>,
 }
 
 pub async fn list_sales(
@@ -145,6 +146,13 @@ pub async fn list_sales(
     let page_value = query.page.unwrap_or(1).max(1);
     let per_page_value = query.per_page.unwrap_or(50).clamp(1, 200);
     let include_items = query.include_items.unwrap_or(false);
+    let search_query = query.q.as_deref().map(str::trim).and_then(|value| {
+        if value.is_empty() {
+            None
+        } else {
+            Some(value.to_string())
+        }
+    });
 
     match Sale::list_authorized_paged(
         &state.pool,
@@ -154,6 +162,7 @@ pub async fn list_sales(
             page: page_value,
             per_page: per_page_value,
             include_items,
+            search_query,
         },
     )
     .await

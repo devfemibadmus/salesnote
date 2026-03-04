@@ -63,11 +63,11 @@ class AuthGate extends StatelessWidget {
         }
         final onboardingComplete = data[0] as bool;
         final token = data[1] as String?;
-        if (!onboardingComplete) {
-          return const OnboardingScreen();
-        }
         if (token != null && token.isNotEmpty) {
           return const HomeScreen();
+        }
+        if (!onboardingComplete) {
+          return const OnboardingScreen();
         }
         return const AuthScreen();
       },

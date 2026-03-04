@@ -8,8 +8,8 @@ class AppTheme {
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.android: _SmoothPageTransitionsBuilder(),
-          TargetPlatform.iOS: _SmoothPageTransitionsBuilder(),
-          TargetPlatform.macOS: _SmoothPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
           TargetPlatform.windows: _SmoothPageTransitionsBuilder(),
           TargetPlatform.linux: _SmoothPageTransitionsBuilder(),
           TargetPlatform.fuchsia: _SmoothPageTransitionsBuilder(),

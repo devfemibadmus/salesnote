@@ -21,7 +21,6 @@ pub struct FcmSubscribeInput {
 }
 
 const MAX_TEXT_FIELD_SIZE: usize = 1024 * 1024;
-const MAX_PROFILE_IMAGE_SIZE: usize = 10 * 1024 * 1024;
 const PROFILE_IMAGE_MAX_DIMENSION: u32 = 1600;
 const PROFILE_IMAGE_JPEG_QUALITY: u8 = 82;
 const MIN_SHOP_NAME_CHARS: usize = 3;
@@ -126,6 +125,7 @@ async fn read_text_field(field: &mut actix_multipart::Field) -> Result<String, H
 async fn read_file_field_and_optimize_logo(
     field: &mut actix_multipart::Field,
     dest_path: &Path,
+    max_size: usize,
 ) -> Result<(), HttpResponse> {
     let mut size = 0usize;
     let mut file_bytes = Vec::new();
@@ -140,7 +140,7 @@ async fn read_file_field_and_optimize_logo(
             }
         };
         size += chunk.len();
-        if size > MAX_PROFILE_IMAGE_SIZE {
+        if size > max_size {
             return Err(json_error(
                 actix_web::http::StatusCode::BAD_REQUEST,
                 "image too large",
@@ -305,7 +305,13 @@ pub async fn update_my_shop(
                     let rel_path = format!("uploads/logos/{}", filename);
                     let dest = PathBuf::from("uploads").join("logos").join(filename);
 
-                    if let Err(resp) = read_file_field_and_optimize_logo(&mut field, &dest).await {
+                    if let Err(resp) = read_file_field_and_optimize_logo(
+                        &mut field,
+                        &dest,
+                        state.profile_image_max_bytes,
+                    )
+                    .await
+                    {
                         return resp;
                     }
                     multipart_input.logo_url = Some(rel_path);

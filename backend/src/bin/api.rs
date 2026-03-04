@@ -27,6 +27,9 @@ async fn main() -> std::io::Result<()> {
     let app_state = state::AppState {
         pool,
         jwt_secret: settings.jwt_secret.clone(),
+        max_request_payload_bytes: settings.max_request_payload_bytes,
+        profile_image_max_bytes: settings.profile_image_max_bytes,
+        signature_image_max_bytes: settings.signature_image_max_bytes,
         refresh_token_days: settings.refresh_token_days,
         forgot_password_max_requests: settings.forgot_password_max_requests,
         forgot_password_window_minutes: settings.forgot_password_window_minutes,
@@ -48,6 +51,8 @@ async fn main() -> std::io::Result<()> {
         let state = app_state.clone();
         App::new()
             .app_data(web::Data::new(state.clone()))
+            .app_data(web::PayloadConfig::new(state.max_request_payload_bytes))
+            .app_data(web::JsonConfig::default().limit(state.max_request_payload_bytes))
             .wrap(Logger::default())
             .wrap(
                 DefaultHeaders::new()

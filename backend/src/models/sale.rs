@@ -122,6 +122,7 @@ pub struct AuthorizedSaleListPayload {
     pub page: i64,
     pub per_page: i64,
     pub include_items: bool,
+    pub search_query: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -277,6 +278,18 @@ impl Sale {
               FROM sales
               WHERE shop_id = $1
                 AND EXISTS (SELECT 1 FROM auth_active)
+                AND (
+                  $5::text IS NULL
+                  OR customer_name ILIKE CONCAT('%', $5::text, '%')
+                  OR customer_contact ILIKE CONCAT('%', $5::text, '%')
+                  OR CAST(id AS text) ILIKE CONCAT('%', $5::text, '%')
+                  OR EXISTS (
+                    SELECT 1
+                    FROM sale_items si_search
+                    WHERE si_search.sale_id = sales.id
+                      AND si_search.product_name ILIKE CONCAT('%', $5::text, '%')
+                  )
+                )
               ORDER BY created_at DESC
               LIMIT $3 OFFSET $4
             )
@@ -301,7 +314,7 @@ impl Sale {
                   'created_at', s.created_at::text,
                   'items',
                     CASE
-                      WHEN $5 THEN (
+                      WHEN $6 THEN (
                         SELECT COALESCE(json_agg(json_build_object(
                           'id', si.id,
                           'sale_id', si.sale_id,
@@ -328,6 +341,7 @@ impl Sale {
             .bind(payload.device_id)
             .bind(payload.per_page)
             .bind(offset)
+            .bind(payload.search_query.as_deref())
             .bind(payload.include_items)
             .fetch_one(pool)
             .await?;

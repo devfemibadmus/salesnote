@@ -472,14 +472,23 @@ class ApiClient {
     int? page,
     int? perPage,
     bool includeItems = true,
+    String? searchQuery,
   }) async {
     final salesUri = () {
       final uri = _uri('/sales');
-      if (page == null && perPage == null) return uri;
+      final normalizedSearch = searchQuery?.trim();
+      if (page == null &&
+          perPage == null &&
+          (normalizedSearch == null || normalizedSearch.isEmpty)) {
+        return uri;
+      }
       final query = <String, String>{};
       if (page != null) query['page'] = page.toString();
       if (perPage != null) query['per_page'] = perPage.toString();
       query['include_items'] = includeItems.toString();
+      if (normalizedSearch != null && normalizedSearch.isNotEmpty) {
+        query['q'] = normalizedSearch;
+      }
       return uri.replace(queryParameters: query);
     }();
     final headers = await _headers();

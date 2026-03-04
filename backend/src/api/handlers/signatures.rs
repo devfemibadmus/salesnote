@@ -15,8 +15,6 @@ use crate::models::{
     AuthorizedSignatureListPayload, Signature,
 };
 
-const MAX_IMAGE_SIZE: usize = 5 * 1024 * 1024;
-
 fn extension_from_mime(mime: &mime::Mime) -> Option<&'static str> {
     match (mime.type_().as_str(), mime.subtype().as_str()) {
         ("image", "jpeg") => Some("jpg"),
@@ -47,7 +45,7 @@ async fn read_text_field(field: &mut actix_multipart::Field) -> Result<String, H
             Err(_) => return Err(json_error(StatusCode::BAD_REQUEST, "invalid field")),
         };
         bytes.extend_from_slice(&chunk);
-        if bytes.len() > MAX_IMAGE_SIZE {
+        if bytes.len() > 1024 * 1024 {
             return Err(json_error(StatusCode::BAD_REQUEST, "field too large"));
         }
     }
@@ -58,6 +56,7 @@ async fn read_text_field(field: &mut actix_multipart::Field) -> Result<String, H
 
 async fn read_file_field_bytes(
     field: &mut actix_multipart::Field,
+    max_size: usize,
 ) -> Result<Vec<u8>, HttpResponse> {
     let mut size = 0usize;
     let mut file_bytes = Vec::new();
@@ -67,7 +66,7 @@ async fn read_file_field_bytes(
             Err(_) => return Err(json_error(StatusCode::BAD_REQUEST, "invalid file")),
         };
         size += chunk.len();
-        if size > MAX_IMAGE_SIZE {
+        if size > max_size {
             return Err(json_error(StatusCode::BAD_REQUEST, "image too large"));
         }
         file_bytes.extend_from_slice(&chunk);
@@ -162,7 +161,9 @@ pub async fn create_signature(
                 Ok(t) => t,
                 Err(_) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, "time error"),
             };
-            let file_bytes = match read_file_field_bytes(&mut field).await {
+            let file_bytes = match read_file_field_bytes(&mut field, state.signature_image_max_bytes)
+                .await
+            {
                 Ok(b) => b,
                 Err(resp) => return resp,
             };

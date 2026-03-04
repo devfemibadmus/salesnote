@@ -157,11 +157,13 @@ class CacheLoader {
     required bool includeItems,
     required int page,
     required int perPage,
+    String? searchQuery,
   }) async {
     final sales = await api.listSales(
       page: page,
       perPage: perPage,
       includeItems: includeItems,
+      searchQuery: searchQuery,
     );
     final pageData = CachedSalesPage(
       sales: sales,
@@ -169,7 +171,9 @@ class CacheLoader {
       hasMore: sales.length == perPage,
     );
 
-    if (page == 1) {
+    final shouldCacheFirstPage =
+        page == 1 && (searchQuery == null || searchQuery.trim().isEmpty);
+    if (shouldCacheFirstPage) {
       await saveSalesPageCache(includeItems: includeItems, data: pageData);
     }
 

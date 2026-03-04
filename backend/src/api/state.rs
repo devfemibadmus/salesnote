@@ -4,6 +4,9 @@ use sqlx::PgPool;
 pub struct AppState {
     pub pool: PgPool,
     pub jwt_secret: String,
+    pub max_request_payload_bytes: usize,
+    pub profile_image_max_bytes: usize,
+    pub signature_image_max_bytes: usize,
     pub refresh_token_days: i64,
     pub forgot_password_max_requests: i64,
     pub forgot_password_window_minutes: i64,

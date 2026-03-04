@@ -138,16 +138,53 @@ class _NewSaleDetailsStep extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: useEmailForContact
-                      ? _InputBox(
+                      ? TextField(
                           controller: customerContactController,
-                          hint: 'Customer Email',
-                          textInputAction: TextInputAction.done,
                           keyboardType: TextInputType.emailAddress,
-                          isInvalid: customerContactInvalid,
+                          textInputAction: TextInputAction.done,
                           inputFormatters: [
                             LengthLimitingTextInputFormatter(50),
                           ],
                           onChanged: onCustomerContactChanged,
+                          decoration: InputDecoration(
+                            hintText: 'Customer Email',
+                            hintStyle: const TextStyle(
+                              color: Color(0xFF94A3B8),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 18,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(
+                                color: customerContactInvalid
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFFD6DFEB),
+                                width: customerContactInvalid ? 1.5 : 1,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(
+                                color: customerContactInvalid
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFFD6DFEB),
+                                width: customerContactInvalid ? 1.5 : 1,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide(
+                                color: customerContactInvalid
+                                    ? const Color(0xFFEF4444)
+                                    : const Color(0xFFD6DFEB),
+                                width: customerContactInvalid ? 1.5 : 1,
+                              ),
+                            ),
+                          ),
                         )
                       : Row(
                           children: [
@@ -194,16 +231,53 @@ class _NewSaleDetailsStep extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: _InputBox(
+                              child: TextField(
                                 controller: customerContactController,
-                                hint: '8104156984',
-                                textInputAction: TextInputAction.done,
                                 keyboardType: TextInputType.phone,
-                                isInvalid: customerContactInvalid,
+                                textInputAction: TextInputAction.done,
                                 inputFormatters: [
                                   FilteringTextInputFormatter.digitsOnly,
                                 ],
                                 onChanged: onCustomerContactChanged,
+                                decoration: InputDecoration(
+                                  hintText: '8104156984',
+                                  hintStyle: const TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 18,
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(
+                                      color: customerContactInvalid
+                                          ? const Color(0xFFEF4444)
+                                          : const Color(0xFFD6DFEB),
+                                      width: customerContactInvalid ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(
+                                      color: customerContactInvalid
+                                          ? const Color(0xFFEF4444)
+                                          : const Color(0xFFD6DFEB),
+                                      width: customerContactInvalid ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    borderSide: BorderSide(
+                                      color: customerContactInvalid
+                                          ? const Color(0xFFEF4444)
+                                          : const Color(0xFFD6DFEB),
+                                      width: customerContactInvalid ? 1.5 : 1,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ],

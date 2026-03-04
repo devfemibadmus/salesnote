@@ -66,7 +66,7 @@ class _SalesSearchField extends StatelessWidget {
         style: const TextStyle(fontSize: 17, color: Color(0xFF334155)),
         decoration: const InputDecoration(
           border: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 16),
+          contentPadding: EdgeInsets.fromLTRB(10, 14, 10, 12),
           prefixIcon: Icon(
             Icons.search_rounded,
             color: Color(0xFF94A3B8),

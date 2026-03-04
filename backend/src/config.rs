@@ -21,6 +21,12 @@ const ENV_PROFILE_TEST: &str = "test";
 pub struct Settings {
     pub bind: String,
     pub database_url: String,
+    #[serde(default = "default_max_request_payload_bytes")]
+    pub max_request_payload_bytes: usize,
+    #[serde(default = "default_profile_image_max_bytes")]
+    pub profile_image_max_bytes: usize,
+    #[serde(default = "default_signature_image_max_bytes")]
+    pub signature_image_max_bytes: usize,
     #[serde(default = "default_pool_max_size")]
     pub pool_max_size: u32,
     #[serde(default = "default_pool_min_idle")]
@@ -374,6 +380,18 @@ fn is_access_target(target: &str) -> bool {
 
 fn default_log_to_terminal() -> bool {
     false
+}
+
+fn default_max_request_payload_bytes() -> usize {
+    12 * 1024 * 1024
+}
+
+fn default_profile_image_max_bytes() -> usize {
+    10 * 1024 * 1024
+}
+
+fn default_signature_image_max_bytes() -> usize {
+    10 * 1024 * 1024
 }
 
 fn default_pool_max_size() -> u32 {

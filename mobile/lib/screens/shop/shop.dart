@@ -6,7 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../app/config.dart';
 import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../../services/api_client.dart';
@@ -176,6 +178,7 @@ class _ShopScreenState extends State<ShopScreen> {
       return;
     }
 
+    await NotificationService.init();
     final status = await NotificationService.requestPermission();
     if (!mounted) return;
     final granted =
@@ -488,6 +491,11 @@ class _ShopScreenState extends State<ShopScreen> {
 
         return StatefulBuilder(
           builder: (context, setLocalState) => AlertDialog(
+            backgroundColor: const Color(0xFFF3F4F6),
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
             title: const Text('Edit Phone'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -550,6 +558,22 @@ class _ShopScreenState extends State<ShopScreen> {
                         decoration: InputDecoration(
                           hintText: '8104156984',
                           errorText: errorText,
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: Color(0xFF1677E6),
+                            ),
+                          ),
                         ),
                         onChanged: (_) => validate(setLocalState),
                       ),
@@ -704,12 +728,34 @@ class _ShopScreenState extends State<ShopScreen> {
         String? errorText;
         return StatefulBuilder(
           builder: (context, setLocalState) => AlertDialog(
+            backgroundColor: const Color(0xFFF3F4F6),
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
             title: Text(title),
             content: TextField(
               controller: controller,
               keyboardType: keyboardType,
               autofocus: true,
-              decoration: InputDecoration(hintText: hint, errorText: errorText),
+              decoration: InputDecoration(
+                hintText: hint,
+                errorText: errorText,
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF1677E6)),
+                ),
+              ),
               onChanged: (value) {
                 final validationError = validator(value);
                 setLocalState(() {
@@ -813,6 +859,24 @@ class _ShopScreenState extends State<ShopScreen> {
     Navigator.pushNamedAndRemoveUntil(context, AppRoutes.auth, (_) => false);
   }
 
+  Future<void> _openExternalUrl(String url, String label) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Invalid $label link.')));
+      return;
+    }
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Unable to open $label.')));
+    }
+  }
+
   @override
   void dispose() {
     _api.dispose();
@@ -840,27 +904,16 @@ class _ShopScreenState extends State<ShopScreen> {
                   onEditAddress: _editAddress,
                   onAddSignature: _addSignature,
                   onDeleteSignature: _deleteSignature,
-                  onPrivacy: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Privacy policy coming next.'),
-                      ),
-                    );
-                  },
-                  onTerms: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Terms of service coming next.'),
-                      ),
-                    );
-                  },
-                  onSupport: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Support contact coming next.'),
-                      ),
-                    );
-                  },
+                  onPrivacy: () => _openExternalUrl(
+                    AppConfig.privacyPolicyUrl,
+                    'privacy policy',
+                  ),
+                  onTerms: () => _openExternalUrl(
+                    AppConfig.termsOfServiceUrl,
+                    'terms of service',
+                  ),
+                  onSupport: () =>
+                      _openExternalUrl(AppConfig.supportUrl, 'support'),
                   onLogout: _confirmLogout,
                   appVersion: _appVersion,
                 ));
