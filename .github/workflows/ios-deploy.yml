@@ -134,8 +134,6 @@ jobs:
                   ls -la ~/Library/MobileDevice/Provisioning\ Profiles || true
 
             - name: Build iOS app
-              env:
-                  APPLE_PROVISIONING_PROFILE_NAME: ${{ secrets.APPLE_PROVISIONING_PROFILE_NAME }}
               run: |
                   # Clean previous builds
                   cd mobile
@@ -152,8 +150,6 @@ jobs:
                     CODE_SIGN_STYLE=Manual \
                     CODE_SIGN_IDENTITY="Apple Distribution" \
                     DEVELOPMENT_TEAM=NB8QPVZ6PA \
-                    PROVISIONING_PROFILE_SPECIFIER="$APPLE_PROVISIONING_PROFILE_NAME" \
-                    PRODUCT_BUNDLE_IDENTIFIER=com.blackstackhub.salesnote \
                     OTHER_CODE_SIGN_FLAGS="--keychain $RUNNER_TEMP/app-signing.keychain-db" \
                     archive
 
