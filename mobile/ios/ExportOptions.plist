@@ -17,7 +17,7 @@
     <key>provisioningProfiles</key>
     <dict>
         <key>com.blackstackhub.salesnote</key>
-        <string>SalesNote AppStore Profile</string>
+        <string>Sales Note</string>
     </dict>
     <key>signingCertificate</key>
     <string>Apple Distribution</string>
