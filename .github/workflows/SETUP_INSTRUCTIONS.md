@@ -134,14 +134,6 @@ Current deploy behavior through [manage.sh](/c:/Users/Femi.Badmus/Desktop/Sales%
 - local PostgreSQL bootstrap enforces:
     - `max_connections = 152`
 
-Why:
-
-- app pool is currently planned around:
-    - `5` API instances
-    - `SALESNOTE__POOL_MAX_SIZE=28`
-- total possible DB connections:
-    - `5 x 30 = 150`
-
 Useful PostgreSQL commands:
 
 ```bash
@@ -151,26 +143,31 @@ sudo -u postgres psql -tAc "SELECT count(*) FROM pg_stat_activity;"
 
 ### Useful Server Commands
 
-Check all API instances:
+Manage the single API instance:
+
+```bash
+sudo bash /home/salesnote/manage.sh start
+sudo bash /home/salesnote/manage.sh stop
+sudo bash /home/salesnote/manage.sh status
+```
+
+Check the service unit directly:
 
 ```bash
 systemctl list-units --type=service | grep salesnote
 sudo systemctl status salesnote@8081
-sudo systemctl status salesnote@8082
-sudo bash /home/salesnote/manage.sh status 2
 ```
 
 Check logs:
 
 ```bash
 journalctl -u salesnote@8081 -n 100 --no-pager
-journalctl -u salesnote@8082 -n 100 --no-pager
 ```
 
 Check port usage:
 
 ```bash
-sudo ss -ltnp | grep -E '8081|8082|8083|8084|8085'
+sudo ss -ltnp | grep '8081'
 sudo ss -ltnp | grep ':80'
 sudo ss -ltnp | grep ':443'
 ```
@@ -403,7 +400,7 @@ worker_connections are not enough while connecting to upstream
 
 that means failures are happening at nginx under load, before the request fully reaches Actix.
 
-Current deploy now updates nginx worker tuning through [manage.sh](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/backend/manage.sh) during `scale`.
+Current deploy now updates nginx worker tuning through [manage.sh](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/backend/manage.sh) during `start`.
 
 ---
 

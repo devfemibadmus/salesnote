@@ -13,17 +13,10 @@ on:
                 required: true
                 default: "true"
                 type: boolean
-            instance_count:
-                description: "Number of API instances"
-                required: true
-                default: "2"
-                type: string
 
 jobs:
     build-and-deploy:
         runs-on: ubuntu-latest
-        env:
-            API_INSTANCE_COUNT: ${{ github.event.inputs.instance_count || '2' }}
         steps:
             - name: Checkout code
               uses: actions/checkout@v3
@@ -64,7 +57,11 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   script: |
                       mkdir -p /home/salesnote
-                      sudo systemctl stop 'salesnote@*' || true
+                      if [ -f /home/salesnote/manage.sh ]; then
+                        sudo bash /home/salesnote/manage.sh stop || true
+                      else
+                        sudo systemctl stop 'salesnote@*' || true
+                      fi
 
             - name: Write API env file
               uses: appleboy/ssh-action@master
@@ -166,5 +163,5 @@ jobs:
                       set -e
                       chmod +x "/home/salesnote/api"
                       chmod +x "/home/salesnote/manage.sh"
-                      sudo bash /home/salesnote/manage.sh scale "${{ env.API_INSTANCE_COUNT }}"
+                      sudo bash /home/salesnote/manage.sh start
                       echo "Deployment complete!"

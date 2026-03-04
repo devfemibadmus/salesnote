@@ -17,11 +17,12 @@ DATABASE_URL=""
 
 usage() {
   cat <<EOF
-Usage: manage.sh <command> [count]
+Usage: manage.sh <command>
 
 Commands:
-  scale <count>       Install units if needed, enable, start/stop to match count, regen nginx, reload
-  status <count>      Status of N instances
+  start               Install units if needed, ensure dependencies, start the single API instance, regen nginx, reload
+  stop                Stop and disable all salesnote instances
+  status              Show status of the single API instance
 
 Env overrides:
   APP_DIR=/path/to/backend
@@ -387,18 +388,8 @@ EOF
 
 cmd="${1:-}"
 case "$cmd" in
-  scale)
-    require_count "${2:-}"
-    local_count="$2"
-    if [ "$local_count" -eq 0 ]; then
-      for unit in $(systemctl list-units --all --type=service --no-legend "salesnote@*.service" | awk '{print $1}'); do
-        port="${unit#salesnote@}"
-        port="${port%.service}"
-        systemctl stop "salesnote@${port}" || true
-        systemctl disable "salesnote@${port}" || true
-      done
-      exit 0
-    fi
+  start)
+    local_count=1
     ensure_postgres
     ensure_nginx
     ensure_redis
@@ -421,8 +412,15 @@ case "$cmd" in
     reload_nginx
     ;;
   status)
-    require_count "${2:-}"
-    status_instances "$2"
+    status_instances 1
+    ;;
+  stop)
+    for unit in $(systemctl list-units --all --type=service --no-legend "salesnote@*.service" | awk '{print $1}'); do
+      port="${unit#salesnote@}"
+      port="${port%.service}"
+      systemctl stop "salesnote@${port}" || true
+      systemctl disable "salesnote@${port}" || true
+    done
     ;;
   *)
     usage
