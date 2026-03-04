@@ -132,7 +132,7 @@ Environment=SALESNOTE__BIND=0.0.0.0:%i
 Current deploy behavior through [manage.sh](/c:/Users/Femi.Badmus/Desktop/Sales%20Note/backend/manage.sh):
 
 - local PostgreSQL bootstrap enforces:
-    - `max_connections = 152`
+    - `max_connections = 100`
 
 Useful PostgreSQL commands:
 
