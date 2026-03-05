@@ -502,12 +502,21 @@ extension _PreviewPdf on _SalePreviewScreenState {
     return pdf.save();
   }
 
-  Future<String> _savePdfToDevice(Uint8List bytes) async {
+  String _receiptFileName(String extension) {
     final now = DateTime.now();
+    final name = widget.customerName.trim().isNotEmpty
+        ? widget.customerName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), '').replaceAll(' ', '_')
+        : 'Customer';
+    final total = widget.total.toStringAsFixed(2);
     final stamp = DateFormat('yyyyMMdd_HHmmss').format(now);
-    final fileName = 'salesnote_receipt_$stamp';
+    return '${name}--${total}--$stamp.$extension';
+  }
+
+  Future<String> _savePdfToDevice(Uint8List bytes) async {
+    final fileName = _receiptFileName('pdf');
+    final baseName = fileName.substring(0, fileName.length - 4);
     final savedPath = await FileSaver.instance.saveAs(
-      name: fileName,
+      name: baseName,
       bytes: bytes,
       includeExtension: true,
       fileExtension: 'pdf',
@@ -535,9 +544,7 @@ extension _PreviewPdf on _SalePreviewScreenState {
   }
 
   Future<void> _saveImageToDevice(Uint8List bytes) async {
-    final now = DateTime.now();
-    final stamp = DateFormat('yyyyMMdd_HHmmss').format(now);
-    final fileName = 'salesnote_receipt_$stamp.png';
+    final fileName = _receiptFileName('png');
     final result = await SaverGallery.saveImage(
       bytes,
       fileName: fileName,

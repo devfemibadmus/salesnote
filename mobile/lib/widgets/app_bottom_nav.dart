@@ -22,16 +22,14 @@ class AppBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-    final bottomSpacing = bottomInset > 0 ? bottomInset : 6.0;
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
     return Container(
-      height: 72 + bottomSpacing,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFD9E1EE))),
       ),
       child: Padding(
-        padding: EdgeInsets.only(bottom: bottomSpacing),
+        padding: EdgeInsets.only(bottom: bottomInset),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [

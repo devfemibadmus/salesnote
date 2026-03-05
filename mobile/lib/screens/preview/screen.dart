@@ -157,8 +157,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     setState(() => _busy = true);
     try {
       final bytes = await _buildReceiptPdfBytes();
-      final fileName =
-          'salesnote_receipt_${DateFormat('yyyyMMdd_HHmmss').format(DateTime.now())}.pdf';
+      final fileName = _receiptFileName('pdf');
       await Share.shareXFiles([
         XFile.fromData(bytes, mimeType: 'application/pdf', name: fileName),
       ], text: 'Salesnote receipt');
