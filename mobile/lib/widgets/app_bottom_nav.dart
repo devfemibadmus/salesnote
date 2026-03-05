@@ -22,8 +22,11 @@ class AppBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
     final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+    final navHeight = (screenHeight * 0.085).clamp(56.0, 80.0);
     return Container(
+      height: navHeight + bottomInset,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(top: BorderSide(color: Color(0xFFD9E1EE))),
