@@ -17,6 +17,8 @@ on:
 jobs:
     build-and-deploy:
         runs-on: ubuntu-latest
+        env:
+            API_DIR: /home/salesnote/api
         steps:
             - name: Checkout code
               uses: actions/checkout@v3
@@ -56,9 +58,10 @@ jobs:
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
                   script: |
-                      mkdir -p /home/salesnote
-                      if [ -f /home/salesnote/manage.sh ]; then
-                        sudo bash /home/salesnote/manage.sh stop || true
+                      sudo mkdir -p "${{ env.API_DIR }}"
+                      sudo chown -R "${USER}:${USER}" "${{ env.API_DIR }}"
+                      if [ -f "${{ env.API_DIR }}/manage.sh" ]; then
+                        sudo bash "${{ env.API_DIR }}/manage.sh" stop || true
                       else
                         sudo systemctl stop 'salesnote@*' || true
                       fi
@@ -74,11 +77,11 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   envs: API_ENV_FILE,API_ENV_FILE_B64
                   script: |
-                      mkdir -p /home/salesnote
+                      mkdir -p "${{ env.API_DIR }}"
                       if [ -n "$API_ENV_FILE_B64" ]; then
-                        printf '%s' "$API_ENV_FILE_B64" | base64 -d > /home/salesnote/.env
+                        printf '%s' "$API_ENV_FILE_B64" | base64 -d > "${{ env.API_DIR }}/.env"
                       elif [ -n "$API_ENV_FILE" ]; then
-                        printf '%s' "$API_ENV_FILE" > /home/salesnote/.env
+                        printf '%s' "$API_ENV_FILE" > "${{ env.API_DIR }}/.env"
                       else
                         echo "Missing API env secret. Set API_ENV_FILE or API_ENV_FILE_B64."
                         exit 1
@@ -91,7 +94,7 @@ jobs:
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
                   source: "backend/target/release/api"
-                  target: "/home/salesnote/.deploy/"
+                  target: "${{ env.API_DIR }}/.deploy/"
                   strip_components: 3
                   overwrite: true
 
@@ -102,7 +105,7 @@ jobs:
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
                   source: "backend/manage.sh,backend/nginx.conf,backend/nginx.conf.template,backend/salesnote@.service,backend/salesnote.service"
-                  target: "/home/salesnote/"
+                  target: "${{ env.API_DIR }}/"
                   strip_components: 1
                   overwrite: true
 
@@ -117,11 +120,11 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   envs: API_FIREBASE_ADMINSDK_JSON,API_FIREBASE_ADMINSDK_JSON_B64
                   script: |
-                      mkdir -p /home/salesnote
+                      mkdir -p "${{ env.API_DIR }}"
                       if [ -n "$API_FIREBASE_ADMINSDK_JSON_B64" ]; then
-                        printf '%s' "$API_FIREBASE_ADMINSDK_JSON_B64" | base64 -d > /home/salesnote/firebase-adminsdk.json
+                        printf '%s' "$API_FIREBASE_ADMINSDK_JSON_B64" | base64 -d > "${{ env.API_DIR }}/firebase-adminsdk.json"
                       elif [ -n "$API_FIREBASE_ADMINSDK_JSON" ]; then
-                        printf '%s' "$API_FIREBASE_ADMINSDK_JSON" > /home/salesnote/firebase-adminsdk.json
+                        printf '%s' "$API_FIREBASE_ADMINSDK_JSON" > "${{ env.API_DIR }}/firebase-adminsdk.json"
                       else
                         echo "Missing Firebase admin SDK secret. Set API_FIREBASE_ADMINSDK_JSON or API_FIREBASE_ADMINSDK_JSON_B64."
                         exit 1
@@ -140,9 +143,9 @@ jobs:
                   envs: SSL_CERT_B64,SSL_KEY_B64
                   script: |
                       if [ -n "$SSL_CERT_B64" ] && [ -n "$SSL_KEY_B64" ]; then
-                        DOMAIN=$(grep -E '^NGINX_SERVER_NAME=' /home/salesnote/.env | cut -d'=' -f2- | tr -d '\r')
+                        DOMAIN=$(grep -E '^NGINX_SERVER_NAME=' "${{ env.API_DIR }}/.env" | cut -d'=' -f2- | tr -d '\r')
                         if [ -z "$DOMAIN" ]; then
-                          echo "NGINX_SERVER_NAME not set in /home/salesnote/.env"
+                          echo "NGINX_SERVER_NAME not set in ${{ env.API_DIR }}/.env"
                           exit 1
                         fi
                         sudo mkdir -p "/etc/letsencrypt/live/$DOMAIN"
@@ -161,14 +164,14 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   script: |
                       set -e
-                      if [ -f /home/salesnote/manage.sh ]; then
-                        sudo bash /home/salesnote/manage.sh stop || true
+                      if [ -f "${{ env.API_DIR }}/manage.sh" ]; then
+                        sudo bash "${{ env.API_DIR }}/manage.sh" stop || true
                       else
                         sudo systemctl stop 'salesnote@*' || true
                       fi
-                      test -f "/home/salesnote/.deploy/api"
-                      sudo install -m 755 "/home/salesnote/.deploy/api" "/home/salesnote/api"
-                      sudo chmod +x "/home/salesnote/api"
-                      chmod +x "/home/salesnote/manage.sh"
-                      sudo bash /home/salesnote/manage.sh start
+                      test -f "${{ env.API_DIR }}/.deploy/api"
+                      sudo install -m 755 "${{ env.API_DIR }}/.deploy/api" "${{ env.API_DIR }}/api"
+                      sudo chmod +x "${{ env.API_DIR }}/api"
+                      sudo chmod +x "${{ env.API_DIR }}/manage.sh"
+                      sudo bash "${{ env.API_DIR }}/manage.sh" start
                       echo "Deployment complete!"

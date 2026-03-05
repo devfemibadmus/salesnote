@@ -72,19 +72,58 @@ jobs:
                   strip_components: 3
                   overwrite: true
 
-            - name: Upload worker assets
+            - name: Upload worker service file
               uses: appleboy/scp-action@master
               with:
                   host: ${{ secrets.API_SSH_HOST }}
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
-                  source: |
-                      backend/.env
-                      backend/firebase-adminsdk.json
-                      backend/salesnoteworker.service
+                  source: "backend/salesnoteworker.service"
                   target: "/home/salesnote/worker/"
                   strip_components: 1
                   overwrite: true
+
+            - name: Write worker env file
+              uses: appleboy/ssh-action@master
+              env:
+                  API_ENV_FILE: ${{ secrets.API_ENV_FILE }}
+                  API_ENV_FILE_B64: ${{ secrets.API_ENV_FILE_B64 }}
+              with:
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
+                  envs: API_ENV_FILE,API_ENV_FILE_B64
+                  script: |
+                      set -e
+                      if [ -n "$API_ENV_FILE_B64" ]; then
+                        printf '%s' "$API_ENV_FILE_B64" | base64 -d > /home/salesnote/worker/.env
+                      elif [ -n "$API_ENV_FILE" ]; then
+                        printf '%s' "$API_ENV_FILE" > /home/salesnote/worker/.env
+                      else
+                        echo "Missing API env secret. Set API_ENV_FILE or API_ENV_FILE_B64."
+                        exit 1
+                      fi
+
+            - name: Write worker Firebase admin SDK file
+              uses: appleboy/ssh-action@master
+              env:
+                  API_FIREBASE_ADMINSDK_JSON: ${{ secrets.API_FIREBASE_ADMINSDK_JSON }}
+                  API_FIREBASE_ADMINSDK_JSON_B64: ${{ secrets.API_FIREBASE_ADMINSDK_JSON_B64 }}
+              with:
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
+                  envs: API_FIREBASE_ADMINSDK_JSON,API_FIREBASE_ADMINSDK_JSON_B64
+                  script: |
+                      set -e
+                      if [ -n "$API_FIREBASE_ADMINSDK_JSON_B64" ]; then
+                        printf '%s' "$API_FIREBASE_ADMINSDK_JSON_B64" | base64 -d > /home/salesnote/worker/firebase-adminsdk.json
+                      elif [ -n "$API_FIREBASE_ADMINSDK_JSON" ]; then
+                        printf '%s' "$API_FIREBASE_ADMINSDK_JSON" > /home/salesnote/worker/firebase-adminsdk.json
+                      else
+                        echo "Missing API Firebase admin SDK secret. Set API_FIREBASE_ADMINSDK_JSON or API_FIREBASE_ADMINSDK_JSON_B64."
+                        exit 1
+                      fi
 
             - name: Register and start worker
               uses: appleboy/ssh-action@master
@@ -95,6 +134,9 @@ jobs:
                   script: |
                       set -e
                       test -f "/home/salesnote/worker/worker"
+                      test -f "/home/salesnote/worker/.env"
+                      test -f "/home/salesnote/worker/firebase-adminsdk.json"
+                      test -f "/home/salesnote/worker/salesnoteworker.service"
                       sudo chmod +x "/home/salesnote/worker/worker"
                       sudo install -m 644 /home/salesnote/worker/salesnoteworker.service /etc/systemd/system/salesnoteworker.service
                       sudo systemctl daemon-reload

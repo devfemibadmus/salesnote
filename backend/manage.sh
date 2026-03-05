@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/home/salesnote}"
+APP_DIR="${APP_DIR:-/home/salesnote/api}"
 UNIT_TEMPLATE="/etc/systemd/system/salesnote@.service"
 UNIT_GROUP="/etc/systemd/system/salesnote.service"
 NGINX_TEMPLATE="${APP_DIR}/nginx.conf.template"
