@@ -112,7 +112,6 @@ fn template_candidates(filename: &str) -> Vec<std::path::PathBuf> {
         }
     }
 
-    out.push(std::path::PathBuf::from("/home/salesnote/api/templates/email").join(filename));
     out.push(std::path::PathBuf::from("/home/salesnote/worker/templates/email").join(filename));
     out.push(
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
