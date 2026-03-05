@@ -106,53 +106,33 @@ class _ResetPasswordState extends State<ResetPassword> {
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 8),
-                  Center(
-                    child: Container(
-                      width: 88,
-                      height: 88,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF007AFF), Color(0xFF0055CC)],
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x33007AFF),
-                            blurRadius: 20,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.receipt_long_rounded,
-                        color: Colors.white,
-                        size: 42,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Center(
-                    child: Text(
-                      'Sales Note',
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF0E1930),
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 36),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            children: [
+              IconButton(
+                alignment: Alignment.centerLeft,
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Reset Password',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w800,
+                  color: _textDark,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Create a new password for your shop.',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: _textMuted,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 32),
                   TextField(
                     controller: _password,
                     focusNode: _passwordFocus,
@@ -240,9 +220,7 @@ class _ResetPasswordState extends State<ResetPassword> {
                   ),
                   const SizedBox(height: 18),
                   const SizedBox(height: 2),
-                ],
-              ),
-            ),
+            ],
           ),
         ),
       ),
