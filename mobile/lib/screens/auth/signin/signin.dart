@@ -30,12 +30,16 @@ class _SigninState extends State<Signin> {
 
   bool _loading = false;
   bool _showPassword = false;
+  bool _useEmail = false;
   late final String _deviceRegionCode;
+  
+  final _passwordFocusNode = FocusNode();
 
   @override
   void dispose() {
     _loginId.dispose();
     _password.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -43,6 +47,9 @@ class _SigninState extends State<Signin> {
   void initState() {
     super.initState();
     _deviceRegionCode = RegionService.getDeviceRegionCode();
+    _passwordFocusNode.addListener(() {
+      setState(() {});
+    });
   }
 
 
@@ -169,20 +176,12 @@ class _SigninState extends State<Signin> {
                 ),
               ),
               const SizedBox(height: 36),
-              const Text(
-                'Phone or Email',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: _textMuted,
-                ),
-              ),
-              const SizedBox(height: 8),
               TextField(
                 controller: _loginId,
                 keyboardType: TextInputType.emailAddress,
                 enabled: !_loading,
                 decoration: InputDecoration(
-                  hintText: 'Enter phone or email',
+                  hintText: 'Enter Phone or Email',
                   hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                   filled: true,
                   fillColor: Colors.white,
@@ -201,21 +200,14 @@ class _SigninState extends State<Signin> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Password',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: _textMuted,
-                ),
-              ),
-              const SizedBox(height: 8),
               TextField(
                 controller: _password,
+                focusNode: _passwordFocusNode,
                 obscureText: !_showPassword,
                 enabled: !_loading,
                 decoration: InputDecoration(
-                  hintText: '• • • • • • • •',
-                  hintStyle: const TextStyle(color: Color(0xFFCBD5F5)),
+                  hintText: 'Password',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
                   filled: true,
                   fillColor: Colors.white,
                   contentPadding: const EdgeInsets.symmetric(
@@ -230,13 +222,13 @@ class _SigninState extends State<Signin> {
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
-                  suffixIcon: IconButton(
+                  suffixIcon: _passwordFocusNode.hasFocus ? IconButton(
                     onPressed: () =>
                         setState(() => _showPassword = !_showPassword),
                     icon: Icon(
                       _showPassword ? Icons.visibility_off : Icons.visibility,
                     ),
-                  ),
+                  ) : null,
                 ),
               ),
               const SizedBox(height: 10),
