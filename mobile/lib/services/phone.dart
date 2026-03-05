@@ -33,7 +33,7 @@ class PhoneService {
       return result;
     }
 
-    final result = '+$digits';
+    final result = digits;
     // ignore: avoid_print
     print('PhoneService._buildInputForValidation fallback digits="$digits" result="$result"');
     return result;
