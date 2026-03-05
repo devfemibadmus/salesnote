@@ -5,6 +5,7 @@ import 'package:country_picker/country_picker.dart';
 
 import '../../../data/models.dart';
 import '../../../services/api_client.dart';
+import '../../../services/cache/local.dart';
 import '../../../services/device_info.dart';
 import '../../../services/phone.dart';
 import '../../../services/region.dart';
@@ -141,6 +142,7 @@ class _SignupState extends State<Signup> {
         devicePlatform: device.platform,
         deviceOs: device.os,
       );
+      await LocalCache.setPreferredRegionCode(phoneRegion);
       if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
     } catch (e) {

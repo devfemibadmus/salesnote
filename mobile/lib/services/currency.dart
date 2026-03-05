@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
+import 'cache/local.dart';
 import 'region.dart';
 
 class CurrencyService {
@@ -60,7 +61,9 @@ class CurrencyService {
   }
 
   static String? _resolveCurrencyCode() {
-    final region = RegionService.getDeviceRegionCode().toUpperCase();
+    final preferredRegion = LocalCache.getPreferredRegionCode();
+    final region =
+        (preferredRegion ?? RegionService.getDeviceRegionCode()).toUpperCase();
     final byRegion = _regionToCurrency[region];
     if (byRegion != null && byRegion.isNotEmpty) {
       return byRegion;

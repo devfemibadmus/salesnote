@@ -101,4 +101,17 @@ class PhoneService {
       return false;
     }
   }
+
+  static Future<String?> regionCodeFromE164(String raw) async {
+    final input = raw.trim();
+    if (!input.startsWith('+')) return null;
+    try {
+      final parsed = await _util.parse(input, regionCode: 'US');
+      final code = parsed.regionCode.trim().toUpperCase();
+      if (code.isEmpty) return null;
+      return code;
+    } catch (_) {
+      return null;
+    }
+  }
 }

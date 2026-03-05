@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../services/api_client.dart';
+import '../../../services/cache/local.dart';
 import '../../../services/device_info.dart';
 import '../../../services/token_store.dart';
 import 'package:country_picker/country_picker.dart';
@@ -92,13 +93,17 @@ class _SigninState extends State<Signin> {
     try {
       final device = await DeviceInfoService.getDeviceInfo()
           .timeout(const Duration(seconds: 2), onTimeout: () => DeviceInfoData());
-      await _api.login(
+      final auth = await _api.login(
         loginValue,
         _password.text.trim(),
         deviceName: device.name,
         devicePlatform: device.platform,
         deviceOs: device.os,
       );
+      final selectedRegion = !_useEmail
+          ? (_country?.countryCode ?? _deviceRegionCode)
+          : await PhoneService.regionCodeFromE164(auth.shop.phone);
+      await LocalCache.setPreferredRegionCode(selectedRegion);
       if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
     } catch (e) {

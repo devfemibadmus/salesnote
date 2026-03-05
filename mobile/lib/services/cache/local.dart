@@ -13,6 +13,7 @@ class LocalCache {
   static const _notificationPromptCooldownKey = 'notification_prompt_cooldown';
   static const _notificationOptOutKey = 'notification_opt_out';
   static const _shopLogoCacheBustKey = 'shop_logo_cache_bust';
+  static const _preferredRegionCodeKey = 'preferred_region_code';
 
   static Future<void> init() async {
     await Hive.openBox<String>(_receiptsBox);
@@ -106,6 +107,23 @@ class LocalCache {
   static Future<void> setShopLogoCacheBust(int value) async {
     final box = Hive.box<int>(_metaBox);
     await box.put(_shopLogoCacheBustKey, value);
+  }
+
+  static String? getPreferredRegionCode() {
+    final box = Hive.box<String>(_pageBox);
+    final value = box.get(_preferredRegionCodeKey)?.trim().toUpperCase();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  static Future<void> setPreferredRegionCode(String? code) async {
+    final box = Hive.box<String>(_pageBox);
+    final normalized = code?.trim().toUpperCase();
+    if (normalized == null || normalized.isEmpty) {
+      await box.delete(_preferredRegionCodeKey);
+      return;
+    }
+    await box.put(_preferredRegionCodeKey, normalized);
   }
 
   static Future<void> saveHomeSummary(Map<String, dynamic> data) async {
