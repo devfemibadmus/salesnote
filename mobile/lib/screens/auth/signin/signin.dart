@@ -1,13 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../services/api_client.dart';
 import '../../../services/cache/local.dart';
 import '../../../services/device_info.dart';
 import '../../../services/token_store.dart';
-import 'package:country_picker/country_picker.dart';
 
 import '../../../services/phone.dart';
 import '../../../services/region.dart';
@@ -27,23 +25,16 @@ class _SigninState extends State<Signin> {
   static const _textMuted = Color(0xFF64748B);
 
   final _api = ApiClient(TokenStore());
-  final _phone = TextEditingController();
-  final _email = TextEditingController();
+  final _loginId = TextEditingController();
   final _password = TextEditingController();
 
   bool _loading = false;
   bool _showPassword = false;
-  bool _useEmail = false;
-  Country? _country;
   late final String _deviceRegionCode;
-  String? _phoneError;
-  Timer? _phoneDebounce;
 
   @override
   void dispose() {
-    _phoneDebounce?.cancel();
-    _phone.dispose();
-    _email.dispose();
+    _loginId.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -52,35 +43,29 @@ class _SigninState extends State<Signin> {
   void initState() {
     super.initState();
     _deviceRegionCode = RegionService.getDeviceRegionCode();
-    _initCountry();
-  }
-
-  void _initCountry() {
-    try {
-      _country = CountryParser.parseCountryCode(_deviceRegionCode);
-    } catch (_) {
-      _country = CountryParser.parseCountryCode('NG');
-    }
   }
 
 
   Future<void> _login() async {
+    final input = _loginId.text.trim();
+    if (input.isEmpty) {
+      _showError('Enter your phone or email.');
+      return;
+    }
+
     String loginValue;
-    if (_useEmail) {
-      final input = _email.text.trim();
+    final isEmail = input.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(input);
+
+    if (isEmail) {
       if (!Validators.isValidEmail(input)) {
         _showError('Enter a valid email.');
         return;
       }
       loginValue = input;
     } else {
-      final input = _phone.text.trim();
-      final region = _country?.countryCode ?? _deviceRegionCode;
-      final phoneCode = _country?.phoneCode;
       final strictPhone = await PhoneService.normalizeE164(
         input,
-        region,
-        countryPhoneCode: phoneCode,
+        _deviceRegionCode,
       );
       if (strictPhone == null) {
         _showError('Enter a valid phone number.');
@@ -100,8 +85,8 @@ class _SigninState extends State<Signin> {
         devicePlatform: device.platform,
         deviceOs: device.os,
       );
-      final selectedRegion = !_useEmail
-          ? (_country?.countryCode ?? _deviceRegionCode)
+      final selectedRegion = !isEmail
+          ? _deviceRegionCode
           : await PhoneService.regionCodeFromE164(auth.shop.phone);
       await LocalCache.setPreferredRegionCode(selectedRegion);
       if (!mounted) return;
@@ -129,29 +114,7 @@ class _SigninState extends State<Signin> {
     return error.toString();
   }
 
-  void _onPhoneChanged(String value) {
-    _phoneDebounce?.cancel();
-    _phoneDebounce = Timer(const Duration(milliseconds: 300), () async {
-      final input = value.trim();
-      if (input.isEmpty) {
-        if (mounted) setState(() => _phoneError = null);
-        return;
-      }
-      final region = _country?.countryCode ?? _deviceRegionCode;
-      final valid = await PhoneService.isValid(
-        input,
-        region,
-        countryPhoneCode: _country?.phoneCode,
-      );
-      if (!mounted) return;
-      setState(() {
-        _phoneError = valid ? null : 'Enter a valid phone number.';
-      });
-      if (valid) {
-        FocusManager.instance.primaryFocus?.unfocus();
-      }
-    });
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -166,18 +129,46 @@ class _SigninState extends State<Signin> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
               children: [
-              const SizedBox(height: 16),
-              const Center(
-                child: Text(
-                  'Salesnote',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: _primary,
+              const SizedBox(height: 8),
+              Center(
+                child: Container(
+                  width: 88,
+                  height: 88,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF007AFF), Color(0xFF0055CC)],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33007AFF),
+                        blurRadius: 20,
+                        offset: Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.receipt_long_rounded,
+                    color: Colors.white,
+                    size: 42,
                   ),
                 ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 20),
+              const Center(
+                child: Text(
+                  'Sales Note',
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0E1930),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 36),
               const Text(
                 'Phone or Email',
                 style: TextStyle(
@@ -186,133 +177,30 @@ class _SigninState extends State<Signin> {
                 ),
               ),
               const SizedBox(height: 8),
-              if (_useEmail)
-                TextField(
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  enabled: !_loading,
-                  decoration: InputDecoration(
-                    hintText: 'name@email.com',
-                    hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 18,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
+              TextField(
+                controller: _loginId,
+                keyboardType: TextInputType.emailAddress,
+                enabled: !_loading,
+                decoration: InputDecoration(
+                  hintText: 'Enter phone or email',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 18,
                   ),
-                )
-              else
-                Row(
-                  children: [
-                    InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: _loading
-                          ? null
-                          : () {
-                              showCountryPicker(
-                                context: context,
-                                showPhoneCode: true,
-                                onSelect: (value) async {
-                                  setState(() => _country = value);
-                                },
-                              );
-                            },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 16,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          children: [
-                            Text(
-                              _country?.flagEmoji ?? '🇳🇬',
-                              style: const TextStyle(fontSize: 18),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '+${_country?.phoneCode ?? '234'}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF111827),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            const Icon(Icons.keyboard_arrow_down, size: 18),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _phone,
-                        keyboardType: TextInputType.phone,
-                        enabled: !_loading,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        onChanged: _onPhoneChanged,
-                        decoration: InputDecoration(
-                          hintText: '8104156984',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 18,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              if (!_useEmail && _phoneError != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  _phoneError!,
-                  style: const TextStyle(color: Color(0xFFDC2626), fontSize: 12),
-                ),
-              ],
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _loading
-                      ? null
-                      : () {
-                          setState(() => _useEmail = !_useEmail);
-                        },
-                  child: Text(
-                    _useEmail ? 'Use phone instead' : 'Use email instead',
-                    style: const TextStyle(
-                      color: _textMuted,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               const Text(
                 'Password',
                 style: TextStyle(
