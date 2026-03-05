@@ -19,6 +19,7 @@ const ENV_PROFILE_TEST: &str = "test";
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
+    #[serde(default = "default_bind")]
     pub bind: String,
     pub database_url: String,
     #[serde(default = "default_max_request_payload_bytes")]
@@ -220,6 +221,9 @@ fn build_settings() -> Settings {
         &["SALESNOTE__ERROR_LOG_FILE", "ERROR_LOG_FILE"],
         settings.error_log_file.clone(),
     );
+    if settings.bind.trim().is_empty() {
+        settings.bind = default_bind();
+    }
 
     apply_instance_log_suffixes(&mut settings);
 
@@ -380,6 +384,10 @@ fn is_access_target(target: &str) -> bool {
 
 fn default_log_to_terminal() -> bool {
     false
+}
+
+fn default_bind() -> String {
+    "0.0.0.0:8080".to_string()
 }
 
 fn default_max_request_payload_bytes() -> usize {
