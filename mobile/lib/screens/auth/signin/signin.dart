@@ -168,7 +168,7 @@ class _SigninState extends State<Signin> {
                 ),
               ),
 
-              const SizedBox(height: 36),
+              const SizedBox(height: 70),
               TextField(
                 controller: _loginId,
                 keyboardType: TextInputType.emailAddress,
