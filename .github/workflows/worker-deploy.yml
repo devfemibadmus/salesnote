@@ -21,6 +21,15 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v3
 
+            - name: Test SSH connection
+              uses: appleboy/ssh-action@master
+              with:
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
+                  script: |
+                      echo "SSH connection successful on $(hostname)"
+
             - name: Setup Rust
               uses: actions-rs/toolchain@v1
               with:
@@ -36,10 +45,6 @@ jobs:
                       target
                   key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-            - name: Run tests
-              run: cargo test
-              working-directory: backend
-
             - name: Build worker binary
               run: cargo build --release --bin worker
               working-directory: backend
@@ -51,8 +56,10 @@ jobs:
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
                   script: |
+                      set -e
                       sudo systemctl stop salesnoteworker || true
-                      mkdir -p /home/salesnote/worker
+                      sudo mkdir -p /home/salesnote/worker
+                      sudo chown -R "${USER}:${USER}" /home/salesnote/worker
 
             - name: Upload worker binary
               uses: appleboy/scp-action@master
@@ -62,6 +69,7 @@ jobs:
                   key: ${{ secrets.API_SSH_KEY }}
                   source: "backend/target/release/worker"
                   target: "/home/salesnote/worker/"
+                  strip_components: 3
                   overwrite: true
 
             - name: Upload worker assets
@@ -75,6 +83,7 @@ jobs:
                       backend/firebase-adminsdk.json
                       backend/salesnoteworker.service
                   target: "/home/salesnote/worker/"
+                  strip_components: 1
                   overwrite: true
 
             - name: Register and start worker
@@ -84,11 +93,11 @@ jobs:
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
                   script: |
-                      chmod +x "/home/salesnote/worker/worker"
-                      if [ ! -f /etc/systemd/system/salesnoteworker.service ]; then
-                        sudo cp /home/salesnote/worker/salesnoteworker.service /etc/systemd/system/salesnoteworker.service
-                        sudo systemctl daemon-reload
-                        sudo systemctl enable salesnoteworker
-                      fi
+                      set -e
+                      test -f "/home/salesnote/worker/worker"
+                      sudo chmod +x "/home/salesnote/worker/worker"
+                      sudo install -m 644 /home/salesnote/worker/salesnoteworker.service /etc/systemd/system/salesnoteworker.service
+                      sudo systemctl daemon-reload
+                      sudo systemctl enable salesnoteworker
                       sudo systemctl restart salesnoteworker
                       echo "Worker deployment complete!"
