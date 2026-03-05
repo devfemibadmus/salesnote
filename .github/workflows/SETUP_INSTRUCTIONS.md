@@ -541,13 +541,59 @@ This identifies your app to Apple.
 3. Select **App IDs** → **Continue**
 4. Select **App** → **Continue**
 5. Fill in:
-    - **Description:** `Media Saver`
+    - **Description:** `Salesnote`
     - **Bundle ID:** Select **Explicit** and enter: `com.blackstackhub.salesnote`
-6. Click **Continue** → **Register**
+6. Under **Capabilities**, enable **Push Notifications**
+7. Click **Continue** → **Register**
+
+> ⚠️ **IMPORTANT:** Push Notifications MUST be enabled on the App ID before creating the provisioning profile. If you forgot, edit the App ID and enable it, then regenerate the provisioning profile.
 
 ---
 
-## 📱 Step 4: Create Provisioning Profile
+## � Push Notification Configuration
+
+These files in the iOS project are required for APNS (Apple Push Notification Service) to work:
+
+### Runner.entitlements
+
+File: `mobile/ios/Runner/Runner.entitlements`
+
+This file tells iOS the app is allowed to receive push notifications. It contains:
+
+```xml
+<key>aps-environment</key>
+<string>production</string>
+```
+
+### Info.plist — Background Modes
+
+File: `mobile/ios/Runner/Info.plist`
+
+Must include `UIBackgroundModes` with `remote-notification`:
+
+```xml
+<key>UIBackgroundModes</key>
+<array>
+    <string>fetch</string>
+    <string>remote-notification</string>
+</array>
+```
+
+### project.pbxproj — Entitlements Wiring
+
+File: `mobile/ios/Runner.xcodeproj/project.pbxproj`
+
+All three Runner build configurations (Debug, Release, Profile) must have:
+
+```text
+CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
+```
+
+Without ALL three of these, the APNS token will never be delivered to the device and `getAPNSToken()` will always return null.
+
+---
+
+## �📱 Step 4: Create Provisioning Profile
 
 This links your app, certificate, and Apple account together.
 
@@ -699,6 +745,15 @@ All your certificate files are now in `.gitignore` and won't be committed.
 - Generate a new one following Step 2 again
 - Update the `BUILD_CERTIFICATE_BASE64` secret in GitHub
 
+### ❌ `[firebase_messaging/apns-token-not-set]` APNS token not received
+
+- Ensure `Runner.entitlements` exists with `aps-environment` set to `production`
+- Ensure `Info.plist` has `UIBackgroundModes` with `remote-notification`
+- Ensure `project.pbxproj` has `CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements` in all Runner build configs
+- Ensure the **App ID** on Apple Developer has **Push Notifications** enabled
+- Ensure the **provisioning profile** was created AFTER enabling push notifications on the App ID
+- If you updated the App ID, you must **regenerate** the provisioning profile and update `BUILD_PROVISION_PROFILE_BASE64` in GitHub Secrets
+
 ---
 
 ## ✅ Success Checklist
@@ -706,10 +761,14 @@ All your certificate files are now in `.gitignore` and won't be committed.
 - [x] Downloaded `.p8` API key from App Store Connect
 - [x] Created Apple Distribution certificate
 - [x] Created App ID: `com.blackstackhub.salesnote`
-- [x] Created Provisioning Profile
+- [x] Enabled **Push Notifications** on the App ID
+- [x] Created Provisioning Profile (after enabling push)
 - [x] Converted all files to Base64
 - [x] Added all 7 secrets to GitHub
 - [x] Updated Team ID in `ExportOptions.plist`
+- [x] `Runner.entitlements` exists with `aps-environment`
+- [x] `Info.plist` has `UIBackgroundModes` with `remote-notification`
+- [x] `project.pbxproj` has `CODE_SIGN_ENTITLEMENTS` in all configs
 - [ ] Pushed to GitHub
 - [ ] Workflow ran successfully
 - [ ] App appeared in TestFlight
