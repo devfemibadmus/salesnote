@@ -151,6 +151,7 @@ jobs:
                       test -f "/home/salesnote/worker/salesnoteworker.service"
                       test -f "/home/salesnote/worker/templates/email/password-reset.html"
                       test -f "/home/salesnote/worker/templates/email/welcome.html"
+                      test -f "/home/salesnote/worker/templates/email/logo.jpg"
                       sudo chmod +x "/home/salesnote/worker/worker"
                       sudo install -m 644 /home/salesnote/worker/salesnoteworker.service /etc/systemd/system/salesnoteworker.service
                       sudo systemctl daemon-reload

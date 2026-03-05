@@ -9,116 +9,147 @@
         margin: 0;
         padding: 0;
         background: #f4f7fb;
-        font-family: "Inter", Arial, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
         color: #1b1f24;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrapper {
+        width: 100%;
+        background-color: #f4f7fb;
+        padding: 40px 0;
       }
       .container {
-        width: 100%;
-        padding: 32px 12px;
-      }
-      .card {
-        width: 100%;
-        max-width: 360px;
+        max-width: 480px;
         margin: 0 auto;
         background: #ffffff;
-        border-radius: 16px;
-        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+        border-radius: 24px;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.06);
         overflow: hidden;
       }
-      .card-inner {
-        padding: 24px 22px 18px;
+      .header {
+        text-align: center;
+        padding: 48px 32px 16px;
+      }
+      .logo {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+        border: 1px solid #f1f5f9;
+        margin-bottom: 24px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .content {
+        padding: 0 40px 40px;
         text-align: center;
       }
-      .brand {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        font-weight: 700;
-        color: #1b1f24;
-        font-size: 18px;
-        margin-bottom: 14px;
-      }
-      .brand-badge {
-        width: 28px;
-        height: 28px;
-        border-radius: 8px;
-        background: #1c7cff;
-        color: #ffffff;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
-        font-weight: 700;
-      }
-      .banner {
-        height: 110px;
-        border-radius: 10px;
-        background: linear-gradient(180deg, #f4c464 0%, #d8a647 100%);
-        margin-bottom: 16px;
-      }
       h1 {
-        font-size: 20px;
-        margin: 12px 0 8px;
-        color: #111827;
+        font-size: 24px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0 0 16px;
+        letter-spacing: -0.02em;
       }
       p {
-        font-size: 14px;
-        line-height: 1.5;
-        color: #6b7280;
-        margin: 0 0 16px;
+        font-size: 15px;
+        line-height: 1.6;
+        color: #475569;
+        margin: 0 0 32px;
       }
       .button {
         display: inline-block;
-        padding: 12px 20px;
-        background: #1c7cff;
+        padding: 14px 32px;
+        background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
         color: #ffffff !important;
         text-decoration: none;
-        border-radius: 10px;
+        border-radius: 12px;
         font-weight: 600;
-        font-size: 14px;
+        font-size: 16px;
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        transition: transform 0.2s, box-shadow 0.2s;
+        letter-spacing: 0.01em;
       }
       .divider {
         height: 1px;
-        background: #eef2f6;
-        margin: 18px 0 12px;
+        background: #f1f5f9;
+        margin: 32px 0 24px;
+      }
+      .brand-text {
+        font-size: 20px;
+        font-weight: 800;
+        color: #0f172a;
+        margin-bottom: 32px;
+        letter-spacing: -0.01em;
+      }
+      .team-sign {
+        font-size: 15px;
+        color: #334155;
       }
       .footer {
+        background: #f8fafc;
+        padding: 32px 40px;
         text-align: center;
-        color: #9ca3af;
-        font-size: 11px;
-        line-height: 1.5;
+        border-top: 1px solid #f1f5f9;
+      }
+      .footer p {
+        font-size: 13px;
+        color: #64748b;
+        margin: 0 0 12px;
+        line-height: 1.6;
       }
       .footer a {
-        color: #1c7cff;
+        color: #3b82f6;
         text-decoration: none;
+        font-weight: 500;
+      }
+      @media (max-width: 600px) {
+        .container {
+          border-radius: 0;
+          margin: 0;
+          max-width: 100%;
+        }
+        .wrapper {
+          padding: 0;
+        }
+        .content {
+          padding: 0 24px 32px;
+        }
+        .header {
+          padding: 40px 24px 16px;
+        }
+        h1 {
+          font-size: 22px;
+        }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <div class="card">
-        <div class="card-inner">
-          <div class="brand">
-            <span class="brand-badge">S</span>
-            Salesnote
-          </div>
-          <div class="banner"></div>
-          <h1>Welcome to Salesnote, {{SHOP_NAME}}!</h1>
-          <p>
-            We are excited to help you manage your sales and generate
-            e-receipts effortlessly. Your account is ready, and you can start
-            recording sales right away.
-          </p>
-          <a class="button" href="{{DASHBOARD_URL}}">Go to Dashboard</a>
-          <div class="divider"></div>
-          <p style="margin-bottom:0;">Happy selling,<br /><strong>The Salesnote Team</strong></p>
+    <div class="wrapper">
+      <div class="container">
+        <div class="header">
+          <img src="{{LOGO_URL}}" alt="Salesnote Logo" class="logo" />
+          <div class="brand-text">Salesnote</div>
         </div>
-        <div class="footer" style="padding: 0 22px 18px;">
-          You're receiving this because you signed up for Salesnote.
-          <br />
-          © {{YEAR}} Salesnote Inc. 123 Business Ave, Suite 100.
-          <br />
-          <a href="#">Help Center</a> · <a href="#">Unsubscribe</a>
+        <div class="content">
+          <h1>Welcome, {{SHOP_NAME}}!</h1>
+          <p>
+            We're thrilled to have you on board. Your account is fully set up and ready to go. Start managing your sales, generating e-receipts, and growing your business effortlessly.
+          </p>
+          <a href="{{DASHBOARD_URL}}" class="button">Go to Dashboard</a>
+          <div class="divider"></div>
+          <p class="team-sign" style="margin-bottom:0;">
+            Happy selling,<br />
+            <strong>The Salesnote Team</strong>
+          </p>
+        </div>
+        <div class="footer">
+          <p>You're receiving this because you signed up for Salesnote.</p>
+          <p style="margin-bottom:0;">
+            © {{YEAR}} Salesnote Inc. 123 Business Ave, Suite 100.<br />
+            <a href="#">Help Center</a> &bull; <a href="#">Unsubscribe</a>
+          </p>
         </div>
       </div>
     </div>

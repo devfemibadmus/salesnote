@@ -58,14 +58,16 @@ pub async fn process_yearly_receipt(settings: &Settings, pool: &PgPool) -> Resul
             top_item,
         });
         if let Some(message) = message {
-            send_fcm_notification(
-                &shop.fcm_token,
-                message.title,
-                message.body,
-                KIND_YEARLY,
-                settings,
-            )
-            .await?;
+            for token in &shop.fcm_tokens {
+                let _ = send_fcm_notification(
+                    token,
+                    message.title.clone(),
+                    message.body.clone(),
+                    KIND_YEARLY,
+                    settings,
+                )
+                .await;
+            }
             mark_sent(pool, shop.id, KIND_YEARLY, &period_key)
                 .await
                 .map_err(|e| e.to_string())?;

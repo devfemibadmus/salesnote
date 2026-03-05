@@ -68,7 +68,6 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   bool _hydratingDraft = false;
   bool _customerNameTouched = false;
   bool _customerContactTouched = false;
-  bool _useEmailForContact = false;
   double _discountAmount = 0;
   double _vatAmount = 0;
   double _serviceFeeAmount = 0;
@@ -323,7 +322,6 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       setState(() {
         _customerNameController.text = '';
         _customerContactController.text = '';
-        _useEmailForContact = false;
         _phoneError = null;
         _discountAmount = 0;
         _vatAmount = 0;
@@ -363,7 +361,6 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _customerNameController.text = (draft['customer_name'] ?? '').toString();
       _customerContactController.text = (draft['customer_contact'] ?? '')
           .toString();
-      _useEmailForContact = draft['contact_use_email'] == true;
       final countryCode = (draft['contact_country'] ?? '').toString().trim();
       if (countryCode.isNotEmpty) {
         try {
@@ -427,7 +424,6 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     await LocalCache.saveDraft(_draftStorageKey(_activeDraftId), {
       'customer_name': _customerNameController.text.trim(),
       'customer_contact': _customerContactController.text.trim(),
-      'contact_use_email': _useEmailForContact,
       'contact_country': _country?.countryCode,
       'discount_amount': _discountAmount,
       'vat_amount': _vatAmount,
@@ -471,7 +467,6 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _activeDraftId = id;
       _customerNameController.text = '';
       _customerContactController.text = '';
-      _useEmailForContact = false;
       _phoneError = null;
       _discountAmount = 0;
       _vatAmount = 0;
@@ -515,7 +510,6 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       setState(() {
         _customerNameController.text = '';
         _customerContactController.text = '';
-        _useEmailForContact = false;
         _phoneError = null;
         _discountAmount = 0;
         _vatAmount = 0;
@@ -608,9 +602,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
   bool _isCustomerNameValid(String value) => Validators.isValidShopName(value);
 
-  bool _isCustomerContactValid(String value) => _useEmailForContact
-      ? Validators.isValidEmail(value.trim())
-      : value.trim().isNotEmpty && _phoneError == null;
+  bool _isCustomerContactValid(String value) {
+    final input = value.trim();
+    if (input.isEmpty) return false;
+    final isEmail = input.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(input);
+    if (isEmail) return Validators.isValidEmail(input);
+    return _phoneError == null;
+  }
 
   bool get _customerNameInvalid =>
       _customerNameTouched &&
@@ -644,10 +642,12 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _showSnackBar('Customer contact is required.');
       return;
     }
-    if (!_useEmailForContact) {
+    final contactInput = _customerContactController.text.trim();
+    final isEmail = contactInput.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(contactInput);
+    if (!isEmail) {
       final region = _country?.countryCode ?? _deviceRegionCode;
       final valid = await PhoneService.isValid(
-        _customerContactController.text.trim(),
+        contactInput,
         region,
         countryPhoneCode: _country?.phoneCode,
       );
@@ -657,10 +657,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _customerContactTouched = true;
       });
     }
-    if (!_isCustomerContactValid(_customerContactController.text)) {
+    if (!_isCustomerContactValid(contactInput)) {
       setState(() => _customerContactTouched = true);
       _showSnackBar(
-        _useEmailForContact
+        isEmail
             ? 'Enter a valid email.'
             : 'Enter a valid phone number.',
       );
@@ -684,8 +684,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       if (!_isCustomerNameValid(_customerNameController.text)) {
         _showSnackBar('Customer name must be between 3 and 40 characters.');
       } else if (!_isCustomerContactValid(_customerContactController.text)) {
+        final contactInput = _customerContactController.text.trim();
+        final isEmail = contactInput.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(contactInput);
         _showSnackBar(
-          _useEmailForContact
+          isEmail
               ? 'Enter a valid email.'
               : 'Enter a valid phone number.',
         );
@@ -706,8 +708,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     try {
       final contact = await _normalizedCustomerContactForSubmit();
       if (contact == null) {
+        final contactInput = _customerContactController.text.trim();
+        final isEmail = contactInput.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(contactInput);
         _showSnackBar(
-          _useEmailForContact
+          isEmail
               ? 'Enter a valid email.'
               : 'Enter a valid phone number.',
         );
@@ -837,8 +841,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       if (!_isCustomerNameValid(_customerNameController.text)) {
         _showSnackBar('Customer name must be between 3 and 40 characters.');
       } else if (!_isCustomerContactValid(_customerContactController.text)) {
+        final contactInput = _customerContactController.text.trim();
+        final isEmail = contactInput.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(contactInput);
         _showSnackBar(
-          _useEmailForContact
+          isEmail
               ? 'Enter a valid email.'
               : 'Enter a valid phone number.',
         );
@@ -909,10 +915,14 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
   Future<String?> _normalizedCustomerContactForSubmit() async {
     final raw = _customerContactController.text.trim();
-    if (_useEmailForContact) {
+    if (raw.isEmpty) return null;
+    final isEmail = raw.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(raw);
+    
+    if (isEmail) {
       if (!Validators.isValidEmail(raw)) return null;
       return raw.toLowerCase();
     }
+    
     final region = _country?.countryCode ?? _deviceRegionCode;
     return PhoneService.normalizeE164(
       raw,
@@ -923,21 +933,18 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
   void _onContactChanged(String value) {
     _saveDraftDebounced();
-    if (_useEmailForContact) {
+    final input = value.trim();
+    final isEmail = input.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(input);
+    
+    if (isEmail || input.isEmpty) {
       if (_phoneError != null && mounted) {
         setState(() => _phoneError = null);
       }
       return;
     }
+    
     _phoneDebounce?.cancel();
     _phoneDebounce = Timer(const Duration(milliseconds: 300), () async {
-      final input = value.trim();
-      if (input.isEmpty) {
-        if (mounted) {
-          setState(() => _phoneError = null);
-        }
-        return;
-      }
       final region = _country?.countryCode ?? _deviceRegionCode;
       final valid = await PhoneService.isValid(
         input,
@@ -1445,7 +1452,6 @@ class _NewSaleScreenState extends State<NewSaleScreen>
             customerContactController: _customerContactController,
             customerNameInvalid: _customerNameInvalid,
             customerContactInvalid: _customerContactInvalid,
-            useEmailForContact: _useEmailForContact,
             country: _country,
             phoneError: _phoneError,
             onPickCountry: () {
@@ -1461,14 +1467,6 @@ class _NewSaleScreenState extends State<NewSaleScreen>
                   _onContactChanged(_customerContactController.text);
                 },
               );
-            },
-            onToggleContactType: () {
-              setState(() {
-                _useEmailForContact = !_useEmailForContact;
-                _phoneError = null;
-                _customerContactTouched = true;
-              });
-              _onContactChanged(_customerContactController.text);
             },
             onCustomerNameChanged: (_) {
               if (!_customerNameTouched) {

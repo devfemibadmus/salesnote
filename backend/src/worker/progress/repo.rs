@@ -4,20 +4,21 @@ use sqlx::{PgPool, Row};
 use crate::worker::progress::message::TopItem;
 
 #[derive(Debug)]
-pub struct ShopToken {
+pub struct ShopTokens {
     pub id: i64,
-    pub fcm_token: String,
+    pub fcm_tokens: Vec<String>,
     pub timezone: String,
 }
 
-pub async fn fetch_shops_with_tokens(pool: &PgPool) -> Result<Vec<ShopToken>, sqlx::Error> {
+pub async fn fetch_shops_with_tokens(pool: &PgPool) -> Result<Vec<ShopTokens>, sqlx::Error> {
     let rows = sqlx::query(
-        "SELECT DISTINCT ds.shop_id as id, ds.fcm_token, s.timezone
+        "SELECT ds.shop_id as id, s.timezone, array_agg(DISTINCT ds.fcm_token) as fcm_tokens
          FROM device_sessions ds
          JOIN shops s ON s.id = ds.shop_id
          WHERE ds.deleted_at IS NULL
            AND ds.fcm_token IS NOT NULL
            AND ds.fcm_token <> ''
+         GROUP BY ds.shop_id, s.timezone
          ORDER BY ds.shop_id ASC",
     )
     .fetch_all(pool)
@@ -25,9 +26,9 @@ pub async fn fetch_shops_with_tokens(pool: &PgPool) -> Result<Vec<ShopToken>, sq
 
     Ok(rows
         .into_iter()
-        .map(|row| ShopToken {
+        .map(|row| ShopTokens {
             id: row.get("id"),
-            fcm_token: row.get("fcm_token"),
+            fcm_tokens: row.get("fcm_tokens"),
             timezone: row.get("timezone"),
         })
         .collect())

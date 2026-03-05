@@ -6,11 +6,9 @@ class _NewSaleDetailsStep extends StatelessWidget {
     required this.customerContactController,
     required this.customerNameInvalid,
     required this.customerContactInvalid,
-    required this.useEmailForContact,
     required this.country,
     required this.phoneError,
     required this.onPickCountry,
-    required this.onToggleContactType,
     required this.onCustomerNameChanged,
     required this.onCustomerContactChanged,
     required this.drafts,
@@ -36,11 +34,9 @@ class _NewSaleDetailsStep extends StatelessWidget {
   final TextEditingController customerContactController;
   final bool customerNameInvalid;
   final bool customerContactInvalid;
-  final bool useEmailForContact;
   final Country? country;
   final String? phoneError;
   final VoidCallback onPickCountry;
-  final VoidCallback onToggleContactType;
   final ValueChanged<String> onCustomerNameChanged;
   final ValueChanged<String> onCustomerContactChanged;
   final List<_DraftSlot> drafts;
@@ -137,153 +133,56 @@ class _NewSaleDetailsStep extends StatelessWidget {
                 const SizedBox(height: 14),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: useEmailForContact
-                      ? TextField(
-                          controller: customerContactController,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.done,
-                          inputFormatters: [
-                            LengthLimitingTextInputFormatter(50),
-                          ],
-                          onChanged: onCustomerContactChanged,
-                          decoration: InputDecoration(
-                            hintText: 'Customer Email',
-                            hintStyle: const TextStyle(
-                              color: Color(0xFF94A3B8),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 18,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(
-                                color: customerContactInvalid
-                                    ? const Color(0xFFEF4444)
-                                    : const Color(0xFFD6DFEB),
-                                width: customerContactInvalid ? 1.5 : 1,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(
-                                color: customerContactInvalid
-                                    ? const Color(0xFFEF4444)
-                                    : const Color(0xFFD6DFEB),
-                                width: customerContactInvalid ? 1.5 : 1,
-                              ),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide(
-                                color: customerContactInvalid
-                                    ? const Color(0xFFEF4444)
-                                    : const Color(0xFFD6DFEB),
-                                width: customerContactInvalid ? 1.5 : 1,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Row(
-                          children: [
-                            InkWell(
-                              borderRadius: BorderRadius.circular(16),
-                              onTap: onPickCountry,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 16,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: customerContactInvalid
-                                        ? const Color(0xFFEF4444)
-                                        : const Color(0xFFD6DFEB),
-                                    width: customerContactInvalid ? 1.5 : 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      country?.flagEmoji ?? '🇳🇬',
-                                      style: const TextStyle(fontSize: 18),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '+${country?.phoneCode ?? '234'}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF111827),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    const Icon(
-                                      Icons.keyboard_arrow_down,
-                                      size: 18,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: customerContactController,
-                                keyboardType: TextInputType.phone,
-                                textInputAction: TextInputAction.done,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                onChanged: onCustomerContactChanged,
-                                decoration: InputDecoration(
-                                  hintText: '8104156984',
-                                  hintStyle: const TextStyle(
-                                    color: Color(0xFF94A3B8),
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 18,
-                                  ),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(
-                                      color: customerContactInvalid
-                                          ? const Color(0xFFEF4444)
-                                          : const Color(0xFFD6DFEB),
-                                      width: customerContactInvalid ? 1.5 : 1,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(
-                                      color: customerContactInvalid
-                                          ? const Color(0xFFEF4444)
-                                          : const Color(0xFFD6DFEB),
-                                      width: customerContactInvalid ? 1.5 : 1,
-                                    ),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    borderSide: BorderSide(
-                                      color: customerContactInvalid
-                                          ? const Color(0xFFEF4444)
-                                          : const Color(0xFFD6DFEB),
-                                      width: customerContactInvalid ? 1.5 : 1,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                  child: TextField(
+                    controller: customerContactController,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.done,
+                    inputFormatters: [
+                      LengthLimitingTextInputFormatter(50),
+                    ],
+                    onChanged: onCustomerContactChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Enter Phone or Email',
+                      hintStyle: const TextStyle(
+                        color: Color(0xFF94A3B8),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 18,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: customerContactInvalid
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFFD6DFEB),
+                          width: customerContactInvalid ? 1.5 : 1,
                         ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: customerContactInvalid
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFFD6DFEB),
+                          width: customerContactInvalid ? 1.5 : 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(
+                          color: customerContactInvalid
+                              ? const Color(0xFFEF4444)
+                              : const Color(0xFFD6DFEB),
+                          width: customerContactInvalid ? 1.5 : 1,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                if (!useEmailForContact && phoneError != null) ...[
+                if (phoneError != null) ...[
                   const SizedBox(height: 6),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -296,25 +195,6 @@ class _NewSaleDetailsStep extends StatelessWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: 6),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: onToggleContactType,
-                      child: Text(
-                        useEmailForContact
-                            ? 'Use phone instead'
-                            : 'Use email instead',
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 24),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
