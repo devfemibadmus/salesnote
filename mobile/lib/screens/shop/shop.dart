@@ -174,9 +174,10 @@ class _ShopScreenState extends State<ShopScreen> {
         );
       } catch (e) {
         if (!mounted) return;
-        final message = e is ApiException
-            ? e.message
-            : 'Unable to update notification setting.';
+        final message = _caughtErrorMessage(
+          e,
+          fallback: 'Unable to update notification setting.',
+        );
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(message)));
@@ -217,9 +218,10 @@ class _ShopScreenState extends State<ShopScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      final message = e is ApiException
-          ? e.message
-          : 'Unable to update notification setting.';
+      final message = _caughtErrorMessage(
+        e,
+        fallback: 'Unable to update notification setting.',
+      );
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
@@ -237,6 +239,14 @@ class _ShopScreenState extends State<ShopScreen> {
         currentDevicePushEnabled: _pushEnabled,
       ),
     );
+  }
+
+  String _caughtErrorMessage(Object error, {required String fallback}) {
+    if (error is ApiException && error.message.trim().isNotEmpty) {
+      return error.message;
+    }
+    final raw = error.toString().trim();
+    return raw.isEmpty ? fallback : raw;
   }
 
   Future<void> _saveSignaturesCache() async {
