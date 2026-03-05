@@ -21,8 +21,8 @@ class _VerifyCodeState extends State<VerifyCode> {
   static const _textDark = Color(0xFF0F172A);
   static const _textMuted = Color(0xFF64748B);
 
-  final _controllers = List.generate(6, (_) => TextEditingController());
-  final _focusNodes = List.generate(6, (_) => FocusNode());
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
   final _api = ApiClient(TokenStore());
   Timer? _resendTimer;
   int _resendSeconds = 120;
@@ -33,29 +33,27 @@ class _VerifyCodeState extends State<VerifyCode> {
   void initState() {
     super.initState();
     _startResendTimer();
+    _controller.addListener(_onTextChanged);
+    _focusNode.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _resendTimer?.cancel();
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
+    _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   Future<void> _verify() async {
     if (_loading) return;
-    if (!_isComplete()) {
+    if (_controller.text.length != 6) {
       setState(() => _errorText = 'Enter the 6-digit code.');
       _showError('Enter the 6-digit code.');
       return;
     }
 
-    final code = _controllers.map((c) => c.text.trim()).join();
+    final code = _controller.text;
     try {
       FocusManager.instance.primaryFocus?.unfocus();
       setState(() {
@@ -96,41 +94,14 @@ class _VerifyCodeState extends State<VerifyCode> {
     }
   }
 
-  void _onChanged(int index, String value) {
-    if (value.length > 1) {
-      _applyPastedCode(value);
-      return;
-    }
-    if (value.length == 1 && index < _focusNodes.length - 1) {
-      _focusNodes[index + 1].requestFocus();
-    }
-    if (value.isEmpty && index > 0) {
-      _focusNodes[index - 1].requestFocus();
-    }
+  void _onTextChanged() {
     if (_errorText != null) {
       setState(() => _errorText = null);
     }
-    if (_isComplete()) {
+    setState(() {});
+    if (_controller.text.length == 6) {
       _verify();
     }
-  }
-
-  void _applyPastedCode(String raw) {
-    final digits = raw.replaceAll(RegExp(r'\D'), '');
-    if (digits.isEmpty) return;
-    for (var i = 0; i < _controllers.length; i++) {
-      _controllers[i].text = i < digits.length ? digits[i] : '';
-    }
-    if (digits.length >= _controllers.length) {
-      _focusNodes.last.unfocus();
-      _verify();
-    } else {
-      _focusNodes[digits.length].requestFocus();
-    }
-  }
-
-  bool _isComplete() {
-    return _controllers.every((c) => c.text.trim().isNotEmpty);
   }
 
   void _showError(String message) {
@@ -197,41 +168,73 @@ class _VerifyCodeState extends State<VerifyCode> {
               ),
               const SizedBox(height: 32),
               Center(
-                child: Wrap(
-                  spacing: 10,
-                  children: List.generate(6, (index) {
-                    return SizedBox(
-                      width: 48,
-                      child: TextField(
-                      controller: _controllers[index],
-                      focusNode: _focusNodes[index],
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      maxLength: null,
-                      maxLengthEnforcement: MaxLengthEnforcement.none,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      onChanged: (value) => _onChanged(index, value),
-                      decoration: InputDecoration(
-                        counterText: '',
-                        hintText: '-',
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 18),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 18),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                child: SizedBox(
+                  height: 60,
+                  width: 338,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(6, (index) {
+                          final text = _controller.text;
+                          final hasDigit = index < text.length;
+                          final isFocused = _focusNode.hasFocus &&
+                              (index == text.length ||
+                                  (index == 5 && text.length == 6));
+
+                          return Container(
+                            width: 48,
+                            height: 60,
+                            margin: EdgeInsets.only(right: index < 5 ? 10 : 0),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isFocused ? _primary : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            child: Text(
+                              hasDigit ? text[index] : '-',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w600,
+                                color:
+                                    hasDigit
+                                        ? _textDark
+                                        : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                      Positioned.fill(
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          maxLength: 6,
+                          autofocus: true,
+                          showCursor: false,
+                          enableInteractiveSelection: false,
+                          style: const TextStyle(
+                            color: Colors.transparent,
+                            fontSize: 1,
+                          ),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            counterText: '',
+                            filled: false,
+                          ),
                         ),
                       ),
-                      ),
-                    );
-                  }),
+                    ],
+                  ),
                 ),
               ),
               if (_errorText != null) ...[
