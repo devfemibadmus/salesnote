@@ -167,18 +167,7 @@ class _SigninState extends State<Signin> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
-              const Center(
-                child: Text(
-                  'Sales Note',
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0E1930),
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ),
+
               const SizedBox(height: 36),
               TextField(
                 controller: _loginId,
