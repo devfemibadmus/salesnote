@@ -33,28 +33,36 @@ class _ItemsSearchField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE5EAF1)),
       ),
-      child: TextField(
-        controller: controller,
-        readOnly: readOnly,
-        style: const TextStyle(fontSize: 17, color: Color(0xFF334155)),
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.fromLTRB(10, 14, 10, 12),
-          prefixIcon: Icon(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Icon(
             Icons.search_rounded,
             color: Color(0xFF94A3B8),
-            size: 34,
+            size: 26,
           ),
-          prefixIconConstraints: BoxConstraints(minWidth: 54, minHeight: 34),
-          hintText: 'Search by item name',
-          hintStyle: TextStyle(fontSize: 17, color: Color(0xFF94A3B8)),
-        ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              readOnly: readOnly,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(fontSize: 17, color: Color(0xFF334155)),
+              decoration: const InputDecoration(
+                isCollapsed: true,
+                border: InputBorder.none,
+                hintText: 'Search by item name',
+                hintStyle: TextStyle(fontSize: 17, color: Color(0xFF94A3B8)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

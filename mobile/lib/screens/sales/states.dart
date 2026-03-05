@@ -153,7 +153,7 @@ class _SalesMainState extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 _SalesSearchField(controller: queryController),
-                const SizedBox(height: 20),
+                const SizedBox(height: 10),
               ],
             ),
           ),
