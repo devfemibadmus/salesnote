@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:country_picker/country_picker.dart';
@@ -67,12 +66,16 @@ class _ShopScreenState extends State<ShopScreen> {
     final cachedSignatures = CacheLoader.loadSignaturesCache();
     if (settings != null) {
       final packageInfo = await PackageInfo.fromPlatform();
+      final permissionGranted =
+          await NotificationService.hasGrantedPermission();
+      final pushEnabled =
+          settings.currentDevicePushEnabled && permissionGranted;
       if (!mounted) return;
       setState(() {
         _shop = settings.shop;
         _devices = settings.devices;
         _signatures = cachedSignatures;
-        _pushEnabled = settings.currentDevicePushEnabled;
+        _pushEnabled = pushEnabled;
         _appVersion = packageInfo.version;
         _loading = false;
         _error = null;
@@ -97,10 +100,15 @@ class _ShopScreenState extends State<ShopScreen> {
       if (!mounted) return;
       final settings = results[0] as SettingsSummary;
       final packageInfo = results[1] as PackageInfo;
+      final permissionGranted =
+          await NotificationService.hasGrantedPermission();
+      final pushEnabled =
+          settings.currentDevicePushEnabled && permissionGranted;
+      if (!mounted) return;
       setState(() {
         _shop = settings.shop;
         _devices = settings.devices;
-        _pushEnabled = settings.currentDevicePushEnabled;
+        _pushEnabled = pushEnabled;
         _appVersion = packageInfo.version;
         _error = null;
         _loading = false;
@@ -125,10 +133,15 @@ class _ShopScreenState extends State<ShopScreen> {
       if (!mounted) return;
       final settings = results[0] as SettingsSummary;
       final packageInfo = results[1] as PackageInfo;
+      final permissionGranted =
+          await NotificationService.hasGrantedPermission();
+      final pushEnabled =
+          settings.currentDevicePushEnabled && permissionGranted;
+      if (!mounted) return;
       setState(() {
         _shop = settings.shop;
         _devices = settings.devices;
-        _pushEnabled = settings.currentDevicePushEnabled;
+        _pushEnabled = pushEnabled;
         _appVersion = packageInfo.version;
       });
       unawaited(_loadSignaturesInBackground(refresh: true));
@@ -173,17 +186,8 @@ class _ShopScreenState extends State<ShopScreen> {
       return;
     }
 
-    final allow = await NotificationService.showPermissionPrompt(context);
-    if (!allow || !mounted) {
-      return;
-    }
-
-    await NotificationService.init();
-    final status = await NotificationService.requestPermission();
+    final granted = await NotificationService.ensurePermissionEnabled(context);
     if (!mounted) return;
-    final granted =
-        status == AuthorizationStatus.authorized ||
-        status == AuthorizationStatus.provisional;
     if (!granted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -240,15 +244,12 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   Future<bool> _subscribeCurrentDeviceFcm() async {
-    for (var i = 0; i < 3; i++) {
-      final token = await NotificationService.getDeviceToken();
-      if (token != null && token.trim().isNotEmpty) {
-        await _api.subscribeFcm(token);
-        return true;
-      }
-      await Future.delayed(const Duration(milliseconds: 450));
+    final token = await NotificationService.getDeviceTokenWithRetry();
+    if (token == null || token.trim().isEmpty) {
+      return false;
     }
-    return false;
+    await _api.subscribeFcm(token);
+    return true;
   }
 
   Future<void> _removeDevice(DeviceSession device) async {

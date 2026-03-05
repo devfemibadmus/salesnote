@@ -77,9 +77,9 @@ class NotificationService {
       '@mipmap/ic_launcher',
     );
     const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
     );
     const settings = InitializationSettings(
       android: androidSettings,
@@ -142,9 +142,54 @@ class NotificationService {
     return settings.authorizationStatus;
   }
 
+  static Future<bool> hasGrantedPermission() async {
+    final status = await getPermissionStatus();
+    return isPermissionGranted(status);
+  }
+
+  static bool isPermissionGranted(AuthorizationStatus status) {
+    return status == AuthorizationStatus.authorized ||
+        status == AuthorizationStatus.provisional;
+  }
+
+  static Future<bool> ensurePermissionEnabled(BuildContext context) async {
+    await init();
+    var status = await getPermissionStatus();
+    if (isPermissionGranted(status)) {
+      return true;
+    }
+
+    if (!context.mounted) {
+      return false;
+    }
+    final allow = await showPermissionPrompt(context);
+    if (!allow) {
+      return false;
+    }
+
+    status = await requestPermission();
+    return isPermissionGranted(status);
+  }
+
   static Future<String?> getDeviceToken() async {
     final token = await FirebaseMessaging.instance.getToken();
     return token;
+  }
+
+  static Future<String?> getDeviceTokenWithRetry({
+    int attempts = 3,
+    Duration delay = const Duration(milliseconds: 450),
+  }) async {
+    for (var i = 0; i < attempts; i++) {
+      final token = await getDeviceToken();
+      if (token != null && token.trim().isNotEmpty) {
+        return token;
+      }
+      if (i < attempts - 1) {
+        await Future.delayed(delay);
+      }
+    }
+    return null;
   }
 
   static Future<void> clearLocalState() async {
