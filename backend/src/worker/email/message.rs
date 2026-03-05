@@ -70,9 +70,68 @@ pub fn build_welcome(data: WelcomeData) -> EmailMessage {
 }
 
 fn load_template(filename: &str) -> Option<String> {
-    let base = env!("CARGO_MANIFEST_DIR");
-    let path = format!("{}/src/worker/email/templates/{}", base, filename);
-    std::fs::read_to_string(path).ok()
+    for path in template_candidates(filename) {
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            return Some(content);
+        }
+    }
+
+    embedded_template(filename).map(ToString::to_string)
+}
+
+fn template_candidates(filename: &str) -> Vec<std::path::PathBuf> {
+    let mut out = Vec::new();
+
+    if let Some(dir) = std::env::var("SALESNOTE__EMAIL_TEMPLATES_DIR")
+        .ok()
+        .or_else(|| std::env::var("EMAIL_TEMPLATES_DIR").ok())
+    {
+        let dir = dir.trim();
+        if !dir.is_empty() {
+            out.push(std::path::PathBuf::from(dir).join(filename));
+        }
+    }
+
+    if let Ok(cwd) = std::env::current_dir() {
+        out.push(cwd.join("templates").join("email").join(filename));
+        out.push(
+            cwd.join("src")
+                .join("worker")
+                .join("email")
+                .join("templates")
+                .join(filename),
+        );
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            out.push(parent.join("templates").join("email").join(filename));
+            if let Some(grand_parent) = parent.parent() {
+                out.push(grand_parent.join("templates").join("email").join(filename));
+            }
+        }
+    }
+
+    out.push(std::path::PathBuf::from("/home/salesnote/api/templates/email").join(filename));
+    out.push(std::path::PathBuf::from("/home/salesnote/worker/templates/email").join(filename));
+    out.push(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("src")
+            .join("worker")
+            .join("email")
+            .join("templates")
+            .join(filename),
+    );
+
+    out
+}
+
+fn embedded_template(filename: &str) -> Option<&'static str> {
+    match filename {
+        "password-reset.html" => Some(include_str!("templates/password-reset.html")),
+        "welcome.html" => Some(include_str!("templates/welcome.html")),
+        _ => None,
+    }
 }
 
 fn render_code_boxes(code: &str) -> String {

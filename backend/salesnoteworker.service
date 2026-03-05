@@ -5,6 +5,7 @@ After=network.target
 [Service]
 Type=simple
 EnvironmentFile=/home/salesnote/worker/.env
+Environment=SALESNOTE__EMAIL_TEMPLATES_DIR=/home/salesnote/api/templates/email
 WorkingDirectory=/home/salesnote/worker
 ExecStart=/home/salesnote/worker/worker
 Restart=always
