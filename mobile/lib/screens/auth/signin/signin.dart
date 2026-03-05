@@ -133,9 +133,13 @@ class _SigninState extends State<Signin> {
         child: SafeArea(
           child: AbsorbPointer(
             absorbing: _loading,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
-              children: [
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
               const SizedBox(height: 8),
               Center(
                 child: Container(
@@ -300,7 +304,9 @@ class _SigninState extends State<Signin> {
                   ),
                 ],
               ),
-              ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
