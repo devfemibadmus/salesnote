@@ -24,6 +24,8 @@ class _ResetPasswordState extends State<ResetPassword> {
 
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+  final _passwordFocus = FocusNode();
+  final _confirmFocus = FocusNode();
   final _api = ApiClient(TokenStore());
   bool _showPassword = false;
   bool _showConfirm = false;
@@ -32,9 +34,18 @@ class _ResetPasswordState extends State<ResetPassword> {
   String? _confirmError;
 
   @override
+  void initState() {
+    super.initState();
+    _passwordFocus.addListener(() => setState(() {}));
+    _confirmFocus.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
     _password.dispose();
     _confirm.dispose();
+    _passwordFocus.dispose();
+    _confirmFocus.dispose();
     super.dispose();
   }
 
@@ -95,130 +106,126 @@ class _ResetPasswordState extends State<ResetPassword> {
         behavior: HitTestBehavior.translucent,
         onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
         child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-            children: [
-              const SizedBox(height: 8),
-              const Center(
-                child: Text(
-                  'Salesnote',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: _primary,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Center(
-                child: Text(
-                  'Reset Password',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: _textDark,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 28),
-              const Text(
-                'New Password',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: _textMuted,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _password,
-                enabled: !_loading,
-                obscureText: !_showPassword,
-                onChanged: (_) {
-                  if (_passwordError != null) {
-                    setState(() => _passwordError = null);
-                  }
-                },
-                decoration: InputDecoration(
-                  hintText: '• • • • • • • •',
-                  hintStyle: const TextStyle(color: Color(0xFFCBD5F5)),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  suffixIcon: IconButton(
-                    onPressed: () => setState(() => _showPassword = !_showPassword),
-                    icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
-                  ),
-                  errorText: _passwordError,
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Confirm New Password',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: _textMuted,
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _confirm,
-                enabled: !_loading,
-                obscureText: !_showConfirm,
-                onChanged: (_) {
-                  if (_confirmError != null) {
-                    setState(() => _confirmError = null);
-                  }
-                },
-                decoration: InputDecoration(
-                  hintText: '• • • • • • • •',
-                  hintStyle: const TextStyle(color: Color(0xFFCBD5F5)),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  suffixIcon: IconButton(
-                    onPressed: () => setState(() => _showConfirm = !_showConfirm),
-                    icon: Icon(_showConfirm ? Icons.visibility_off : Icons.visibility),
-                  ),
-                  errorText: _confirmError,
-                ),
-              ),
-              const SizedBox(height: 28),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 8),
+                  const Center(
+                    child: Text(
+                      'Salesnote',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: _primary,
+                      ),
                     ),
                   ),
-                  onPressed: _loading ? null : _reset,
-                  child: Text(
-                    _loading ? 'Please wait...' : 'Reset password',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  const SizedBox(height: 8),
+                  const Center(
+                    child: Text(
+                      'Reset Password',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        color: _textDark,
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 36),
+                  TextField(
+                    controller: _password,
+                    focusNode: _passwordFocus,
+                    enabled: !_loading,
+                    obscureText: !_showPassword,
+                    onChanged: (_) {
+                      if (_passwordError != null) {
+                        setState(() => _passwordError = null);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'New Password',
+                      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      suffixIcon: _passwordFocus.hasFocus
+                          ? IconButton(
+                              onPressed: () => setState(() => _showPassword = !_showPassword),
+                              icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
+                            )
+                          : null,
+                      errorText: _passwordError,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _confirm,
+                    focusNode: _confirmFocus,
+                    enabled: !_loading,
+                    obscureText: !_showConfirm,
+                    onChanged: (_) {
+                      if (_confirmError != null) {
+                        setState(() => _confirmError = null);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      hintText: 'Confirm Password',
+                      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      suffixIcon: _confirmFocus.hasFocus
+                          ? IconButton(
+                              onPressed: () => setState(() => _showConfirm = !_showConfirm),
+                              icon: Icon(_showConfirm ? Icons.visibility_off : Icons.visibility),
+                            )
+                          : null,
+                      errorText: _confirmError,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _primary,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      onPressed: _loading ? null : _reset,
+                      child: Text(
+                        _loading ? 'Please wait...' : 'Reset password',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const SizedBox(height: 2),
+                ],
               ),
-              const SizedBox(height: 18),
-              const SizedBox(height: 2),
-            ],
+            ),
           ),
         ),
       ),
