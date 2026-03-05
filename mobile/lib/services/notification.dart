@@ -1,5 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app/navigator.dart';
@@ -172,24 +173,69 @@ class NotificationService {
   }
 
   static Future<String?> getDeviceToken() async {
-    final token = await FirebaseMessaging.instance.getToken();
-    return token;
+    await FirebaseMessaging.instance.setAutoInitEnabled(true);
+    final apnsReady = await _waitForApnsTokenIfNeeded();
+    if (!apnsReady) return null;
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      return token;
+    } catch (e) {
+      if (_isApnsNotReadyError(e)) return null;
+      rethrow;
+    }
   }
 
   static Future<String?> getDeviceTokenWithRetry({
-    int attempts = 3,
-    Duration delay = const Duration(milliseconds: 450),
+    int attempts = 8,
+    Duration delay = const Duration(seconds: 1),
   }) async {
+    Object? lastError;
     for (var i = 0; i < attempts; i++) {
-      final token = await getDeviceToken();
-      if (token != null && token.trim().isNotEmpty) {
-        return token;
+      try {
+        final token = await getDeviceToken();
+        if (token != null && token.trim().isNotEmpty) {
+          return token;
+        }
+      } catch (e) {
+        lastError = e;
+        if (kDebugMode) {
+          debugPrint('FCM token attempt ${i + 1}/$attempts failed: $e');
+        }
       }
       if (i < attempts - 1) {
         await Future.delayed(delay);
       }
     }
+    if (lastError != null && !_isApnsNotReadyError(lastError)) {
+      throw lastError;
+    }
     return null;
+  }
+
+  /// Returns true if the APNS token is available (or not needed).
+  static Future<bool> _waitForApnsTokenIfNeeded() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return true;
+    for (var i = 0; i < 20; i++) {
+      try {
+        final apns = await FirebaseMessaging.instance.getAPNSToken();
+        if (apns != null && apns.trim().isNotEmpty) return true;
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('APNS token check #${i + 1} error: $e');
+        }
+      }
+      if (i < 19) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+    }
+    if (kDebugMode) {
+      debugPrint('APNS token was not received after 10 s — skipping FCM token');
+    }
+    return false;
+  }
+
+  static bool _isApnsNotReadyError(Object error) {
+    return error.toString().toLowerCase().contains('apns-token-not-set');
   }
 
   static Future<void> clearLocalState() async {
