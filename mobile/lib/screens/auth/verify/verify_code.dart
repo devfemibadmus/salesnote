@@ -33,7 +33,6 @@ class _VerifyCodeState extends State<VerifyCode> {
   void initState() {
     super.initState();
     _startResendTimer();
-    _controller.addListener(_onTextChanged);
     _focusNode.addListener(() => setState(() {}));
   }
 
@@ -94,12 +93,12 @@ class _VerifyCodeState extends State<VerifyCode> {
     }
   }
 
-  void _onTextChanged() {
+  void _onTextChanged(String value) {
     if (_errorText != null) {
       setState(() => _errorText = null);
     }
     setState(() {});
-    if (_controller.text.length == 6) {
+    if (value.length == 6) {
       _verify();
     }
   }
@@ -222,6 +221,7 @@ class _VerifyCodeState extends State<VerifyCode> {
                           autofocus: true,
                           showCursor: false,
                           enableInteractiveSelection: false,
+                          onChanged: _onTextChanged,
                           style: const TextStyle(
                             color: Colors.transparent,
                             fontSize: 1,
