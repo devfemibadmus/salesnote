@@ -47,9 +47,9 @@ jobs:
             - name: Stop worker service before upload
               uses: appleboy/ssh-action@master
               with:
-                  host: ${{ secrets.WORKER_SSH_HOST }}
-                  username: ${{ secrets.WORKER_SSH_USER }}
-                  key: ${{ secrets.WORKER_SSH_KEY }}
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
                   script: |
                       sudo systemctl stop salesnoteworker || true
                       mkdir -p /home/salesnote/worker
@@ -57,9 +57,9 @@ jobs:
             - name: Upload worker binary
               uses: appleboy/scp-action@master
               with:
-                  host: ${{ secrets.WORKER_SSH_HOST }}
-                  username: ${{ secrets.WORKER_SSH_USER }}
-                  key: ${{ secrets.WORKER_SSH_KEY }}
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
                   source: "backend/target/release/worker"
                   target: "/home/salesnote/worker/"
                   overwrite: true
@@ -67,9 +67,9 @@ jobs:
             - name: Upload worker assets
               uses: appleboy/scp-action@master
               with:
-                  host: ${{ secrets.WORKER_SSH_HOST }}
-                  username: ${{ secrets.WORKER_SSH_USER }}
-                  key: ${{ secrets.WORKER_SSH_KEY }}
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
                   source: |
                       backend/.env
                       backend/firebase-adminsdk.json
@@ -80,9 +80,9 @@ jobs:
             - name: Register and start worker
               uses: appleboy/ssh-action@master
               with:
-                  host: ${{ secrets.WORKER_SSH_HOST }}
-                  username: ${{ secrets.WORKER_SSH_USER }}
-                  key: ${{ secrets.WORKER_SSH_KEY }}
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
                   script: |
                       chmod +x "/home/salesnote/worker/worker"
                       if [ ! -f /etc/systemd/system/salesnoteworker.service ]; then
