@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:country_picker/country_picker.dart';
 
 import '../../../services/api_client.dart';
 import '../../../services/phone.dart';
@@ -24,21 +23,14 @@ class _ForgotPasswordState extends State<ForgotPassword> {
   static const _textMuted = Color(0xFF64748B);
 
   final _phoneOrEmail = TextEditingController();
-  final _email = TextEditingController();
-  Country? _country;
   late final String _deviceRegionCode;
-  bool _useEmail = true;
   String? _errorText;
-  String? _phoneError;
-  Timer? _phoneDebounce;
   final _api = ApiClient(TokenStore());
   bool _loading = false;
 
   @override
   void dispose() {
-    _phoneDebounce?.cancel();
     _phoneOrEmail.dispose();
-    _email.dispose();
     super.dispose();
   }
 
@@ -46,83 +38,50 @@ class _ForgotPasswordState extends State<ForgotPassword> {
   void initState() {
     super.initState();
     _deviceRegionCode = RegionService.getDeviceRegionCode();
-    _initCountry();
-  }
-
-  void _initCountry() {
-    try {
-      _country = CountryParser.parseCountryCode(_deviceRegionCode);
-    } catch (_) {
-      _country = CountryParser.parseCountryCode('NG');
-    }
-  }
-
-  void _onPhoneChanged(String value) {
-    _phoneDebounce?.cancel();
-    _phoneDebounce = Timer(const Duration(milliseconds: 300), () async {
-      final input = value.trim();
-      if (input.isEmpty) {
-        if (mounted) setState(() => _phoneError = null);
-        return;
-      }
-      final region = _country?.countryCode ?? _deviceRegionCode;
-      final valid = await PhoneService.isValid(
-        input,
-        region,
-        countryPhoneCode: _country?.phoneCode,
-      );
-      if (!mounted) return;
-      setState(() {
-        _phoneError = valid ? null : 'Enter a valid phone number.';
-      });
-      if (valid) {
-        FocusManager.instance.primaryFocus?.unfocus();
-      }
-    });
   }
 
   Future<void> _next() async {
-    String phoneOrEmail;
-    if (_useEmail) {
-      final input = _email.text.trim();
+    final input = _phoneOrEmail.text.trim();
+    if (input.isEmpty) {
+      setState(() => _errorText = 'Enter your phone or email.');
+      _showError('Enter your phone or email.');
+      return;
+    }
+
+    String phoneOrEmailValue;
+    final isEmail = input.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(input);
+
+    if (isEmail) {
       if (!Validators.isValidEmail(input)) {
         setState(() => _errorText = 'Enter a valid email.');
         _showError('Enter a valid email.');
         return;
       }
-      phoneOrEmail = input.toLowerCase();
+      phoneOrEmailValue = input.toLowerCase();
     } else {
-      final input = _phoneOrEmail.text.trim();
-      if (input.isEmpty) {
-        setState(() => _phoneError = 'Enter a phone number.');
-        _showError('Enter a phone number.');
-        return;
-      }
-      final region = _country?.countryCode ?? _deviceRegionCode;
       final normalized = await PhoneService.normalizeE164(
         input,
-        region,
-        countryPhoneCode: _country?.phoneCode,
+        _deviceRegionCode,
       );
       if (normalized == null) {
-        setState(() => _phoneError = 'Enter a valid phone number.');
+        setState(() => _errorText = 'Enter a valid phone number.');
         _showError('Enter a valid phone number.');
         return;
       }
-      phoneOrEmail = normalized;
+      phoneOrEmailValue = normalized;
     }
     setState(() => _errorText = null);
 
     try {
       FocusManager.instance.primaryFocus?.unfocus();
       setState(() => _loading = true);
-      await _api.forgotPassword(phoneOrEmail);
+      await _api.forgotPassword(phoneOrEmailValue);
       if (!mounted) return;
       Navigator.of(
         context,
       ).push(
         MaterialPageRoute(
-          builder: (_) => VerifyCode(phoneOrEmail: phoneOrEmail),
+          builder: (_) => VerifyCode(phoneOrEmail: phoneOrEmailValue),
         ),
       );
     } catch (e) {
@@ -173,7 +132,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Enter your phone or email to receive a reset code.',
+                  'Your code may be sent to your email or whatsapp or phone',
                   style: TextStyle(
                     fontSize: 18,
                     color: _textMuted,
@@ -181,151 +140,33 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                   ),
                 ),
                 const SizedBox(height: 28),
-                const Text(
-                  'Phone or Email',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: _textMuted,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if (_useEmail)
-                  TextField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    enabled: !_loading,
-                    onChanged: (_) {
-                      if (_errorText != null) {
-                        setState(() => _errorText = null);
-                      }
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'name@email.com',
-                      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 18,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      errorText: _errorText,
+                TextField(
+                  controller: _phoneOrEmail,
+                  keyboardType: TextInputType.emailAddress,
+                  enabled: !_loading,
+                  onChanged: (_) {
+                    if (_errorText != null) {
+                      setState(() => _errorText = null);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Enter Phone or Email',
+                    hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 18,
                     ),
-                  )
-                else
-                  Row(
-                    children: [
-                      InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () {
-                          showCountryPicker(
-                            context: context,
-                            showPhoneCode: true,
-                            onSelect: (value) async {
-                              setState(() => _country = value);
-                            },
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                _country?.flagEmoji ?? '🇳🇬',
-                                style: const TextStyle(fontSize: 18),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '+${_country?.phoneCode ?? '234'}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF111827),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              const Icon(Icons.keyboard_arrow_down, size: 18),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _phoneOrEmail,
-                          keyboardType: TextInputType.phone,
-                          enabled: !_loading,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          onChanged: (_) {
-                            if (_errorText != null) {
-                              setState(() => _errorText = null);
-                            }
-                            _onPhoneChanged(_phoneOrEmail.text);
-                          },
-                          decoration: InputDecoration(
-                            hintText: '8104156984',
-                            hintStyle: const TextStyle(
-                              color: Color(0xFF94A3B8),
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 18,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                if (!_useEmail && _phoneError != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    _phoneError!,
-                    style: const TextStyle(
-                      color: Color(0xFFDC2626),
-                      fontSize: 12,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => setState(() {
-                      _useEmail = !_useEmail;
-                      _errorText = null;
-                    }),
-                    child: Text(
-                      _useEmail ? 'Use phone instead' : 'Use email instead',
-                      style: const TextStyle(
-                        color: _textMuted,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
                     ),
+                    errorText: _errorText,
                   ),
                 ),
                 const SizedBox(height: 24),
