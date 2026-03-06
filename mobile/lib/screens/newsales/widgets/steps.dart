@@ -133,53 +133,14 @@ class _NewSaleDetailsStep extends StatelessWidget {
                 const SizedBox(height: 14),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: TextField(
+                  child: _InputBox(
                     controller: customerContactController,
+                    hint: 'Enter Phone or Email',
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.done,
-                    inputFormatters: [
-                      LengthLimitingTextInputFormatter(50),
-                    ],
+                    isInvalid: customerContactInvalid,
+                    inputFormatters: [LengthLimitingTextInputFormatter(50)],
                     onChanged: onCustomerContactChanged,
-                    decoration: InputDecoration(
-                      hintText: 'Enter Phone or Email',
-                      hintStyle: const TextStyle(
-                        color: Color(0xFF94A3B8),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 18,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: customerContactInvalid
-                              ? const Color(0xFFEF4444)
-                              : const Color(0xFFD6DFEB),
-                          width: customerContactInvalid ? 1.5 : 1,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: customerContactInvalid
-                              ? const Color(0xFFEF4444)
-                              : const Color(0xFFD6DFEB),
-                          width: customerContactInvalid ? 1.5 : 1,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: customerContactInvalid
-                              ? const Color(0xFFEF4444)
-                              : const Color(0xFFD6DFEB),
-                          width: customerContactInvalid ? 1.5 : 1,
-                        ),
-                      ),
-                    ),
                   ),
                 ),
                 if (phoneError != null) ...[
