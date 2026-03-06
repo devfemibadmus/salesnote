@@ -158,12 +158,16 @@ class CacheLoader {
     required int page,
     required int perPage,
     String? searchQuery,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     final sales = await api.listSales(
       page: page,
       perPage: perPage,
       includeItems: includeItems,
       searchQuery: searchQuery,
+      startDate: startDate,
+      endDate: endDate,
     );
     final pageData = CachedSalesPage(
       sales: sales,
