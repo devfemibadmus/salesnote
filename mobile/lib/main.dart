@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -17,6 +18,14 @@ Future<void> main() async {
   await Firebase.initializeApp();
   await Hive.initFlutter();
   await LocalCache.init();
+  
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    systemNavigationBarColor: Colors.white,
+    systemNavigationBarIconBrightness: Brightness.dark,
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+  ));
+
   runApp(const SalesNoteApp());
 }
 
@@ -31,9 +40,17 @@ class SalesNoteApp extends StatelessWidget {
       theme: AppTheme.light(),
       builder: (context, child) {
         final mediaQuery = MediaQuery.of(context);
-        return MediaQuery(
-          data: mediaQuery.copyWith(boldText: false),
-          child: child ?? const SizedBox.shrink(),
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+            systemNavigationBarColor: Colors.white,
+            systemNavigationBarIconBrightness: Brightness.dark,
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark,
+          ),
+          child: MediaQuery(
+            data: mediaQuery.copyWith(boldText: false),
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
       onGenerateRoute: AppRouter.onGenerateRoute,
