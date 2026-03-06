@@ -30,9 +30,8 @@ class _SigninState extends State<Signin> {
 
   bool _loading = false;
   bool _showPassword = false;
-  bool _useEmail = false;
   late final String _deviceRegionCode;
-  
+
   final _passwordFocusNode = FocusNode();
 
   @override
@@ -51,7 +50,6 @@ class _SigninState extends State<Signin> {
       setState(() {});
     });
   }
-
 
   Future<void> _login() async {
     final input = _loginId.text.trim();
@@ -83,8 +81,10 @@ class _SigninState extends State<Signin> {
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _loading = true);
     try {
-      final device = await DeviceInfoService.getDeviceInfo()
-          .timeout(const Duration(seconds: 2), onTimeout: () => DeviceInfoData());
+      final device = await DeviceInfoService.getDeviceInfo().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => DeviceInfoData(),
+      );
       final auth = await _api.login(
         loginValue,
         _password.text.trim(),
@@ -109,19 +109,13 @@ class _SigninState extends State<Signin> {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _errorMessage(Object error) {
     if (error is ApiException) return error.message;
     return error.toString();
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -135,164 +129,174 @@ class _SigninState extends State<Signin> {
             absorbing: _loading,
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 24,
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-              const SizedBox(height: 8),
-              Center(
-                child: Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF007AFF), Color(0xFF0055CC)],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x33007AFF),
-                        blurRadius: 20,
-                        offset: Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.receipt_long_rounded,
-                    color: Colors.white,
-                    size: 42,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 70),
-              TextField(
-                controller: _loginId,
-                keyboardType: TextInputType.emailAddress,
-                enabled: !_loading,
-                decoration: InputDecoration(
-                  hintText: 'Enter Phone or Email',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 18,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _password,
-                focusNode: _passwordFocusNode,
-                obscureText: !_showPassword,
-                enabled: !_loading,
-                decoration: InputDecoration(
-                  hintText: 'Password',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                  filled: true,
-                  fillColor: Colors.white,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 18,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  suffixIcon: _passwordFocusNode.hasFocus ? IconButton(
-                    onPressed: () =>
-                        setState(() => _showPassword = !_showPassword),
-                    icon: Icon(
-                      _showPassword ? Icons.visibility_off : Icons.visibility,
-                    ),
-                  ) : null,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _loading
-                      ? null
-                      : () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ForgotPassword(),
+                    const SizedBox(height: 8),
+                    Center(
+                      child: Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF007AFF), Color(0xFF0055CC)],
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x33007AFF),
+                              blurRadius: 20,
+                              offset: Offset(0, 8),
                             ),
-                          );
-                        },
-                  child: const Text(
-                    'Forgot Password?',
-                    style: TextStyle(
-                      color: _textMuted,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
-                  onPressed: _loading ? null : _login,
-                  child: Text(
-                    _loading ? 'Please wait...' : 'Sign In',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    "Don't have a shop? ",
-                    style: TextStyle(color: _textMuted),
-                  ),
-                  GestureDetector(
-                    onTap: _loading
-                        ? null
-                        : () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const Signup()),
-                            );
-                          },
-                    child: const Text(
-                      'Create a shop',
-                      style: TextStyle(
-                        color: _textMuted,
-                        fontWeight: FontWeight.w700,
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.receipt_long_rounded,
+                          color: Colors.white,
+                          size: 42,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+
+                    const SizedBox(height: 70),
+                    TextField(
+                      controller: _loginId,
+                      keyboardType: TextInputType.emailAddress,
+                      enabled: !_loading,
+                      decoration: InputDecoration(
+                        hintText: 'Enter Phone or Email',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 18,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _password,
+                      focusNode: _passwordFocusNode,
+                      obscureText: !_showPassword,
+                      enabled: !_loading,
+                      decoration: InputDecoration(
+                        hintText: 'Password',
+                        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 18,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        suffixIcon: _passwordFocusNode.hasFocus
+                            ? IconButton(
+                                onPressed: () => setState(
+                                  () => _showPassword = !_showPassword,
+                                ),
+                                icon: Icon(
+                                  _showPassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _loading
+                            ? null
+                            : () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const ForgotPassword(),
+                                  ),
+                                );
+                              },
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            color: _textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _primary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                        ),
+                        onPressed: _loading ? null : _login,
+                        child: Text(
+                          _loading ? 'Please wait...' : 'Sign In',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Don't have a shop? ",
+                          style: TextStyle(color: _textMuted),
+                        ),
+                        GestureDetector(
+                          onTap: _loading
+                              ? null
+                              : () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const Signup(),
+                                    ),
+                                  );
+                                },
+                          child: const Text(
+                            'Create a shop',
+                            style: TextStyle(
+                              color: _textMuted,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

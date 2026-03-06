@@ -1,6 +1,6 @@
 use actix_web::web::ReqData;
 use actix_web::{http::StatusCode, web, HttpRequest, Responder};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::Deserialize;
 
 use crate::api::handlers::auth;
@@ -8,10 +8,10 @@ use crate::api::middlewares::auth::AuthDeviceId;
 use crate::api::response::{json_created, json_empty, json_error, json_ok};
 use crate::api::state::AppState;
 use crate::models::{
-    AuthorizedSaleCreatePayload, AuthorizedSaleCreateResult,
-    AuthorizedSaleDeletePayload, AuthorizedSaleDeleteResult, AuthorizedSaleGetPayload,
-    AuthorizedSaleGetResult, AuthorizedSaleListPayload, AuthorizedSaleListResult,
-    AuthorizedSaleUpdatePayload, AuthorizedSaleUpdateResult, Sale, SaleInput, SaleUpdateInput,
+    AuthorizedSaleCreatePayload, AuthorizedSaleCreateResult, AuthorizedSaleDeletePayload,
+    AuthorizedSaleDeleteResult, AuthorizedSaleGetPayload, AuthorizedSaleGetResult,
+    AuthorizedSaleListPayload, AuthorizedSaleListResult, AuthorizedSaleUpdatePayload,
+    AuthorizedSaleUpdateResult, Sale, SaleInput, SaleUpdateInput,
 };
 
 const MAX_ITEM_NAME_CHARS: usize = 20;
@@ -156,16 +156,14 @@ pub async fn list_sales(
         }
     });
 
-    let start_date = query.start_date.as_deref().and_then(|s| {
-        NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
-            .and_then(|d| d.and_hms_opt(0, 0, 0))
-            .map(|dt| Utc.from_local_datetime(&dt).unwrap())
-    });
-    let end_date = query.end_date.as_deref().and_then(|s| {
-        NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
-            .and_then(|d| d.and_hms_opt(23, 59, 59))
-            .map(|dt| Utc.from_local_datetime(&dt).unwrap())
-    });
+    let start_date = query
+        .start_date
+        .as_deref()
+        .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
+    let end_date = query
+        .end_date
+        .as_deref()
+        .and_then(|s| NaiveDate::parse_from_str(s, "%Y-%m-%d").ok());
 
     match Sale::list_authorized_paged(
         &state.pool,

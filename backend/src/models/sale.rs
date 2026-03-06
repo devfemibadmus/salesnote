@@ -123,8 +123,8 @@ pub struct AuthorizedSaleListPayload {
     pub per_page: i64,
     pub include_items: bool,
     pub search_query: Option<String>,
-    pub start_date: Option<DateTime<Utc>>,
-    pub end_date: Option<DateTime<Utc>>,
+    pub start_date: Option<NaiveDate>,
+    pub end_date: Option<NaiveDate>,
 }
 
 #[derive(Debug, Clone)]
@@ -292,8 +292,8 @@ impl Sale {
                       AND si_search.product_name ILIKE CONCAT('%', $5::text, '%')
                   )
                 )
-                AND ($7::timestamptz IS NULL OR created_at >= $7)
-                AND ($8::timestamptz IS NULL OR created_at <= $8)
+                AND ($7::date IS NULL OR created_at::date >= $7)
+                AND ($8::date IS NULL OR created_at::date <= $8)
               ORDER BY created_at DESC
               LIMIT $3 OFFSET $4
             )
