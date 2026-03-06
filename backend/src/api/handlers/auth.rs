@@ -220,6 +220,21 @@ pub async fn forgot_password(
         );
     }
 
+    if result.has_shop {
+        if let Some(shop_email) = result.shop_email {
+            let code_clone = code.clone();
+            actix_web::rt::spawn(async move {
+                let settings = crate::config::Settings::load();
+                let _ = crate::worker::email::send_password_reset_email_direct(
+                    &settings,
+                    &shop_email,
+                    &code_clone,
+                )
+                .await;
+            });
+        }
+    }
+
     json_ok("If that account exists, a reset code has been sent.")
 }
 

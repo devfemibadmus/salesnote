@@ -11,8 +11,9 @@ use crate::models::{
     AuthorizedSaleCreatePayload, AuthorizedSaleCreateResult, AuthorizedSaleDeletePayload,
     AuthorizedSaleDeleteResult, AuthorizedSaleGetPayload, AuthorizedSaleGetResult,
     AuthorizedSaleListPayload, AuthorizedSaleListResult, AuthorizedSaleUpdatePayload,
-    AuthorizedSaleUpdateResult, Sale, SaleInput, SaleUpdateInput,
+    AuthorizedSaleUpdateResult, DeviceSession, Sale, SaleInput, SaleUpdateInput,
 };
+use crate::{config::Settings, worker::notification::fcm::send_fcm_notification};
 
 const MAX_ITEM_NAME_CHARS: usize = 20;
 const MAX_SALE_TOTAL: f64 = 9_999_999_999.99;
@@ -246,7 +247,40 @@ pub async fn create_sale(
         Ok(AuthorizedSaleCreateResult::ShopMismatch) => {
             json_error(StatusCode::FORBIDDEN, "shop mismatch")
         }
-        Ok(AuthorizedSaleCreateResult::Created(sale)) => json_created(sale),
+        Ok(AuthorizedSaleCreateResult::Created(sale)) => {
+            let pool = state.pool.clone();
+            let shop_id_val = *shop_id;
+            let device_id_val = (*device_id).0;
+            let total = sale.total;
+            
+            actix_web::rt::spawn(async move {
+                let settings = Settings::load();
+                if let Ok(tokens) = DeviceSession::get_fcm_tokens_for_shop_except(
+                    &pool,
+                    shop_id_val,
+                    device_id_val,
+                )
+                .await
+                {
+                    if !tokens.is_empty() {
+                        let title = String::from("New Sale");
+                        let body = format!("A new sale of ₦{:.2} was just recorded.", total);
+                        for token in tokens {
+                            let _ = send_fcm_notification(
+                                &token,
+                                title.clone(),
+                                body.clone(),
+                                "new_sale",
+                                &settings,
+                            )
+                            .await;
+                        }
+                    }
+                }
+            });
+
+            json_created(sale)
+        }
         Err(e) => {
             tracing::error!("create sale error: {}", e);
             json_error(

@@ -224,6 +224,47 @@ pub async fn check_smtp(settings: &config::Settings) -> Result<(), String> {
     }
 }
 
+pub async fn send_password_reset_email_direct(
+    settings: &config::Settings,
+    to_email: &str,
+    code: &str,
+) -> Result<(), String> {
+    let from = settings
+        .smtp_from
+        .parse::<Mailbox>()
+        .map_err(|_| "invalid smtp_from".to_string())?;
+
+    let to = to_email
+        .parse::<Mailbox>()
+        .map_err(|_| format!("invalid recipient: {}", to_email))?;
+
+    let mailer = build_mailer(settings)?;
+
+    let built = build_password_reset_code(PasswordResetCodeData {
+        code: code.to_string(),
+    });
+
+    let message = Message::builder()
+        .from(from)
+        .to(to)
+        .subject(built.subject)
+        .header(ContentType::TEXT_HTML)
+        .body(built.html_body)
+        .map_err(|e| format!("email build error: {}", e))?;
+
+    let send_result = tokio::time::timeout(
+        std::time::Duration::from_secs(settings.smtp_timeout_secs),
+        mailer.send(message),
+    )
+    .await;
+
+    match send_result {
+        Ok(Ok(_)) => Ok(()),
+        Ok(Err(err)) => Err(format!("smtp error: {}", err)),
+        Err(_) => Err("smtp timeout".to_string()),
+    }
+}
+
 fn build_message(email: &EmailOutbox) -> message::EmailMessage {
     if let Some(template) = email.template.as_deref() {
         let template = template.trim().to_lowercase();

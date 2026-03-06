@@ -156,6 +156,17 @@ jobs:
                         echo "SSL cert secrets not provided; skipping SSL upload."
                       fi
 
+            - name: Upload email templates
+              uses: appleboy/scp-action@master
+              with:
+                  host: ${{ secrets.API_SSH_HOST }}
+                  username: ${{ secrets.API_SSH_USER }}
+                  key: ${{ secrets.API_SSH_KEY }}
+                  source: "backend/src/worker/email/templates/*"
+                  target: "/home/salesnote/api/templates/email/"
+                  strip_components: 5
+                  overwrite: true
+
             - name: Restart service
               uses: appleboy/ssh-action@master
               with:
@@ -170,6 +181,9 @@ jobs:
                         sudo systemctl stop 'salesnote@*' || true
                       fi
                       test -f "${{ env.API_DIR }}/.deploy/api"
+                      test -f "/home/salesnote/api/templates/email/password-reset.html"
+                      test -f "/home/salesnote/api/templates/email/welcome.html"
+                      test -f "/home/salesnote/api/templates/email/logo.jpg"
                       sudo install -m 755 "${{ env.API_DIR }}/.deploy/api" "${{ env.API_DIR }}/api"
                       sudo chmod +x "${{ env.API_DIR }}/api"
                       sudo chmod +x "${{ env.API_DIR }}/manage.sh"

@@ -156,6 +156,7 @@ pub struct RefreshSessionResult {
 pub struct ForgotPasswordResult {
     pub has_shop: bool,
     pub request_count: i32,
+    pub shop_email: Option<String>,
 }
 
 #[derive(Debug)]
@@ -793,15 +794,10 @@ impl ShopAuthRecord {
                WHERE EXISTS(SELECT 1 FROM shop_row)
                  AND (SELECT cnt FROM request_count) < $5
                RETURNING shop_id
-             ),
-             inserted_email AS (
-               INSERT INTO email_outbox (to_email, template, payload)
-               SELECT (SELECT email FROM shop_row), 'password_reset_code', json_build_object('code', $3)
-               WHERE EXISTS(SELECT 1 FROM inserted_code)
-               RETURNING id
              )
              SELECT
                EXISTS(SELECT 1 FROM shop_row) AS has_shop,
+               (SELECT email FROM shop_row) AS shop_email,
                (SELECT cnt FROM request_count) AS request_count",
         )
         .bind(phone_or_email)
@@ -815,6 +811,7 @@ impl ShopAuthRecord {
         Ok(ForgotPasswordResult {
             has_shop: row.get("has_shop"),
             request_count: row.get("request_count"),
+            shop_email: row.try_get("shop_email").unwrap_or(None),
         })
     }
 
