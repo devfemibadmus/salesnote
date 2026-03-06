@@ -11,30 +11,83 @@ import '../screens/shop/shop.dart';
 import 'routes.dart';
 
 class AppRouter {
+  static int? _lastTabIndex;
+
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
-    switch (settings.name) {
+    final name = settings.name ?? '';
+    final int? nextIndex = AppRoutes.tabIndices[name];
+    final int? prevIndex = _lastTabIndex;
+    
+    // Only update last index if it's a main tab
+    if (nextIndex != null) {
+      _lastTabIndex = nextIndex;
+    }
+
+    Route<dynamic> buildDefault(Widget page) {
+      return MaterialPageRoute(
+        settings: settings,
+        builder: (_) => page,
+      );
+    }
+
+    // Directional transition for main tabs
+    Route<dynamic> buildTab(Widget page) {
+      if (prevIndex == null || nextIndex == null || prevIndex == nextIndex) {
+        return buildDefault(page);
+      }
+
+      final bool slideForward = nextIndex > prevIndex;
+      final beginOffset = Offset(slideForward ? 0.06 : -0.06, 0);
+
+      return PageRouteBuilder(
+        settings: settings,
+        pageBuilder: (context, animation, secondaryAnimation) => page,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final slide = Tween<Offset>(
+            begin: beginOffset,
+            end: Offset.zero,
+          ).animate(CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          ));
+
+          final fade = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
+
+          return FadeTransition(
+            opacity: fade,
+            child: SlideTransition(
+              position: slide,
+              child: child,
+            ),
+          );
+        },
+      );
+    }
+
+    switch (name) {
       case AppRoutes.auth:
-        return MaterialPageRoute(builder: (_) => const AuthScreen());
+        return buildDefault(const AuthScreen());
       case AppRoutes.onboarding:
-        return MaterialPageRoute(builder: (_) => const OnboardingScreen());
+        return buildDefault(const OnboardingScreen());
       case AppRoutes.home:
-        return MaterialPageRoute(builder: (_) => const HomeScreen());
+        return buildTab(const HomeScreen());
       case AppRoutes.sales:
         final args = settings.arguments;
         final salesArgs = args is SalesRouteArgs ? args : null;
-        return MaterialPageRoute(
-          builder: (_) => SalesScreen(routeArgs: salesArgs),
-        );
+        return buildTab(SalesScreen(routeArgs: salesArgs));
       case AppRoutes.items:
-        return MaterialPageRoute(builder: (_) => const ItemsScreen());
+        return buildTab(const ItemsScreen());
       case AppRoutes.newSale:
-        return MaterialPageRoute(builder: (_) => const NewSaleScreen());
+        return buildDefault(const NewSaleScreen());
       case AppRoutes.shop:
-        return MaterialPageRoute(builder: (_) => const ShopScreen());
+        return buildTab(const ShopScreen());
       case AppRoutes.notification:
-        return MaterialPageRoute(builder: (_) => const NotificationScreen());
+        return buildDefault(const NotificationScreen());
       default:
-        return MaterialPageRoute(builder: (_) => const AuthScreen());
+        return buildDefault(const AuthScreen());
     }
   }
 }

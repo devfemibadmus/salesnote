@@ -7,6 +7,13 @@ class AppRoutes {
   static const newSale = '/sales/new';
   static const shop = '/shop';
   static const notification = '/notification';
+
+  static const Map<String, int> tabIndices = {
+    home: 0,
+    sales: 1,
+    items: 2,
+    shop: 3,
+  };
 }
 
 class SalesRouteArgs {
