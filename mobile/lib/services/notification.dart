@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../app/navigator.dart';
 import '../app/routes.dart';
 import 'cache/local.dart';
+import 'preview.dart';
 
 class InAppNotification {
   const InAppNotification({
@@ -13,6 +14,7 @@ class InAppNotification {
     required this.title,
     required this.body,
     required this.kind,
+    this.saleId,
     required this.createdAtMillis,
     required this.isRead,
   });
@@ -21,6 +23,7 @@ class InAppNotification {
   final String title;
   final String body;
   final String kind;
+  final String? saleId;
   final int createdAtMillis;
   final bool isRead;
 
@@ -29,6 +32,7 @@ class InAppNotification {
     'title': title,
     'body': body,
     'kind': kind,
+    'sale_id': saleId,
     'created_at_millis': createdAtMillis,
     'is_read': isRead,
   };
@@ -39,6 +43,7 @@ class InAppNotification {
       title: json['title']?.toString() ?? 'Salesnote',
       body: json['body']?.toString() ?? '',
       kind: json['kind']?.toString() ?? 'general',
+      saleId: json['sale_id']?.toString(),
       createdAtMillis:
           int.tryParse(json['created_at_millis']?.toString() ?? '') ??
           DateTime.now().millisecondsSinceEpoch,
@@ -257,6 +262,7 @@ class NotificationService {
             title: n.title,
             body: n.body,
             kind: n.kind,
+            saleId: n.saleId,
             createdAtMillis: n.createdAtMillis,
             isRead: true,
           ),
@@ -277,6 +283,7 @@ class NotificationService {
         title: n.title,
         body: n.body,
         kind: n.kind,
+        saleId: n.saleId,
         createdAtMillis: n.createdAtMillis,
         isRead: true,
       );
@@ -443,18 +450,24 @@ class NotificationService {
     final kind = data['type']?.toString().trim() ?? '';
     final saleId = data['sale_id']?.toString().trim() ?? '';
     if (kind == 'new_sale' && saleId.isNotEmpty) {
-      navigator.pushNamedAndRemoveUntil(
-        AppRoutes.sales,
-        (_) => false,
-        arguments: SalesRouteArgs(
-          openSaleId: saleId,
-          refreshFirst: true,
-        ),
-      );
+      PreviewService.openById(saleId);
       return;
     }
 
     navigator.pushNamed(AppRoutes.notification);
+  }
+
+  static Future<void> openInboxNotification(InAppNotification notification) async {
+    await markRead(notification.id);
+    final data = <String, dynamic>{
+      'id': notification.id,
+      'type': notification.kind,
+      'title': notification.title,
+      'body': notification.body,
+      if (notification.saleId != null && notification.saleId!.trim().isNotEmpty)
+        'sale_id': notification.saleId!.trim(),
+    };
+    _handleNotificationData(data, null);
   }
 
   static String _encodePayload(
@@ -478,6 +491,7 @@ class NotificationService {
         data['title']?.toString() ?? notification?.title ?? 'Salesnote';
     final body = data['body']?.toString() ?? notification?.body ?? '';
     final kind = data['type']?.toString() ?? 'general';
+    final saleId = data['sale_id']?.toString().trim();
     final now = DateTime.now().millisecondsSinceEpoch;
     final id = data['id']?.toString() ?? '${now}_${title.hashCode}';
 
@@ -488,6 +502,7 @@ class NotificationService {
         title: title,
         body: body,
         kind: kind,
+        saleId: saleId == null || saleId.isEmpty ? null : saleId,
         createdAtMillis: now,
         isRead: false,
       ),

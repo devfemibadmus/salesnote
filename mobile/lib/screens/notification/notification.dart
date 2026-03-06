@@ -27,9 +27,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
     });
   }
 
-  Future<void> _markRead(InAppNotification item) async {
-    if (item.isRead) return;
-    await NotificationService.markRead(item.id);
+  Future<void> _openNotification(InAppNotification item) async {
+    await NotificationService.openInboxNotification(item);
     if (!mounted) return;
     setState(() {
       _items = _items
@@ -39,6 +38,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   title: n.title,
                   body: n.body,
                   kind: n.kind,
+                  saleId: n.saleId,
                   createdAtMillis: n.createdAtMillis,
                   isRead: true,
                 )
@@ -112,7 +112,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     color: Colors.transparent,
                     child: InkWell(
                       borderRadius: BorderRadius.circular(14),
-                      onTap: () => _markRead(n),
+                      onTap: () => _openNotification(n),
                       child: Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(

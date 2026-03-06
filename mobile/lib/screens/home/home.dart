@@ -7,12 +7,12 @@ import 'package:intl/intl.dart';
 import '../../app/config.dart';
 import '../../app/routes.dart';
 import '../../data/models.dart';
-import '../preview/preview.dart';
 import '../../services/api_client.dart';
+import '../../services/cache/local.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
-import '../../services/cache/local.dart';
 import '../../services/notification.dart';
+import '../../services/preview.dart';
 import '../../services/token_store.dart';
 import '../../widgets/app_bottom_nav.dart';
 
@@ -68,86 +68,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (_openingPreview) return;
     setState(() => _openingPreview = true);
     try {
-      final loadingRoute = MaterialPageRoute<void>(
-        builder: (_) => const SalePreviewLoadingScreen(),
-      );
-      if (mounted) {
-        Navigator.of(context).push(loadingRoute);
-      }
-
-      final saleDetail = await CacheLoader.loadOrFetchSalePreview(_api, saleId);
-      if (saleDetail == null) {
-        if (loadingRoute.isActive && mounted) {
-          Navigator.of(context).pop();
-        }
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Unable to open sale preview.')),
-          );
-        }
-        return;
-      }
-
-      if (!mounted) return;
-
-      if (!loadingRoute.isActive) {
-        return;
-      }
-
-      final settings = await CacheLoader.loadOrFetchSettingsSummary(_api);
-      final signatures = await CacheLoader.loadOrFetchSignatures(_api);
-      if (!mounted) return;
-
-      final shop = settings?.shop;
-      final detail = saleDetail;
-      SignatureItem? signature;
-      for (final sig in signatures) {
-        if (sig.id == detail.signatureId) {
-          signature = sig;
-          break;
-        }
-      }
-
-      final previewItems = detail.items
-          .map(
-            (item) => PreviewSaleItem(
-              productName: item.productName,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-            ),
-          )
-          .toList();
-      final total = detail.total;
-      final createdAtText = detail.createdAt;
-      final createdAt = DateTime.tryParse(createdAtText)?.toLocal();
-
-      final previewRoute = MaterialPageRoute<void>(
-        builder: (_) => SalePreviewScreen(
-          isCreatedSale: true,
-          shop: shop,
-          signature: signature,
-          customerName: detail.customerName ?? '',
-          customerContact: detail.customerContact ?? '',
-          items: previewItems,
-          subtotal: detail.subtotal,
-          discountAmount: detail.discountAmount,
-          vatAmount: detail.vatAmount,
-          serviceFeeAmount: detail.serviceFeeAmount,
-          deliveryFeeAmount: detail.deliveryFeeAmount,
-          roundingAmount: detail.roundingAmount,
-          otherAmount: detail.otherAmount,
-          otherLabel: detail.otherLabel,
-          total: total,
-          receiptNumber: '#REC-$saleId',
-          createdAt: createdAt,
-        ),
-      );
-
-      if (loadingRoute.isActive) {
-        await Navigator.of(context).pushReplacement(previewRoute);
-      } else {
-        await Navigator.of(context).push(previewRoute);
-      }
+      await PreviewService.openById(saleId);
     } finally {
       if (mounted) {
         setState(() => _openingPreview = false);
