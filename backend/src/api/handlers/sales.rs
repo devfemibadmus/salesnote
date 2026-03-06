@@ -129,6 +129,8 @@ pub struct SalesListQuery {
     pub per_page: Option<i64>,
     pub include_items: Option<bool>,
     pub q: Option<String>,
+    pub start_date: Option<String>,
+    pub end_date: Option<String>,
 }
 
 pub async fn list_sales(
@@ -154,6 +156,17 @@ pub async fn list_sales(
         }
     });
 
+    let start_date = query.start_date.as_deref().and_then(|s| {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
+            .and_then(|d| d.and_hms_opt(0, 0, 0))
+            .map(|dt| Utc.from_local_datetime(&dt).unwrap())
+    });
+    let end_date = query.end_date.as_deref().and_then(|s| {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
+            .and_then(|d| d.and_hms_opt(23, 59, 59))
+            .map(|dt| Utc.from_local_datetime(&dt).unwrap())
+    });
+
     match Sale::list_authorized_paged(
         &state.pool,
         &AuthorizedSaleListPayload {
@@ -163,6 +176,8 @@ pub async fn list_sales(
             per_page: per_page_value,
             include_items,
             search_query,
+            start_date,
+            end_date,
         },
     )
     .await

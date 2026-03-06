@@ -14,7 +14,10 @@ class _ItemsLoadingState extends StatelessWidget {
       children: const [
         _ItemsHeader(),
         SizedBox(height: 20),
-        _ItemsSearchField(readOnly: true),
+        HistorySearchField(
+          hasDateFilter: false,
+          hintText: 'Search by item name',
+        ),
         SizedBox(height: 18),
         _ItemsRowSkeleton(),
         SizedBox(height: 12),
@@ -104,6 +107,8 @@ class _ItemsMainState extends StatelessWidget {
     required this.loadingMore,
     required this.hasMore,
     required this.onLoadMore,
+    required this.onDateTap,
+    required this.hasDateFilter,
   });
 
   final TextEditingController queryController;
@@ -112,6 +117,8 @@ class _ItemsMainState extends StatelessWidget {
   final bool loadingMore;
   final bool hasMore;
   final Future<void> Function() onLoadMore;
+  final VoidCallback? onDateTap;
+  final bool hasDateFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +133,12 @@ class _ItemsMainState extends StatelessWidget {
               children: [
                 const _ItemsHeader(),
                 const SizedBox(height: 20),
-                _ItemsSearchField(controller: queryController),
+                HistorySearchField(
+                  controller: queryController,
+                  onDateTap: onDateTap ?? () {},
+                  hasDateFilter: hasDateFilter,
+                  hintText: 'Search by item name',
+                ),
                 const SizedBox(height: 20),
               ],
             ),

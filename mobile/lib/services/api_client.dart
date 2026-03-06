@@ -473,13 +473,17 @@ class ApiClient {
     int? perPage,
     bool includeItems = true,
     String? searchQuery,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     final salesUri = () {
       final uri = _uri('/sales');
       final normalizedSearch = searchQuery?.trim();
       if (page == null &&
           perPage == null &&
-          (normalizedSearch == null || normalizedSearch.isEmpty)) {
+          (normalizedSearch == null || normalizedSearch.isEmpty) &&
+          startDate == null &&
+          endDate == null) {
         return uri;
       }
       final query = <String, String>{};
@@ -488,6 +492,12 @@ class ApiClient {
       query['include_items'] = includeItems.toString();
       if (normalizedSearch != null && normalizedSearch.isNotEmpty) {
         query['q'] = normalizedSearch;
+      }
+      if (startDate != null) {
+        query['start_date'] = startDate.toUtc().toIso8601String().split('T')[0];
+      }
+      if (endDate != null) {
+        query['end_date'] = endDate.toUtc().toIso8601String().split('T')[0];
       }
       return uri.replace(queryParameters: query);
     }();

@@ -47,47 +47,7 @@ class _SalesHeader extends StatelessWidget {
   }
 }
 
-class _SalesSearchField extends StatelessWidget {
-  const _SalesSearchField({required this.controller});
-  final TextEditingController controller;
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5EAF1)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.search_rounded,
-            color: Color(0xFF94A3B8),
-            size: 26,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              textAlignVertical: TextAlignVertical.center,
-              style: const TextStyle(fontSize: 17, color: Color(0xFF334155)),
-              decoration: const InputDecoration(
-                isCollapsed: true,
-                border: InputBorder.none,
-                hintText: 'Search by customer or ID',
-                hintStyle: TextStyle(fontSize: 17, color: Color(0xFF94A3B8)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _SalesSectionHeader extends StatelessWidget {
   const _SalesSectionHeader({required this.text});
@@ -106,7 +66,6 @@ class _SalesSectionHeader extends StatelessWidget {
     );
   }
 }
-
 class _SalesTile extends StatelessWidget {
   const _SalesTile({
     required this.sale,
@@ -274,58 +233,25 @@ class _SalesRowSkeleton extends StatelessWidget {
       ),
       child: const Row(
         children: [
-          _SkelBox(width: 72, height: 72, radius: 36),
+          SkelBox(width: 72, height: 72, radius: 36),
           SizedBox(width: 14),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _SkelLine(width: 190, height: 20),
+                SkelLine(width: 190, height: 20),
                 SizedBox(height: 10),
-                _SkelLine(width: 240, height: 16),
+                SkelLine(width: 240, height: 16),
               ],
             ),
           ),
           SizedBox(width: 12),
-          _SkelLine(width: 86, height: 22),
+          SkelLine(width: 86, height: 22),
         ],
       ),
     );
   }
 }
 
-class _SkelLine extends StatelessWidget {
-  const _SkelLine({required this.width, required this.height});
-  final double width;
-  final double height;
 
-  @override
-  Widget build(BuildContext context) {
-    return _SkelBox(width: width, height: height);
-  }
-}
-
-class _SkelBox extends StatelessWidget {
-  const _SkelBox({
-    this.width = double.infinity,
-    required this.height,
-    this.radius = 10,
-  });
-
-  final double width;
-  final double height;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: const Color(0xFFE7EBF1),
-        borderRadius: BorderRadius.circular(radius),
-      ),
-    );
-  }
-}

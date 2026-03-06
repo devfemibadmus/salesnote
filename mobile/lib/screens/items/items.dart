@@ -10,6 +10,7 @@ import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
 import '../../services/token_store.dart';
 import '../../widgets/app_bottom_nav.dart';
+import '../../widgets/history.dart';
 
 part 'states.dart';
 part 'widgets.dart';
@@ -35,6 +36,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
   int _page = 1;
   late final String _currencySymbol;
   late final String _currencyLocale;
+  DateTime? _startDate;
+  DateTime? _endDate;
   Timer? _searchDebounce;
 
   void _goTo(String route, {bool reset = false}) {
@@ -111,6 +114,46 @@ class _ItemsScreenState extends State<ItemsScreen> {
     });
   }
 
+  Future<void> _selectDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      initialDateRange: _startDate != null && _endDate != null
+          ? DateTimeRange(start: _startDate!, end: _endDate!)
+          : null,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF007AFF),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF0F172A),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+      });
+      unawaited(_refreshItemsInBackground());
+    }
+  }
+
+  void _clearDateFilter() {
+    if (_startDate == null && _endDate == null) return;
+    setState(() {
+      _startDate = null;
+      _endDate = null;
+    });
+    unawaited(_refreshItemsInBackground());
+  }
+
   Future<void> _refreshItems() async {
     final activeQuery = _query.trim();
     try {
@@ -120,6 +163,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
         page: 1,
         perPage: _perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
+        startDate: _startDate,
+        endDate: _endDate,
       );
       if (!mounted) return;
       if (activeQuery != _query.trim()) return;
@@ -148,6 +193,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
         page: 1,
         perPage: _perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
+        startDate: _startDate,
+        endDate: _endDate,
       );
       if (!mounted) return;
       if (activeQuery != _query.trim()) return;
@@ -172,6 +219,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
         page: nextPage,
         perPage: _perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
+        startDate: _startDate,
+        endDate: _endDate,
       );
       final next = loaded.sales;
       if (!mounted) return;
@@ -262,6 +311,8 @@ class _ItemsScreenState extends State<ItemsScreen> {
         loadingMore: _loadingMore,
         hasMore: _hasMore,
         onLoadMore: _loadMore,
+        onDateTap: _selectDateRange,
+        hasDateFilter: _startDate != null || _endDate != null,
       );
     }
 

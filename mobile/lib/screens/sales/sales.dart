@@ -11,6 +11,7 @@ import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
 import '../../services/token_store.dart';
 import '../../widgets/app_bottom_nav.dart';
+import '../../widgets/history.dart';
 
 part 'states.dart';
 part 'widgets.dart';
@@ -41,6 +42,8 @@ class _SalesScreenState extends State<SalesScreen> {
   bool _openingPreview = false;
   bool _launchIntentHandled = false;
   bool _launchIntentScheduled = false;
+  DateTime? _startDate;
+  DateTime? _endDate;
   Timer? _searchDebounce;
 
   void _goTo(String route, {bool reset = false}) {
@@ -163,6 +166,55 @@ class _SalesScreenState extends State<SalesScreen> {
     });
   }
 
+  Future<void> _selectDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      initialDateRange: _startDate != null && _endDate != null
+          ? DateTimeRange(start: _startDate!, end: _endDate!)
+          : null,
+      firstDate: DateTime(2023),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF007AFF),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF0F172A),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF007AFF),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = picked.start;
+        _endDate = picked.end.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+      });
+      unawaited(_refreshSalesInBackground());
+    } else if (_startDate != null || _endDate != null) {
+      // Clear filter if they cancel and a filter was active? 
+      // Actually, usually cancel means "don't change anything".
+      // Let's provide a way to clear if needed, or if picked is null we just keep current.
+    }
+  }
+
+  void _clearDateFilter() {
+    if (_startDate == null && _endDate == null) return;
+    setState(() {
+      _startDate = null;
+      _endDate = null;
+    });
+    unawaited(_refreshSalesInBackground());
+  }
+
   Future<void> _refreshSales() async {
     final activeQuery = _query.trim();
     try {
@@ -172,6 +224,8 @@ class _SalesScreenState extends State<SalesScreen> {
         page: 1,
         perPage: _perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
+        startDate: _startDate,
+        endDate: _endDate,
       );
       if (!mounted) return;
       if (activeQuery != _query.trim()) return;
@@ -200,6 +254,8 @@ class _SalesScreenState extends State<SalesScreen> {
         page: 1,
         perPage: _perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
+        startDate: _startDate,
+        endDate: _endDate,
       );
       if (!mounted) return;
       if (activeQuery != _query.trim()) return;
@@ -224,6 +280,8 @@ class _SalesScreenState extends State<SalesScreen> {
         page: nextPage,
         perPage: _perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
+        startDate: _startDate,
+        endDate: _endDate,
       );
       final next = loaded.sales;
       if (!mounted) return;
@@ -264,7 +322,18 @@ class _SalesScreenState extends State<SalesScreen> {
     return _sales.where((sale) {
       final customer = (sale.customerName ?? '').toLowerCase();
       final idText = sale.id.toLowerCase();
-      return customer.contains(normalized) || idText.contains(normalized);
+      final matchesSearch = customer.contains(normalized) || idText.contains(normalized);
+      
+      if (!matchesSearch) return false;
+      
+      if (_startDate != null || _endDate != null) {
+        final saleDate = DateTime.tryParse(sale.createdAt)?.toLocal();
+        if (saleDate == null) return false;
+        if (_startDate != null && saleDate.isBefore(_startDate!)) return false;
+        if (_endDate != null && saleDate.isAfter(_endDate!)) return false;
+      }
+      
+      return true;
     }).toList();
   }
 
@@ -380,6 +449,8 @@ class _SalesScreenState extends State<SalesScreen> {
         formatAmount: _formatSalesAmount,
         onLoadMore: _loadMoreSales,
         onOpenSale: (sale) => _openSalePreviewById(sale.id),
+        onDateTap: _selectDateRange,
+        hasDateFilter: _startDate != null || _endDate != null,
       );
     }
 

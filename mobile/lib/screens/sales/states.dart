@@ -18,9 +18,9 @@ class _SalesLoadingState extends StatelessWidget {
           showFilter: false,
         ),
         SizedBox(height: 20),
-        _SkelBox(height: 70, radius: 20),
+        SkelBox(height: 70, radius: 20),
         SizedBox(height: 26),
-        _SkelLine(width: 170, height: 20),
+        SkelLine(width: 170, height: 20),
         SizedBox(height: 18),
         _SalesRowSkeleton(),
         SizedBox(height: 14),
@@ -28,7 +28,7 @@ class _SalesLoadingState extends StatelessWidget {
         SizedBox(height: 14),
         _SalesRowSkeleton(),
         SizedBox(height: 26),
-        _SkelLine(width: 230, height: 20),
+        SkelLine(width: 230, height: 20),
         SizedBox(height: 18),
         _SalesRowSkeleton(),
         SizedBox(height: 14),
@@ -121,6 +121,8 @@ class _SalesMainState extends StatelessWidget {
     required this.formatAmount,
     required this.onLoadMore,
     required this.onOpenSale,
+    required this.onDateTap,
+    required this.hasDateFilter,
   });
 
   final TextEditingController queryController;
@@ -130,6 +132,8 @@ class _SalesMainState extends StatelessWidget {
   final String Function(num amount) formatAmount;
   final Future<void> Function() onLoadMore;
   final Future<void> Function(Sale sale) onOpenSale;
+  final VoidCallback onDateTap;
+  final bool hasDateFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -152,7 +156,12 @@ class _SalesMainState extends StatelessWidget {
                   showFilter: false,
                 ),
                 const SizedBox(height: 20),
-                _SalesSearchField(controller: queryController),
+                HistorySearchField(
+                  controller: queryController,
+                  onDateTap: onDateTap,
+                  hasDateFilter: hasDateFilter,
+                  hintText: 'Search by customer or ID',
+                ),
                 const SizedBox(height: 10),
               ],
             ),
