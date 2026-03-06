@@ -13,7 +13,10 @@ use crate::models::{
     AuthorizedSaleListPayload, AuthorizedSaleListResult, AuthorizedSaleUpdatePayload,
     AuthorizedSaleUpdateResult, DeviceSession, Sale, SaleInput, SaleUpdateInput,
 };
-use crate::{config::Settings, worker::notification::fcm::send_fcm_notification};
+use crate::{
+    config::Settings,
+    worker::notification::fcm::send_fcm_notification_with_data,
+};
 
 const MAX_ITEM_NAME_CHARS: usize = 20;
 const MAX_SALE_TOTAL: f64 = 9_999_999_999.99;
@@ -250,21 +253,43 @@ pub async fn create_sale(
         Ok(AuthorizedSaleCreateResult::Created(sale)) => {
             let pool = state.pool.clone();
             let shop_id_val = *shop_id;
-            let total = sale.total;
+            let sale_id = sale.id;
+            let sale_total = sale.total;
+            let customer_name = sale
+                .customer_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_owned);
+            let item_count = sale.items.len();
             
             actix_web::rt::spawn(async move {
                 let settings = Settings::load();
                 if let Ok(tokens) = DeviceSession::get_fcm_tokens_for_shop(&pool, shop_id_val).await
                 {
                     if !tokens.is_empty() {
-                        let title = String::from("New Sale");
-                        let body = format!("A new sale of ₦{:.2} was just recorded.", total);
+                        let title = customer_name
+                            .as_deref()
+                            .map(|name| format!("New sale from {}", name))
+                            .unwrap_or_else(|| String::from("New sale recorded"));
+                        let body = format!(
+                            "#REC-{} · {} item{} · ₦{:.2}",
+                            sale_id,
+                            item_count,
+                            if item_count == 1 { "" } else { "s" },
+                            sale_total,
+                        );
+                        let extra_data = vec![
+                            (String::from("id"), format!("sale_{}", sale_id)),
+                            (String::from("sale_id"), sale_id.to_string()),
+                        ];
                         for token in tokens {
-                            let _ = send_fcm_notification(
+                            let _ = send_fcm_notification_with_data(
                                 &token,
                                 title.clone(),
                                 body.clone(),
                                 "new_sale",
+                                extra_data.clone(),
                                 &settings,
                             )
                             .await;

@@ -440,6 +440,20 @@ class NotificationService {
       return;
     }
 
+    final kind = data['type']?.toString().trim() ?? '';
+    final saleId = data['sale_id']?.toString().trim() ?? '';
+    if (kind == 'new_sale' && saleId.isNotEmpty) {
+      navigator.pushNamedAndRemoveUntil(
+        AppRoutes.sales,
+        (_) => false,
+        arguments: SalesRouteArgs(
+          openSaleId: saleId,
+          refreshFirst: true,
+        ),
+      );
+      return;
+    }
+
     navigator.pushNamed(AppRoutes.notification);
   }
 

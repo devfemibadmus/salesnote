@@ -1,6 +1,7 @@
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::fs;
 
 use crate::config::Settings;
@@ -23,19 +24,11 @@ struct FcmRequest<'a> {
 struct FcmMessage<'a> {
     token: &'a str,
     notification: FcmNotification<'a>,
-    data: FcmData<'a>,
+    data: BTreeMap<String, String>,
 }
 
 #[derive(Serialize)]
 struct FcmNotification<'a> {
-    title: &'a str,
-    body: &'a str,
-}
-
-#[derive(Serialize)]
-struct FcmData<'a> {
-    #[serde(rename = "type")]
-    kind: &'a str,
     title: &'a str,
     body: &'a str,
 }
@@ -64,11 +57,31 @@ pub async fn send_fcm_notification(
     kind: &str,
     settings: &Settings,
 ) -> Result<(), String> {
+    send_fcm_notification_with_data(token, title, body, kind, Vec::new(), settings).await
+}
+
+pub async fn send_fcm_notification_with_data(
+    token: &str,
+    title: String,
+    body: String,
+    kind: &str,
+    extra_data: Vec<(String, String)>,
+    settings: &Settings,
+) -> Result<(), String> {
     let access_token = fetch_access_token(settings).await?;
     let url = format!(
         "https://fcm.googleapis.com/v1/projects/{}/messages:send",
         settings.fcm_project_id
     );
+
+    let mut data = BTreeMap::from([
+        (String::from("type"), kind.to_string()),
+        (String::from("title"), title.clone()),
+        (String::from("body"), body.clone()),
+    ]);
+    for (key, value) in extra_data {
+        data.insert(key, value);
+    }
 
     let payload = FcmRequest {
         message: FcmMessage {
@@ -77,11 +90,7 @@ pub async fn send_fcm_notification(
                 title: &title,
                 body: &body,
             },
-            data: FcmData {
-                kind,
-                title: &title,
-                body: &body,
-            },
+            data,
         },
     };
 
