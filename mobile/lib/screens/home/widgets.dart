@@ -353,8 +353,9 @@ class _InfoCard extends StatelessWidget {
 }
 
 class _SaleTile extends StatelessWidget {
-  const _SaleTile({required this.sale});
+  const _SaleTile({required this.sale, this.onTap});
   final Sale sale;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -367,44 +368,53 @@ class _SaleTile extends StatelessWidget {
     final initials = _initials(name);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: const Color(0xFFEAF1FB),
-            child: Text(initials),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
               children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
+                CircleAvatar(
+                  backgroundColor: const Color(0xFFEAF1FB),
+                  child: Text(initials),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          color: Color(0xFF64748B),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 13,
-                  ),
+                  _homeFormatAmount(sale.total),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
           ),
-          Text(
-            _homeFormatAmount(sale.total),
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-        ],
+        ),
       ),
     );
   }

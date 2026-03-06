@@ -877,6 +877,7 @@ class _MainState extends StatelessWidget {
     required this.onTabChanged,
     required this.onSettings,
     required this.onNotification,
+    required this.onOpenSale,
   });
 
   final ShopProfile shop;
@@ -886,6 +887,7 @@ class _MainState extends StatelessWidget {
   final ValueChanged<int> onTabChanged;
   final VoidCallback onSettings;
   final VoidCallback onNotification;
+  final void Function(Sale) onOpenSale;
 
   @override
   Widget build(BuildContext context) {
@@ -1107,7 +1109,9 @@ class _MainState extends StatelessWidget {
           style: TextStyle(fontSize: 34 / 2, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
-        ...sales.take(4).map((s) => _SaleTile(sale: s)),
+        ...sales.take(4).map(
+              (s) => _SaleTile(sale: s, onTap: () => onOpenSale(s)),
+            ),
       ],
     );
   }
