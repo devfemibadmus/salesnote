@@ -35,8 +35,8 @@ class _SalesScreenState extends State<SalesScreen> {
 
   bool _loading = true;
   bool _loadingMore = false;
-  bool _refreshingResults = false;
   bool _hasMore = true;
+  bool _baseDataKnownEmpty = true;
   String? _error;
   List<Sale> _sales = [];
   String _query = '';
@@ -85,6 +85,7 @@ class _SalesScreenState extends State<SalesScreen> {
         _sales = cached.sales;
         _page = cached.page;
         _hasMore = cached.hasMore;
+        _baseDataKnownEmpty = cached.sales.isEmpty;
         _error = null;
         _loading = false;
       });
@@ -100,6 +101,7 @@ class _SalesScreenState extends State<SalesScreen> {
       _sales = [];
       _page = 1;
       _hasMore = true;
+      _baseDataKnownEmpty = true;
       _error = null;
       _loading = false;
     });
@@ -165,7 +167,6 @@ class _SalesScreenState extends State<SalesScreen> {
     _searchRequestId += 1;
     setState(() {
       _query = next;
-      _refreshingResults = true;
     });
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 320), () {
@@ -242,6 +243,9 @@ class _SalesScreenState extends State<SalesScreen> {
         _sales = loaded.sales;
         _page = loaded.page;
         _hasMore = !hasActiveFilters && loaded.hasMore;
+        if (!hasActiveFilters) {
+          _baseDataKnownEmpty = loaded.sales.isEmpty;
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -259,9 +263,6 @@ class _SalesScreenState extends State<SalesScreen> {
     final requestId = _searchRequestId;
     final hasActiveFilters = _hasActiveFiltersForQuery(activeQuery);
     final perPage = hasActiveFilters ? _filteredPerPage : _perPage;
-    if (mounted) {
-      setState(() => _refreshingResults = true);
-    }
     try {
       final loaded = await CacheLoader.fetchAndCacheSalesPage(
         _api,
@@ -278,16 +279,12 @@ class _SalesScreenState extends State<SalesScreen> {
         _sales = loaded.sales;
         _page = loaded.page;
         _hasMore = !hasActiveFilters && loaded.hasMore;
+        if (!hasActiveFilters) {
+          _baseDataKnownEmpty = loaded.sales.isEmpty;
+        }
         _error = null;
       });
     } catch (_) {}
-    finally {
-      if (mounted) {
-        if (requestId == _searchRequestId) {
-          setState(() => _refreshingResults = false);
-        }
-      }
-    }
   }
 
   Future<void> _loadMoreSales() async {
@@ -371,9 +368,10 @@ class _SalesScreenState extends State<SalesScreen> {
     return query.isNotEmpty || _startDate != null || _endDate != null;
   }
 
-  bool get _hasActiveFilters => _hasActiveFiltersForQuery(_query.trim());
-
   bool get _isDataEmpty => !_loading && _sales.isEmpty;
+
+  bool get _shouldShowFullEmptyState =>
+      _isDataEmpty && _query.trim().isEmpty && _startDate == null && _endDate == null && _baseDataKnownEmpty;
 
   Future<void> _openSalePreviewById(String saleId) async {
     if (_openingPreview) return;
@@ -471,7 +469,7 @@ class _SalesScreenState extends State<SalesScreen> {
     Widget body;
     if (_loading) {
       body = const _SalesLoadingState();
-    } else if (_isDataEmpty && !_hasActiveFilters && !_refreshingResults) {
+    } else if (_shouldShowFullEmptyState) {
       body = _SalesEmptyState(
         message: _error,
         onAddSale: () => _goTo(AppRoutes.newSale),
