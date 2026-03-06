@@ -317,22 +317,28 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   List<Sale> get _filteredSales {
-    if (_query.isEmpty) return _sales;
-    final normalized = _query.toLowerCase();
+    final normalized = _query.trim().toLowerCase();
+    final hasSearch = normalized.isNotEmpty;
+    final hasDates = _startDate != null || _endDate != null;
+
+    if (!hasSearch && !hasDates) return _sales;
+
     return _sales.where((sale) {
-      final customer = (sale.customerName ?? '').toLowerCase();
-      final idText = sale.id.toLowerCase();
-      final matchesSearch = customer.contains(normalized) || idText.contains(normalized);
-      
-      if (!matchesSearch) return false;
-      
-      if (_startDate != null || _endDate != null) {
+      if (hasSearch) {
+        final customer = (sale.customerName ?? '').toLowerCase();
+        final idText = sale.id.toLowerCase();
+        if (!customer.contains(normalized) && !idText.contains(normalized)) {
+          return false;
+        }
+      }
+
+      if (hasDates) {
         final saleDate = DateTime.tryParse(sale.createdAt)?.toLocal();
         if (saleDate == null) return false;
         if (_startDate != null && saleDate.isBefore(_startDate!)) return false;
         if (_endDate != null && saleDate.isAfter(_endDate!)) return false;
       }
-      
+
       return true;
     }).toList();
   }
@@ -450,6 +456,7 @@ class _SalesScreenState extends State<SalesScreen> {
         onLoadMore: _loadMoreSales,
         onOpenSale: (sale) => _openSalePreviewById(sale.id),
         onDateTap: _selectDateRange,
+        onClearDate: _clearDateFilter,
         hasDateFilter: _startDate != null || _endDate != null,
       );
     }

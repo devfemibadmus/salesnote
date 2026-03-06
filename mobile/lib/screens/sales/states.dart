@@ -122,6 +122,7 @@ class _SalesMainState extends StatelessWidget {
     required this.onLoadMore,
     required this.onOpenSale,
     required this.onDateTap,
+    required this.onClearDate,
     required this.hasDateFilter,
   });
 
@@ -133,6 +134,7 @@ class _SalesMainState extends StatelessWidget {
   final Future<void> Function() onLoadMore;
   final Future<void> Function(Sale sale) onOpenSale;
   final VoidCallback onDateTap;
+  final VoidCallback onClearDate;
   final bool hasDateFilter;
 
   @override
@@ -159,6 +161,7 @@ class _SalesMainState extends StatelessWidget {
                 HistorySearchField(
                   controller: queryController,
                   onDateTap: onDateTap,
+                  onClearDate: onClearDate,
                   hasDateFilter: hasDateFilter,
                   hintText: 'Search by customer or ID',
                 ),

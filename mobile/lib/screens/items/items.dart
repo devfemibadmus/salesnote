@@ -256,11 +256,54 @@ class _ItemsScreenState extends State<ItemsScreen> {
   }
 
   List<_ItemRow> get _itemRows {
+    final normalized = _query.trim().toLowerCase();
+    final hasSearch = normalized.isNotEmpty;
+    final hasDates = _startDate != null || _endDate != null;
+
+    final filteredSales = (hasSearch || hasDates)
+        ? _sales.where((sale) {
+            if (hasDates) {
+              final saleDate = DateTime.tryParse(sale.createdAt)?.toLocal();
+              if (saleDate == null) return false;
+              if (_startDate != null && saleDate.isBefore(_startDate!)) {
+                return false;
+              }
+              if (_endDate != null && saleDate.isAfter(_endDate!)) return false;
+            }
+            if (hasSearch) {
+              final customer = (sale.customerName ?? '').toLowerCase();
+              final idText = sale.id.toLowerCase();
+              final matchesCustomerOrId =
+                  customer.contains(normalized) || idText.contains(normalized);
+
+              final matchesAnyItem = sale.items.any(
+                (item) => item.productName.toLowerCase().contains(normalized),
+              );
+
+              if (!matchesCustomerOrId && !matchesAnyItem) return false;
+            }
+            return true;
+          }).toList()
+        : _sales;
+
     final byNameAndPrice = <String, _ItemRow>{};
-    for (final sale in _sales) {
+    for (final sale in filteredSales) {
       for (final item in sale.items) {
         final raw = item.productName.trim();
         final name = raw.isEmpty ? 'Unnamed item' : raw;
+
+        // If we are searching, we should also filter at the item level 
+        // to show only matching items if the sale matched via items
+        if (hasSearch && !name.toLowerCase().contains(normalized)) {
+          // Check if sale matched via customer/id instead
+          final customer = (sale.customerName ?? '').toLowerCase();
+          final idText = sale.id.toLowerCase();
+          final matchesCustomerOrId = 
+              customer.contains(normalized) || idText.contains(normalized);
+          
+          if (!matchesCustomerOrId) continue;
+        }
+
         final unitPrice = item.unitPrice;
         final key = '$name|${unitPrice.toStringAsFixed(2)}';
         final existing = byNameAndPrice[key];
@@ -283,10 +326,6 @@ class _ItemsScreenState extends State<ItemsScreen> {
     }
 
     var rows = byNameAndPrice.values.toList();
-    if (_query.isNotEmpty) {
-      final q = _query.toLowerCase();
-      rows = rows.where((row) => row.name.toLowerCase().contains(q)).toList();
-    }
     rows.sort((a, b) => b.quantity.compareTo(a.quantity));
     return rows;
   }
@@ -312,6 +351,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
         hasMore: _hasMore,
         onLoadMore: _loadMore,
         onDateTap: _selectDateRange,
+        onClearDate: _clearDateFilter,
         hasDateFilter: _startDate != null || _endDate != null,
       );
     }

@@ -108,6 +108,7 @@ class _ItemsMainState extends StatelessWidget {
     required this.hasMore,
     required this.onLoadMore,
     required this.onDateTap,
+    this.onClearDate,
     required this.hasDateFilter,
   });
 
@@ -118,6 +119,7 @@ class _ItemsMainState extends StatelessWidget {
   final bool hasMore;
   final Future<void> Function() onLoadMore;
   final VoidCallback? onDateTap;
+  final VoidCallback? onClearDate;
   final bool hasDateFilter;
 
   @override
@@ -136,6 +138,7 @@ class _ItemsMainState extends StatelessWidget {
                 HistorySearchField(
                   controller: queryController,
                   onDateTap: onDateTap ?? () {},
+                  onClearDate: onClearDate,
                   hasDateFilter: hasDateFilter,
                   hintText: 'Search by item name',
                 ),

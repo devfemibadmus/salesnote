@@ -175,8 +175,10 @@ class CacheLoader {
       hasMore: sales.length == perPage,
     );
 
-    final shouldCacheFirstPage =
-        page == 1 && (searchQuery == null || searchQuery.trim().isEmpty);
+    final shouldCacheFirstPage = page == 1 &&
+        (searchQuery == null || searchQuery.trim().isEmpty) &&
+        startDate == null &&
+        endDate == null;
     if (shouldCacheFirstPage) {
       await saveSalesPageCache(includeItems: includeItems, data: pageData);
     }

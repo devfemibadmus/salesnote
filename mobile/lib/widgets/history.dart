@@ -5,12 +5,14 @@ class HistorySearchField extends StatelessWidget {
     super.key,
     this.controller,
     this.onDateTap,
+    this.onClearDate,
     required this.hasDateFilter,
     this.hintText = 'Search...',
   });
 
   final TextEditingController? controller;
   final VoidCallback? onDateTap;
+  final VoidCallback? onClearDate;
   final bool hasDateFilter;
   final String hintText;
 
@@ -59,7 +61,7 @@ class HistorySearchField extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           InkWell(
-            onTap: onDateTap,
+            onTap: hasDateFilter ? onClearDate : onDateTap,
             borderRadius: BorderRadius.circular(12),
             child: Container(
               padding: const EdgeInsets.all(8),
@@ -68,7 +70,7 @@ class HistorySearchField extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                Icons.calendar_month_rounded,
+                hasDateFilter ? Icons.close : Icons.calendar_month_rounded,
                 color: hasDateFilter ? const Color(0xFF007AFF) : const Color(0xFF64748B),
                 size: 24,
               ),
