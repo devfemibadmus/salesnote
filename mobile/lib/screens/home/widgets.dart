@@ -392,6 +392,8 @@ class _SaleTile extends StatelessWidget {
                     children: [
                       Text(
                         name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
