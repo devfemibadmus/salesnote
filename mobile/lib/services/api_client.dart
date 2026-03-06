@@ -494,10 +494,10 @@ class ApiClient {
         query['q'] = normalizedSearch;
       }
       if (startDate != null) {
-        query['start_date'] = startDate.toUtc().toIso8601String().split('T')[0];
+        query['start_date'] = startDate.toIso8601String().split('T')[0];
       }
       if (endDate != null) {
-        query['end_date'] = endDate.toUtc().toIso8601String().split('T')[0];
+        query['end_date'] = endDate.toIso8601String().split('T')[0];
       }
       return uri.replace(queryParameters: query);
     }();

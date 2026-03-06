@@ -250,17 +250,11 @@ pub async fn create_sale(
         Ok(AuthorizedSaleCreateResult::Created(sale)) => {
             let pool = state.pool.clone();
             let shop_id_val = *shop_id;
-            let device_id_val = (*device_id).0;
             let total = sale.total;
             
             actix_web::rt::spawn(async move {
                 let settings = Settings::load();
-                if let Ok(tokens) = DeviceSession::get_fcm_tokens_for_shop_except(
-                    &pool,
-                    shop_id_val,
-                    device_id_val,
-                )
-                .await
+                if let Ok(tokens) = DeviceSession::get_fcm_tokens_for_shop(&pool, shop_id_val).await
                 {
                     if !tokens.is_empty() {
                         let title = String::from("New Sale");

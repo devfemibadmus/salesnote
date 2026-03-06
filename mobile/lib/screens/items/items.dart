@@ -26,14 +26,17 @@ class _ItemsScreenState extends State<ItemsScreen> {
   final ApiClient _api = ApiClient(TokenStore());
   final TextEditingController _searchController = TextEditingController();
   static const int _perPage = 20;
+  static const int _filteredPerPage = 200;
 
   bool _loading = true;
   bool _loadingMore = false;
+  bool _refreshingResults = false;
   bool _hasMore = true;
   String? _error;
   List<Sale> _sales = [];
   String _query = '';
   int _page = 1;
+  int _searchRequestId = 0;
   late final String _currencySymbol;
   late final String _currencyLocale;
   DateTime? _startDate;
@@ -107,7 +110,11 @@ class _ItemsScreenState extends State<ItemsScreen> {
   void _onSearchChanged() {
     final next = _searchController.text.trim();
     if (next == _query) return;
-    setState(() => _query = next);
+    _searchRequestId += 1;
+    setState(() {
+      _query = next;
+      _refreshingResults = true;
+    });
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 320), () {
       unawaited(_refreshItemsInBackground(searchQuery: next));
@@ -156,12 +163,14 @@ class _ItemsScreenState extends State<ItemsScreen> {
 
   Future<void> _refreshItems() async {
     final activeQuery = _query.trim();
+    final hasActiveFilters = _hasActiveFiltersForQuery(activeQuery);
+    final perPage = hasActiveFilters ? _filteredPerPage : _perPage;
     try {
       final loaded = await CacheLoader.fetchAndCacheSalesPage(
         _api,
         includeItems: true,
         page: 1,
-        perPage: _perPage,
+        perPage: perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
@@ -171,7 +180,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       setState(() {
         _sales = loaded.sales;
         _page = loaded.page;
-        _hasMore = loaded.hasMore;
+        _hasMore = !hasActiveFilters && loaded.hasMore;
       });
     } catch (e) {
       if (!mounted) return;
@@ -186,29 +195,44 @@ class _ItemsScreenState extends State<ItemsScreen> {
 
   Future<void> _refreshItemsInBackground({String? searchQuery}) async {
     final activeQuery = (searchQuery ?? _query).trim();
+    final requestId = _searchRequestId;
+    final hasActiveFilters = _hasActiveFiltersForQuery(activeQuery);
+    final perPage = hasActiveFilters ? _filteredPerPage : _perPage;
+    if (mounted) {
+      setState(() => _refreshingResults = true);
+    }
     try {
       final loaded = await CacheLoader.fetchAndCacheSalesPage(
         _api,
         includeItems: true,
         page: 1,
-        perPage: _perPage,
+        perPage: perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
       );
       if (!mounted) return;
-      if (activeQuery != _query.trim()) return;
+      if (requestId != _searchRequestId || activeQuery != _query.trim()) return;
       setState(() {
         _sales = loaded.sales;
         _page = loaded.page;
-        _hasMore = loaded.hasMore;
+        _hasMore = !hasActiveFilters && loaded.hasMore;
         _error = null;
       });
     } catch (_) {}
+    finally {
+      if (mounted) {
+        if (requestId == _searchRequestId) {
+          setState(() => _refreshingResults = false);
+        }
+      }
+    }
   }
 
   Future<void> _loadMore() async {
-    if (_loadingMore || !_hasMore || _loading) return;
+    if (_loadingMore || !_hasMore || _loading || _hasActiveFiltersForQuery(_query.trim())) {
+      return;
+    }
     final activeQuery = _query.trim();
     setState(() => _loadingMore = true);
     try {
@@ -332,12 +356,18 @@ class _ItemsScreenState extends State<ItemsScreen> {
 
   bool get _isDataEmpty => !_loading && _sales.isEmpty;
 
+  bool _hasActiveFiltersForQuery(String query) {
+    return query.isNotEmpty || _startDate != null || _endDate != null;
+  }
+
+  bool get _hasActiveFilters => _hasActiveFiltersForQuery(_query.trim());
+
   @override
   Widget build(BuildContext context) {
     Widget body;
     if (_loading) {
       body = const _ItemsLoadingState();
-    } else if (_isDataEmpty) {
+    } else if (_isDataEmpty && !_hasActiveFilters && !_refreshingResults) {
       body = _ItemsEmptyState(
         message: _error,
         onAddSale: () => _goTo(AppRoutes.newSale),

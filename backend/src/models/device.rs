@@ -441,22 +441,19 @@ impl DeviceSession {
         Ok(row.is_some())
     }
 
-    pub async fn get_fcm_tokens_for_shop_except(
+    pub async fn get_fcm_tokens_for_shop(
         pool: &PgPool,
         shop_id: i64,
-        excluded_device_id: i64,
     ) -> Result<Vec<String>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT DISTINCT fcm_token
              FROM device_sessions
              WHERE shop_id = $1
-               AND id != $2
                AND deleted_at IS NULL
                AND fcm_token IS NOT NULL
                AND fcm_token <> ''",
         )
         .bind(shop_id)
-        .bind(excluded_device_id)
         .fetch_all(pool)
         .await?;
 

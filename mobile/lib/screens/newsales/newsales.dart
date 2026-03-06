@@ -44,6 +44,7 @@ class NewSaleScreen extends StatefulWidget {
 class _NewSaleScreenState extends State<NewSaleScreen>
     with WidgetsBindingObserver {
   final ApiClient _api = ApiClient(TokenStore());
+  final PageController _stepController = PageController();
 
   static const String _legacyDraftKey = 'draft_new_sale';
   static const String _draftIndexKey = 'draft_new_sale_index';
@@ -84,6 +85,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   late final String _deviceRegionCode;
 
   int _step = 0;
+  bool _stepSwipeUnlocked = false;
   String? _selectedSignatureId;
   String _activeDraftId = _defaultDraftId;
 
@@ -114,6 +116,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_persistDraftSilently());
     _api.dispose();
+    _stepController.dispose();
     _phoneDebounce?.cancel();
     _customerNameController.dispose();
     _customerContactController.dispose();
@@ -132,6 +135,39 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   Future<void> _initializeScreen() async {
     await _loadDraftBootstrap();
     await _loadSignatures();
+  }
+
+  void _syncStepController({bool animate = false}) {
+    if (!_stepController.hasClients) return;
+    if ((_stepController.page?.round() ?? _stepController.initialPage) == _step) {
+      return;
+    }
+    if (animate) {
+      unawaited(
+        _stepController.animateToPage(
+          _step,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+        ),
+      );
+      return;
+    }
+    _stepController.jumpToPage(_step);
+  }
+
+  void _setStep(int value, {bool animate = false, bool unlockSwipe = false}) {
+    final next = value.clamp(0, 1);
+    if (!mounted) return;
+    setState(() {
+      _step = next;
+      if (unlockSwipe) {
+        _stepSwipeUnlocked = true;
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncStepController(animate: animate);
+    });
   }
 
   Future<void> _persistDraftSilently() async {
@@ -334,9 +370,14 @@ class _NewSaleScreenState extends State<NewSaleScreen>
             ? _signatures.first.id
             : null;
         _step = 0;
+        _stepSwipeUnlocked = false;
         _customerNameTouched = false;
         _customerContactTouched = false;
         _items.clear();
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _syncStepController();
       });
       _hydratingDraft = false;
       return;
@@ -382,11 +423,16 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _otherLabel = otherLabel.isEmpty ? _defaultOtherLabel : otherLabel;
       _selectedSignatureId = draft['signature_id']?.toString();
       _step = (draft['step'] as num?)?.toInt().clamp(0, 1) ?? 0;
+      _stepSwipeUnlocked = _step == 1 || parsedItems.isNotEmpty;
       _customerNameTouched = false;
       _customerContactTouched = false;
       _items
         ..clear()
         ..addAll(parsedItems);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncStepController();
     });
     _hydratingDraft = false;
   }
@@ -479,9 +525,14 @@ class _NewSaleScreenState extends State<NewSaleScreen>
           ? _signatures.first.id
           : null;
       _step = 0;
+      _stepSwipeUnlocked = false;
       _customerNameTouched = false;
       _customerContactTouched = false;
       _items.clear();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncStepController();
     });
     await _saveDraftIndex();
     await _saveDraft();
@@ -522,9 +573,14 @@ class _NewSaleScreenState extends State<NewSaleScreen>
             ? _signatures.first.id
             : null;
         _step = 0;
+        _stepSwipeUnlocked = false;
         _customerNameTouched = false;
         _customerContactTouched = false;
         _items.clear();
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _syncStepController();
       });
       await _saveDraft();
       return;
@@ -563,9 +619,14 @@ class _NewSaleScreenState extends State<NewSaleScreen>
             ? _signatures.first.id
             : null;
         _step = 0;
+        _stepSwipeUnlocked = false;
         _customerNameTouched = false;
         _customerContactTouched = false;
         _items.clear();
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _syncStepController();
       });
       await _saveDraft();
       return;
@@ -670,7 +731,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _showSnackBar('Select a signature.');
       return;
     }
-    setState(() => _step = 1);
+    _setStep(1, animate: true, unlockSwipe: true);
     unawaited(_saveDraft());
   }
 
@@ -1292,9 +1353,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
                     textAlign: usePercentage
                         ? TextAlign.right
                         : TextAlign.start,
-                    keyboardType: const TextInputType.numberWithOptions(
+                    keyboardType: TextInputType.numberWithOptions(
                       decimal: true,
-                      signed: true,
+                      signed: allowNegative && !usePercentage,
                     ),
                     inputFormatters: [
                       _ThousandsSeparatedNumberFormatter(
@@ -1446,102 +1507,114 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
   @override
   Widget build(BuildContext context) {
-    final body = _step == 0
-        ? _NewSaleDetailsStep(
-            customerNameController: _customerNameController,
-            customerContactController: _customerContactController,
-            customerNameInvalid: _customerNameInvalid,
-            customerContactInvalid: _customerContactInvalid,
-            country: _country,
-            phoneError: _phoneError,
-            onPickCountry: () {
-              showCountryPicker(
-                context: context,
-                showPhoneCode: true,
-                onSelect: (value) {
-                  setState(() {
-                    _country = value;
-                    _phoneError = null;
-                    _customerContactTouched = true;
-                  });
-                  _onContactChanged(_customerContactController.text);
-                },
-              );
-            },
-            onCustomerNameChanged: (_) {
-              if (!_customerNameTouched) {
-                setState(() => _customerNameTouched = true);
-              } else {
-                setState(() {});
-              }
-            },
-            onCustomerContactChanged: (_) {
-              if (!_customerContactTouched) {
-                setState(() => _customerContactTouched = true);
-              }
-              _onContactChanged(_customerContactController.text);
+    final body = PageView(
+      controller: _stepController,
+      physics: _stepSwipeUnlocked
+          ? const PageScrollPhysics()
+          : const NeverScrollableScrollPhysics(),
+      onPageChanged: (value) {
+        if (_step == value) return;
+        setState(() => _step = value);
+        unawaited(_saveDraft());
+      },
+      children: [
+        _NewSaleDetailsStep(
+          customerNameController: _customerNameController,
+          customerContactController: _customerContactController,
+          customerNameInvalid: _customerNameInvalid,
+          customerContactInvalid: _customerContactInvalid,
+          country: _country,
+          phoneError: _phoneError,
+          onPickCountry: () {
+            showCountryPicker(
+              context: context,
+              showPhoneCode: true,
+              onSelect: (value) {
+                setState(() {
+                  _country = value;
+                  _phoneError = null;
+                  _customerContactTouched = true;
+                });
+                _onContactChanged(_customerContactController.text);
+              },
+            );
+          },
+          onCustomerNameChanged: (_) {
+            if (!_customerNameTouched) {
+              setState(() => _customerNameTouched = true);
+            } else {
               setState(() {});
-            },
-            drafts: _drafts,
-            activeDraftId: _activeDraftId,
-            switchingDraft: _switchingDraft,
-            onCreateDraft: _createDraft,
-            onSwitchDraft: _switchDraft,
-            onDeleteDraft: _deleteDraft,
-            signatures: _signatures,
-            loadingSignatures: _loadingSignatures,
-            uploadingSignature: _uploadingSignature,
-            selectedSignatureId: _selectedSignatureId,
-            onSelectSignature: (id) {
-              setState(() => _selectedSignatureId = id);
-              unawaited(_saveDraft());
-            },
-            onAddSignature: _openAddSignatureSheet,
-            total: _saleTotal,
-            hasItems: _items.isNotEmpty,
-            formatAmount: _formatAmount,
-            onContinue: () => unawaited(_continueToItems()),
-            onClose: () async {
-              await _persistDraftSilently();
-              if (!mounted) return;
-              Navigator.of(this.context).pop();
-            },
-          )
-        : _NewSaleItemsStep(
-            items: _items,
-            drafts: _drafts,
-            activeDraftId: _activeDraftId,
-            switchingDraft: _switchingDraft,
-            onCreateDraft: _createDraft,
-            onSwitchDraft: _switchDraft,
-            onDeleteDraft: _deleteDraft,
-            saleSubtotal: _saleSubtotal,
-            saleTotal: _saleTotal,
-            discountAmount: _discountAmount,
-            vatAmount: _vatAmount,
-            serviceFeeAmount: _serviceFeeAmount,
-            deliveryFeeAmount: _deliveryFeeAmount,
-            roundingAmount: _roundingAmount,
-            otherAmount: _otherAmount,
-            otherLabel: _otherLabel,
-            itemCount: _itemCount,
-            submitting: _submitting,
-            onBack: () {
-              setState(() => _step = 0);
-              unawaited(_saveDraft());
-            },
-            onAddItem: _openAddItemSheet,
-            onAddAdjustment: _openAdjustmentSheet,
-            onEditAdjustment: (type) => _openAdjustmentSheet(initialType: type),
-            onRemoveAdjustment: _removeCharge,
-            onEdit: (index) => _openAddItemSheet(editIndex: index),
-            onIncrement: (index) => _changeQuantity(index, 1),
-            onDecrement: (index) => _changeQuantity(index, -1),
-            onSetQuantity: _setQuantity,
-            onDelete: _removeItem,
-            onSubmit: _openPreview,
-            formatAmount: _formatAmount,
-          );
+            }
+          },
+          onCustomerContactChanged: (_) {
+            if (!_customerContactTouched) {
+              setState(() => _customerContactTouched = true);
+            }
+            _onContactChanged(_customerContactController.text);
+            setState(() {});
+          },
+          drafts: _drafts,
+          activeDraftId: _activeDraftId,
+          switchingDraft: _switchingDraft,
+          onCreateDraft: _createDraft,
+          onSwitchDraft: _switchDraft,
+          onDeleteDraft: _deleteDraft,
+          signatures: _signatures,
+          loadingSignatures: _loadingSignatures,
+          uploadingSignature: _uploadingSignature,
+          selectedSignatureId: _selectedSignatureId,
+          onSelectSignature: (id) {
+            setState(() => _selectedSignatureId = id);
+            unawaited(_saveDraft());
+          },
+          onAddSignature: _openAddSignatureSheet,
+          total: _saleTotal,
+          hasItems: _items.isNotEmpty,
+          formatAmount: _formatAmount,
+          onContinue: () => unawaited(_continueToItems()),
+          onClose: () async {
+            await _persistDraftSilently();
+            if (!mounted) return;
+            Navigator.of(this.context).pop();
+          },
+        ),
+        _NewSaleItemsStep(
+          items: _items,
+          drafts: _drafts,
+          activeDraftId: _activeDraftId,
+          switchingDraft: _switchingDraft,
+          onCreateDraft: _createDraft,
+          onSwitchDraft: _switchDraft,
+          onDeleteDraft: _deleteDraft,
+          saleSubtotal: _saleSubtotal,
+          saleTotal: _saleTotal,
+          discountAmount: _discountAmount,
+          vatAmount: _vatAmount,
+          serviceFeeAmount: _serviceFeeAmount,
+          deliveryFeeAmount: _deliveryFeeAmount,
+          roundingAmount: _roundingAmount,
+          otherAmount: _otherAmount,
+          otherLabel: _otherLabel,
+          itemCount: _itemCount,
+          submitting: _submitting,
+          onBack: () {
+            _setStep(0, animate: true);
+            unawaited(_saveDraft());
+          },
+          onAddItem: _openAddItemSheet,
+          onAddAdjustment: _openAdjustmentSheet,
+          onEditAdjustment: (type) => _openAdjustmentSheet(initialType: type),
+          onRemoveAdjustment: _removeCharge,
+          onEdit: (index) => _openAddItemSheet(editIndex: index),
+          onIncrement: (index) => _changeQuantity(index, 1),
+          onDecrement: (index) => _changeQuantity(index, -1),
+          onSetQuantity: _setQuantity,
+          onDelete: _removeItem,
+          onSubmit: _openPreview,
+          formatAmount: _formatAmount,
+        ),
+      ],
+    );
 
     return PopScope(
       canPop: false,

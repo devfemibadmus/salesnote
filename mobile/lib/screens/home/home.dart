@@ -275,15 +275,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _setupNotifications() async {
     try {
-      final optedOut = await LocalCache.isNotificationOptedOut();
-      if (optedOut) return;
-
       await NotificationService.init();
       final status = await NotificationService.getPermissionStatus();
-      if (_isGranted(status)) {
+      final permissionGranted = _isGranted(status);
+      final pushEnabled = await _isCurrentDevicePushEnabled();
+      final optedOut = await LocalCache.isNotificationOptedOut();
+
+      if (permissionGranted && pushEnabled) {
         await LocalCache.setNotificationPromptCooldown(0);
         return;
       }
+
+      if (optedOut && !permissionGranted) return;
+
       final cooldown = await LocalCache.getNotificationPromptCooldown();
       if (cooldown > 0) {
         await LocalCache.setNotificationPromptCooldown(cooldown - 1);
@@ -296,17 +300,58 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return;
       }
 
-      var permissionStatus = await NotificationService.getPermissionStatus();
+      var permissionStatus = status;
       if (!_isGranted(permissionStatus)) {
         permissionStatus = await NotificationService.requestPermission();
       }
 
       if (_isGranted(permissionStatus)) {
-        await LocalCache.setNotificationPromptCooldown(0);
+        final subscribed = await _subscribeCurrentDeviceFcmFromHome();
+        if (subscribed) {
+          await LocalCache.setNotificationOptedOut(false);
+          await LocalCache.setNotificationPromptCooldown(0);
+          await _markCurrentDevicePushEnabledInCache(true);
+        } else {
+          await LocalCache.setNotificationPromptCooldown(2);
+        }
       } else {
         await LocalCache.setNotificationPromptCooldown(2);
       }
     } catch (_) {}
+  }
+
+  Future<bool> _isCurrentDevicePushEnabled() async {
+    final cached = CacheLoader.loadSettingsSummaryCache();
+    if (cached != null) {
+      return cached.currentDevicePushEnabled;
+    }
+    try {
+      final fresh = await CacheLoader.fetchAndCacheSettingsSummary(_api);
+      return fresh.currentDevicePushEnabled;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _subscribeCurrentDeviceFcmFromHome() async {
+    final token = await NotificationService.getDeviceTokenWithRetry();
+    if (token == null || token.trim().isEmpty) {
+      return false;
+    }
+    await _api.subscribeFcm(token);
+    return true;
+  }
+
+  Future<void> _markCurrentDevicePushEnabledInCache(bool value) async {
+    final cached = CacheLoader.loadSettingsSummaryCache();
+    if (cached == null) return;
+    await CacheLoader.saveSettingsSummaryCache(
+      SettingsSummary(
+        shop: cached.shop,
+        devices: cached.devices,
+        currentDevicePushEnabled: value,
+      ),
+    );
   }
 
   bool _isGranted(AuthorizationStatus status) =>

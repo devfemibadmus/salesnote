@@ -36,7 +36,9 @@ class DeviceInfoService {
         final brand = info.brand;
         final model = info.model;
         final name = _join([brand, model]) ?? 'Android';
-        final os = _join(['Android', info.version.release]) ?? 'Android';
+        final os = info.version.release.trim().isEmpty
+            ? 'Unknown version'
+            : info.version.release;
         return DeviceInfoData(name: name, platform: 'Android', os: os);
       }
 
@@ -52,21 +54,27 @@ class DeviceInfoService {
             ? model 
             : _join([rawName, model]) ?? model;
             
-        final os = _join(['iOS', info.systemVersion]) ?? 'iOS';
+        final os = info.systemVersion.trim().isEmpty
+            ? 'Unknown version'
+            : info.systemVersion;
         return DeviceInfoData(name: name, platform: 'iOS', os: os);
       }
 
       if (Platform.isMacOS) {
         final info = await _plugin.macOsInfo;
         final name = _join([info.computerName, info.model]) ?? 'macOS';
-        final os = _join(['macOS', info.osRelease]) ?? 'macOS';
+        final os = info.osRelease.trim().isEmpty
+            ? 'Unknown version'
+            : info.osRelease;
         return DeviceInfoData(name: name, platform: 'macOS', os: os);
       }
 
       if (Platform.isWindows) {
         final info = await _plugin.windowsInfo;
         final name = info.computerName.isEmpty ? 'Windows' : info.computerName;
-        final os = _join(['Windows', info.displayVersion]) ?? 'Windows';
+        final os = info.displayVersion.trim().isEmpty
+            ? 'Unknown version'
+            : info.displayVersion;
         return DeviceInfoData(name: name, platform: 'Windows', os: os);
       }
 
