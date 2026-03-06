@@ -63,13 +63,13 @@ class _InputBox extends StatelessWidget {
                 hintStyle: const TextStyle(
                   color: Color(0xFF97A6BD),
                   fontSize: 16,
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.normal,
                 ),
               ),
               style: const TextStyle(
                 color: Color(0xFF101828),
                 fontSize: 18,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.normal,
               ),
             ),
           ),
