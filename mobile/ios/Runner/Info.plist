@@ -47,6 +47,10 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to save receipt images.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We need permission to save receipt images to your photo library.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
