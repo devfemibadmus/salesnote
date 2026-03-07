@@ -12,7 +12,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 | --- | --- | --- | --- |
 | SEC-001 | High | Implemented | Weak password policy |
 | SEC-002 | High | Implemented | Image decode path is vulnerable to memory/CPU exhaustion |
-| SEC-003 | Medium | Open | Signup flow leaks account existence |
+| SEC-003 | Medium | Implemented | Signup flow leaks account existence |
 | SEC-004 | Medium | Implemented | Client IP and geo headers are trusted without a trusted-proxy boundary |
 | SEC-005 | Medium | Open | Uploaded files are exposed publicly under `/uploads` |
 | SEC-006 | Low | Open | Production logging defaults are too verbose |
@@ -77,7 +77,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 ### SEC-003: Signup flow leaks account existence
 
 - Severity: Medium
-- Status: Open
+- Status: Implemented
 - Locations:
   - `backend/src/api/handlers/auth.rs:55`
   - `backend/src/api/handlers/auth.rs:170`
@@ -91,6 +91,10 @@ This is a tracking document for backend security work. Findings are ordered by s
   - Return a generic response for signup initiation and signup verification failures.
   - Keep the exact duplicate reason only in internal logs.
   - If product wants nicer UX, only reveal duplicate state after stronger proof of ownership.
+- Implemented:
+  - signup initiation now returns a generic success response even when the account already exists
+  - duplicate-account races during signup verification now return a generic invalid-code response
+  - exact duplicate reasons are kept only in server logs
 
 ### SEC-004: Client IP and geo headers are trusted without a trusted-proxy boundary
 

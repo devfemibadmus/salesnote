@@ -53,7 +53,12 @@ pub async fn register(
     {
         Ok(result) => {
             if result.has_existing_shop {
-                return json_error(StatusCode::BAD_REQUEST, "phone or email already exists");
+                tracing::warn!(
+                    "signup initiation blocked for existing account: phone={} email={}",
+                    input.phone,
+                    input.email
+                );
+                return json_ok("Verification code sent.");
             }
             let max_requests_i32 = i32::try_from(max_requests).unwrap_or(i32::MAX);
             if result.request_count >= max_requests_i32 {
@@ -168,7 +173,15 @@ pub async fn verify_signup(
             tracing::error!("verify signup create error: {}", e);
             if let sqlx::Error::Database(db_err) = &e {
                 if db_err.code().as_deref() == Some("23505") {
-                    return json_error(StatusCode::BAD_REQUEST, "phone or email already exists");
+                    tracing::warn!(
+                        "signup verification hit duplicate account create: phone={} email={}",
+                        input.input.phone,
+                        input.input.email
+                    );
+                    return json_error(
+                        StatusCode::UNAUTHORIZED,
+                        "invalid or expired code",
+                    );
                 }
             }
             return json_error(
