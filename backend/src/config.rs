@@ -61,6 +61,8 @@ pub struct Settings {
     pub forgot_password_window_minutes: i64,
     #[serde(default = "default_reset_code_max_incorrect_attempts")]
     pub reset_code_max_incorrect_attempts: i64,
+    #[serde(default = "default_trusted_proxy_ranges")]
+    pub trusted_proxy_ranges: String,
     #[serde(default = "default_password_min_chars")]
     pub password_min_chars: usize,
     #[serde(default = "default_password_max_chars")]
@@ -484,6 +486,10 @@ fn default_forgot_password_window_minutes() -> i64 {
 
 fn default_reset_code_max_incorrect_attempts() -> i64 {
     5
+}
+
+fn default_trusted_proxy_ranges() -> String {
+    "127.0.0.1/32,::1/128".to_string()
 }
 
 fn default_password_min_chars() -> usize {

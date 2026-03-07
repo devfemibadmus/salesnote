@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 
 use actix_files::Files;
 use actix_web::{middleware::DefaultHeaders, middleware::Logger, web, App, HttpServer};
+use ipnet::IpNet;
 
 use salesnote_backend::api::{
     middlewares::rate_limit::{AuthRateLimits, RateLimiter},
@@ -43,6 +44,8 @@ async fn main() -> std::io::Result<()> {
         forgot_password_max_requests: settings.forgot_password_max_requests,
         forgot_password_window_minutes: settings.forgot_password_window_minutes,
         reset_code_max_incorrect_attempts: settings.reset_code_max_incorrect_attempts,
+        trusted_proxies: parse_trusted_proxies(&settings.trusted_proxy_ranges)
+            .expect("invalid trusted proxy ranges"),
         smtp_host: settings.smtp_host.clone(),
         smtp_port: settings.smtp_port,
         smtp_username: settings.smtp_username.clone(),
@@ -83,6 +86,7 @@ async fn main() -> std::io::Result<()> {
                     verify_code_per_minute: settings.auth_verify_code_rate_limit_per_minute,
                     reset_password_per_minute: settings.auth_reset_password_rate_limit_per_minute,
                 },
+                state.trusted_proxies.clone(),
                 state.redis.clone(),
             ))
             .configure(|cfg| routes::init_routes(cfg, state.clone()))
@@ -90,4 +94,16 @@ async fn main() -> std::io::Result<()> {
     .bind(addr)?
     .run()
     .await
+}
+
+fn parse_trusted_proxies(value: &str) -> Result<Vec<IpNet>, String> {
+    value
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            part.parse::<IpNet>()
+                .map_err(|_| format!("invalid trusted proxy range: {part}"))
+        })
+        .collect()
 }

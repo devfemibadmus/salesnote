@@ -13,7 +13,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 | SEC-001 | High | Implemented | Weak password policy |
 | SEC-002 | High | Implemented | Image decode path is vulnerable to memory/CPU exhaustion |
 | SEC-003 | Medium | Open | Signup flow leaks account existence |
-| SEC-004 | Medium | Open | Client IP and geo headers are trusted without a trusted-proxy boundary |
+| SEC-004 | Medium | Implemented | Client IP and geo headers are trusted without a trusted-proxy boundary |
 | SEC-005 | Medium | Open | Uploaded files are exposed publicly under `/uploads` |
 | SEC-006 | Low | Open | Production logging defaults are too verbose |
 | SEC-007 | Medium | Implemented | Brute-force and spam protection is only partial on auth flows |
@@ -95,7 +95,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 ### SEC-004: Client IP and geo headers are trusted without a trusted-proxy boundary
 
 - Severity: Medium
-- Status: Open
+- Status: Implemented
 - Locations:
   - `backend/src/api/handlers/auth.rs:538`
   - `backend/src/api/handlers/auth.rs:542`
@@ -116,6 +116,10 @@ This is a tracking document for backend security work. Findings are ordered by s
   - Accept forwarded headers only from a trusted reverse proxy boundary.
   - Prefer a single sanitized upstream header set by nginx.
   - Document and enforce direct-port blocking so clients cannot bypass the proxy.
+- Implemented:
+  - added a configured trusted-proxy boundary via `SALESNOTE__TRUSTED_PROXY_RANGES`
+  - `X-Forwarded-For`, `X-Real-IP`, and geo headers are now used only when the direct peer IP is trusted
+  - auth session metadata and rate-limit attribution now use the same shared trust logic
 
 ### SEC-005: Uploaded files are exposed publicly under `/uploads`
 

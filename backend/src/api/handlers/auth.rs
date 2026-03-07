@@ -9,6 +9,7 @@ use rand::Rng;
 use std::str::FromStr;
 
 use crate::api::middlewares::auth::AuthDeviceId;
+use crate::api::request_origin;
 use crate::api::response::{json_error, json_ok};
 use crate::api::state::AppState;
 use crate::models::{
@@ -140,13 +141,13 @@ pub async fn verify_signup(
         return json_error(StatusCode::UNAUTHORIZED, "invalid or expired code");
     }
 
-    let ip_address = extract_client_ip(&req);
+    let ip_address = request_origin::extract_client_ip(&req, &state.trusted_proxies);
     let user_agent = req
         .headers()
         .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
         .map(|v| v.to_string());
-    let location = build_location_from_headers(req.headers());
+    let location = request_origin::build_location_from_headers(&req, &state.trusted_proxies);
 
     let session = match ShopAuthRecord::create_verified_signup_session(
         &state.pool,
@@ -214,13 +215,13 @@ pub async fn login(
     if phone_or_email.contains('@') {
         phone_or_email = phone_or_email.to_lowercase();
     }
-    let ip_address = extract_client_ip(&req);
+    let ip_address = request_origin::extract_client_ip(&req, &state.trusted_proxies);
     let user_agent = req
         .headers()
         .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok())
         .map(|v| v.to_string());
-    let location = build_location_from_headers(req.headers());
+    let location = request_origin::build_location_from_headers(&req, &state.trusted_proxies);
     let login_payload = LoginOneStepPayload {
         phone_or_email,
         password: payload.password.clone(),
@@ -522,60 +523,6 @@ pub async fn delete_device(
             )
         }
     }
-}
-
-fn build_location_from_headers(headers: &HeaderMap) -> Option<String> {
-    let city = headers
-        .get("X-Geo-City")
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v.trim().to_string());
-    let region = headers
-        .get("X-Geo-Region")
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v.trim().to_string());
-    let country = headers
-        .get("X-Geo-Country")
-        .or_else(|| headers.get("CF-IPCountry"))
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v.trim().to_string());
-
-    let parts: Vec<String> = [city, region, country]
-        .into_iter()
-        .flatten()
-        .filter(|p| !p.is_empty())
-        .collect();
-
-    if parts.is_empty() {
-        None
-    } else {
-        Some(parts.join(", "))
-    }
-}
-
-fn extract_client_ip(req: &HttpRequest) -> Option<String> {
-    if let Some(v) = req.headers().get("X-Forwarded-For") {
-        if let Ok(s) = v.to_str() {
-            if let Some(ip) = s
-                .split(',')
-                .next()
-                .map(|v| v.trim())
-                .filter(|v| !v.is_empty())
-            {
-                return Some(ip.to_string());
-            }
-        }
-    }
-    if let Some(v) = req.headers().get("X-Real-IP") {
-        if let Ok(s) = v.to_str() {
-            if !s.trim().is_empty() {
-                return Some(s.trim().to_string());
-            }
-        }
-    }
-    req.connection_info()
-        .realip_remote_addr()
-        .map(|v| v.to_string())
-        .or_else(|| req.peer_addr().map(|a| a.ip().to_string()))
 }
 
 fn validate_register(input: &AuthRegisterInput, state: &AppState) -> Result<(), String> {

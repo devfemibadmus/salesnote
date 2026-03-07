@@ -8,15 +8,18 @@ use actix_web::{
     Error, HttpMessage,
 };
 use futures_util::future::{ok, LocalBoxFuture, Ready};
+use ipnet::IpNet;
 use redis::AsyncCommands;
 use tokio::time::{timeout, Duration};
 
+use crate::api::request_origin::extract_client_ip_for_service;
 use crate::api::response::json_error;
 
 #[derive(Clone)]
 pub struct RateLimiter {
     pub max_per_minute: u32,
     pub auth_limits: AuthRateLimits,
+    pub trusted_proxies: Vec<IpNet>,
     pub redis: redis::Client,
 }
 
@@ -37,10 +40,16 @@ struct RouteLimit {
 }
 
 impl RateLimiter {
-    pub fn new(max_per_minute: u32, auth_limits: AuthRateLimits, redis: redis::Client) -> Self {
+    pub fn new(
+        max_per_minute: u32,
+        auth_limits: AuthRateLimits,
+        trusted_proxies: Vec<IpNet>,
+        redis: redis::Client,
+    ) -> Self {
         Self {
             max_per_minute,
             auth_limits,
+            trusted_proxies,
             redis,
         }
     }
@@ -100,6 +109,7 @@ where
             service: Rc::new(service),
             max_per_minute: self.max_per_minute,
             auth_limits: self.auth_limits.clone(),
+            trusted_proxies: self.trusted_proxies.clone(),
             redis: self.redis.clone(),
         })
     }
@@ -109,6 +119,7 @@ pub struct RateLimiterMiddleware<S> {
     service: Rc<S>,
     max_per_minute: u32,
     auth_limits: AuthRateLimits,
+    trusted_proxies: Vec<IpNet>,
     redis: redis::Client,
 }
 
@@ -132,6 +143,7 @@ where
         let srv = self.service.clone();
         let max_per_minute = self.max_per_minute;
         let auth_limits = self.auth_limits.clone();
+        let trusted_proxies = self.trusted_proxies.clone();
         let redis = self.redis.clone();
 
         Box::pin(async move {
@@ -145,9 +157,7 @@ where
             let key = if let Some(shop_id) = shop_id {
                 format!("shop:{}", shop_id)
             } else {
-                req.connection_info()
-                    .realip_remote_addr()
-                    .map(|v| v.to_string())
+                extract_client_ip_for_service(&req, &trusted_proxies)
                     .unwrap_or_else(|| "unknown".to_string())
             };
 
