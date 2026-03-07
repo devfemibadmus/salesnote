@@ -4,7 +4,9 @@ use actix_web::web::ReqData;
 use actix_web::{web, HttpResponse, Responder};
 use futures_util::StreamExt;
 use image::codecs::jpeg::JpegEncoder;
+use image::ImageReader;
 use serde::Serialize;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use crate::api::middlewares::auth::AuthDeviceId;
@@ -22,6 +24,8 @@ pub struct FcmSubscribeInput {
 
 const MAX_TEXT_FIELD_SIZE: usize = 1024 * 1024;
 const PROFILE_IMAGE_MAX_DIMENSION: u32 = 1600;
+const PROFILE_IMAGE_MAX_SOURCE_DIMENSION: u32 = 5000;
+const PROFILE_IMAGE_MAX_SOURCE_PIXELS: u64 = 16_000_000;
 const PROFILE_IMAGE_JPEG_QUALITY: u8 = 82;
 const MIN_SHOP_NAME_CHARS: usize = 3;
 const MAX_SHOP_NAME_CHARS: usize = 40;
@@ -161,6 +165,12 @@ async fn read_file_field_and_optimize_logo(
         file_bytes.extend_from_slice(&chunk);
     }
 
+    inspect_image_bounds(
+        &file_bytes,
+        PROFILE_IMAGE_MAX_SOURCE_DIMENSION,
+        PROFILE_IMAGE_MAX_SOURCE_PIXELS,
+    )?;
+
     let mut image = image::load_from_memory(&file_bytes).map_err(|_| {
         json_error(
             actix_web::http::StatusCode::BAD_REQUEST,
@@ -194,6 +204,34 @@ async fn read_file_field_and_optimize_logo(
         return Err(json_error(
             actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
             "image processing error",
+        ));
+    }
+
+    Ok(())
+}
+
+fn inspect_image_bounds(
+    bytes: &[u8],
+    max_dimension: u32,
+    max_pixels: u64,
+) -> Result<(), HttpResponse> {
+    let reader = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|_| json_error(StatusCode::BAD_REQUEST, "invalid image data"))?;
+
+    let (width, height) = reader
+        .into_dimensions()
+        .map_err(|_| json_error(StatusCode::BAD_REQUEST, "invalid image data"))?;
+
+    if width == 0 || height == 0 {
+        return Err(json_error(StatusCode::BAD_REQUEST, "invalid image data"));
+    }
+
+    let pixel_count = u64::from(width) * u64::from(height);
+    if width > max_dimension || height > max_dimension || pixel_count > max_pixels {
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "image dimensions too large",
         ));
     }
 

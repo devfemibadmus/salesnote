@@ -11,7 +11,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 | ID | Severity | Status | Title |
 | --- | --- | --- | --- |
 | SEC-001 | High | Implemented | Weak password policy |
-| SEC-002 | High | Open | Image decode path is vulnerable to memory/CPU exhaustion |
+| SEC-002 | High | Implemented | Image decode path is vulnerable to memory/CPU exhaustion |
 | SEC-003 | Medium | Open | Signup flow leaks account existence |
 | SEC-004 | Medium | Open | Client IP and geo headers are trusted without a trusted-proxy boundary |
 | SEC-005 | Medium | Open | Uploaded files are exposed publicly under `/uploads` |
@@ -49,7 +49,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 ### SEC-002: Image decode path is vulnerable to memory/CPU exhaustion
 
 - Severity: High
-- Status: Open
+- Status: Implemented
 - Locations:
   - `backend/src/api/handlers/shops.rs:152`
   - `backend/src/api/handlers/shops.rs:162`
@@ -68,6 +68,11 @@ This is a tracking document for backend security work. Findings are ordered by s
   - Add explicit max pixel count, for example width * height cap.
   - Consider decode timeouts or worker isolation for expensive image processing.
   - Log rejected images with safe metadata only.
+- Implemented:
+  - source image metadata is now inspected before full decode
+  - source dimension cap added
+  - source pixel-count cap added
+  - applied to both shop logo and signature upload paths
 
 ### SEC-003: Signup flow leaks account existence
 
@@ -251,5 +256,3 @@ This is a tracking document for backend security work. Findings are ordered by s
 - This review is based on code inspection only.
 - No dynamic testing, fuzzing, dependency audit, or infrastructure validation was performed in this pass.
 - Reverse proxy behavior matters for SEC-004 and SEC-005. Confirm nginx and firewall posture before closing those items.
-
-

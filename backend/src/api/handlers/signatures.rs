@@ -3,6 +3,8 @@ use actix_web::web::ReqData;
 use actix_web::{http::StatusCode, web, HttpResponse, Responder};
 use futures_util::StreamExt;
 use image::ImageFormat;
+use image::ImageReader;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -14,6 +16,9 @@ use crate::models::{
     AuthorizedSignatureDeletePayload, AuthorizedSignatureDeleteResult,
     AuthorizedSignatureListPayload, Signature,
 };
+
+const SIGNATURE_IMAGE_MAX_SOURCE_DIMENSION: u32 = 5000;
+const SIGNATURE_IMAGE_MAX_SOURCE_PIXELS: u64 = 16_000_000;
 
 fn extension_from_mime(mime: &mime::Mime) -> Option<&'static str> {
     match (mime.type_().as_str(), mime.subtype().as_str()) {
@@ -72,6 +77,34 @@ async fn read_file_field_bytes(
         file_bytes.extend_from_slice(&chunk);
     }
     Ok(file_bytes)
+}
+
+fn inspect_image_bounds(
+    bytes: &[u8],
+    max_dimension: u32,
+    max_pixels: u64,
+) -> Result<(), HttpResponse> {
+    let reader = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|_| json_error(StatusCode::BAD_REQUEST, "invalid image data"))?;
+
+    let (width, height) = reader
+        .into_dimensions()
+        .map_err(|_| json_error(StatusCode::BAD_REQUEST, "invalid image data"))?;
+
+    if width == 0 || height == 0 {
+        return Err(json_error(StatusCode::BAD_REQUEST, "invalid image data"));
+    }
+
+    let pixel_count = u64::from(width) * u64::from(height);
+    if width > max_dimension || height > max_dimension || pixel_count > max_pixels {
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "image dimensions too large",
+        ));
+    }
+
+    Ok(())
 }
 
 fn remove_signature_background(bytes: &[u8], out_path: &Path) -> Result<(), HttpResponse> {
@@ -166,6 +199,13 @@ pub async fn create_signature(
                     Ok(b) => b,
                     Err(resp) => return resp,
                 };
+            if let Err(resp) = inspect_image_bounds(
+                &file_bytes,
+                SIGNATURE_IMAGE_MAX_SOURCE_DIMENSION,
+                SIGNATURE_IMAGE_MAX_SOURCE_PIXELS,
+            ) {
+                return resp;
+            }
 
             let processed_filename = format!("sig_{}_{}_processed.png", *shop_id, ts.as_millis());
             let processed_rel_path = format!("uploads/signatures/{}", processed_filename);
