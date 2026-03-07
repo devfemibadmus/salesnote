@@ -11,7 +11,7 @@ This is a tracking document for mobile improvements. Items are ordered by fix pr
 | ID | Severity | Status | Title |
 | --- | --- | --- | --- |
 | MOB-001 | High | Implemented | Signed media cache keys are unstable |
-| MOB-002 | Medium | Open | API client crashes on non-JSON error responses |
+| MOB-002 | Medium | Implemented | API client crashes on non-JSON error responses |
 | MOB-003 | Medium | Open | Auth token is stored in SharedPreferences |
 | MOB-004 | Low | Open | Suggestion query URL is built by raw string interpolation |
 
@@ -43,7 +43,7 @@ This is a tracking document for mobile improvements. Items are ordered by fix pr
 ### MOB-002: API client crashes on non-JSON error responses
 
 - Severity: Medium
-- Status: Open
+- Status: Implemented
 - Locations:
   - `mobile/lib/services/api_client.dart`
 - Current behavior:
@@ -55,6 +55,9 @@ This is a tracking document for mobile improvements. Items are ordered by fix pr
 - Recommended fix:
   - Guard JSON decoding.
   - Fall back to raw status/body handling when the response is not JSON.
+- Implemented:
+  - API response parsing now tries JSON decoding safely
+  - non-JSON, HTML, text, or empty responses now fall back into normal status/body error handling instead of throwing `FormatException`
 
 ### MOB-003: Auth token is stored in SharedPreferences
 

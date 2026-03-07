@@ -73,7 +73,7 @@ class ApiClient {
         '-> ${response.statusCode} ${response.body}',
       );
     }
-    final decoded = jsonDecode(response.body);
+    final decoded = _tryDecodeJson(response.body);
     if (decoded is Map<String, dynamic>) {
       if (response.statusCode == 401) {
         final message = (decoded['error'] as Map<String, dynamic>?)?['message']
@@ -115,6 +115,16 @@ class ApiClient {
       'Something went wrong.',
       statusCode: response.statusCode,
     );
+  }
+
+  dynamic _tryDecodeJson(String body) {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) return null;
+    try {
+      return jsonDecode(trimmed);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _handleUnauthorized(http.Response response) async {
