@@ -13,7 +13,7 @@ This is a tracking document for mobile improvements. Items are ordered by fix pr
 | MOB-001 | High | Implemented | Signed media cache keys are unstable |
 | MOB-002 | Medium | Implemented | API client crashes on non-JSON error responses |
 | MOB-003 | Medium | Open | Auth token is stored in SharedPreferences |
-| MOB-004 | Low | Open | Suggestion query URL is built by raw string interpolation |
+| MOB-004 | Low | Implemented | Suggestion query URL is built by raw string interpolation |
 
 ## Details
 
@@ -76,7 +76,7 @@ This is a tracking document for mobile improvements. Items are ordered by fix pr
 ### MOB-004: Suggestion query URL is built by raw string interpolation
 
 - Severity: Low
-- Status: Open
+- Status: Implemented
 - Locations:
   - `mobile/lib/services/api_client.dart`
 - Current behavior:
@@ -86,6 +86,9 @@ This is a tracking document for mobile improvements. Items are ordered by fix pr
   - Request parameters can be malformed for `&`, `?`, `#`, `+`, or non-ASCII input.
 - Recommended fix:
   - Build the URL with `Uri.replace(queryParameters: ...)`.
+- Implemented:
+  - suggestion requests now use `Uri.replace(queryParameters: ...)`
+  - special characters in search input are now encoded safely instead of corrupting the request URL
 
 ## Fix Order
 

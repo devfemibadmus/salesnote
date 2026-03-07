@@ -454,7 +454,13 @@ class ApiClient {
   }
 
   Future<List<SuggestionItem>> listSuggestions(String key, String query) async {
-    final uri = _uri('/suggestions?key=$key&q=$query&limit=10');
+    final uri = _uri('/suggestions').replace(
+      queryParameters: {
+        'key': key,
+        'q': query,
+        'limit': '10',
+      },
+    );
     final headers = await _headers();
     final response = await _timedRequest(
       'GET',
