@@ -561,11 +561,16 @@ extension _PreviewPdf on _SalePreviewScreenState {
   Future<Uint8List?> _loadNetworkImageBytes(String? rawPath) async {
     final raw = (rawPath ?? '').trim();
     if (raw.isEmpty) return null;
+    final cached = MediaService.loadCachedBytes(raw);
+    if (cached != null && cached.isNotEmpty) {
+      return cached;
+    }
     try {
-      final url = MediaService.resolveSrc(raw);
+      final url = MediaService.resolveSrc(raw, withCacheBust: false);
       if (url.isEmpty) return null;
       final response = await http.get(Uri.parse(url));
       if (response.statusCode >= 200 && response.statusCode < 300) {
+        await MediaService.warmImage(raw);
         return response.bodyBytes;
       }
     } catch (_) {}

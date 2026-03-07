@@ -8,6 +8,7 @@ import '../app/routes.dart';
 import '../app/config.dart';
 import '../data/models.dart';
 import 'cache/local.dart';
+import 'media.dart';
 import 'notification.dart';
 import 'token_store.dart';
 
@@ -315,6 +316,7 @@ class ApiClient {
       response,
       (data) => ShopProfile.fromJson(data),
     );
+    await MediaService.warmImage(result.data.logoUrl);
     return result.data;
   }
 
@@ -334,6 +336,7 @@ class ApiClient {
       response,
       (data) => ShopProfile.fromJson(data),
     );
+    await MediaService.warmImage(result.data.logoUrl);
     return result.data;
   }
 
@@ -361,6 +364,7 @@ class ApiClient {
       response,
       (data) => ShopProfile.fromJson(data),
     );
+    await MediaService.warmImage(result.data.logoUrl);
     return result.data;
   }
 
@@ -376,6 +380,7 @@ class ApiClient {
       response,
       (data) => (data as List).map((e) => SignatureItem.fromJson(e)).toList(),
     );
+    await MediaService.warmImages(result.data.map((e) => e.imageUrl));
     return result.data;
   }
 
@@ -392,6 +397,7 @@ class ApiClient {
       response,
       (data) => SignatureItem.fromJson(data),
     );
+    await MediaService.warmImage(result.data.imageUrl);
     return result.data;
   }
 
@@ -422,6 +428,7 @@ class ApiClient {
       response,
       (data) => SignatureItem.fromJson(data),
     );
+    await MediaService.warmImage(result.data.imageUrl);
     return result.data;
   }
 
@@ -634,6 +641,7 @@ class ApiClient {
       response,
       (data) => HomeSummary.fromJson(data),
     );
+    await MediaService.warmImage(result.data.shop.logoUrl);
     return result.data;
   }
 
@@ -649,6 +657,7 @@ class ApiClient {
       response,
       (data) => SettingsSummary.fromJson(data),
     );
+    await MediaService.warmImage(result.data.shop.logoUrl);
     return result.data;
   }
 

@@ -390,10 +390,7 @@ class _ErrorState extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.onCreateSale,
-    required this.onNotification,
-  });
+  const _EmptyState({required this.onCreateSale, required this.onNotification});
   final VoidCallback onCreateSale;
   final VoidCallback onNotification;
 
@@ -543,9 +540,7 @@ class _DashboardEmptyHeader extends StatelessWidget {
                           ),
                           decoration: const BoxDecoration(
                             color: Color(0xFFEF4444),
-                            borderRadius: BorderRadius.all(
-                              Radius.circular(10),
-                            ),
+                            borderRadius: BorderRadius.all(Radius.circular(10)),
                           ),
                           child: Text(
                             unreadCount > 99 ? '99+' : unreadCount.toString(),
@@ -806,15 +801,15 @@ class _AutoMetricCardsState extends State<_AutoMetricCards> {
       _isAnimating = true;
       _controller
           .animateToPage(
-        _page,
-        duration: _duration,
-        curve: Curves.easeInOutCubic,
-      )
+            _page,
+            duration: _duration,
+            curve: Curves.easeInOutCubic,
+          )
           .whenComplete(() {
-        if (mounted) {
-          _isAnimating = false;
-        }
-      });
+            if (mounted) {
+              _isAnimating = false;
+            }
+          });
     });
   }
 
@@ -844,28 +839,6 @@ class _AutoMetricCardsState extends State<_AutoMetricCards> {
       },
     );
   }
-}
-
-String _homeMediaSrc(String src) {
-  if (src.startsWith('http://') || src.startsWith('https://')) {
-    final bust = LocalCache.getShopLogoCacheBust();
-    if (bust <= 0) return src;
-    final uri = Uri.tryParse(src);
-    if (uri == null) return src;
-    final nextQuery = Map<String, String>.from(uri.queryParameters)
-      ..['cb'] = bust.toString();
-    return uri.replace(queryParameters: nextQuery).toString();
-  }
-  final base = AppConfig.apiBaseUrl.endsWith('/')
-      ? AppConfig.apiBaseUrl.substring(0, AppConfig.apiBaseUrl.length - 1)
-      : AppConfig.apiBaseUrl;
-  final path = src.startsWith('/') ? src.substring(1) : src;
-  final uri = Uri.parse('$base/$path');
-  final bust = LocalCache.getShopLogoCacheBust();
-  if (bust <= 0) return uri.toString();
-  final nextQuery = Map<String, String>.from(uri.queryParameters)
-    ..['cb'] = bust.toString();
-  return uri.replace(queryParameters: nextQuery).toString();
 }
 
 class _MainState extends StatelessWidget {
@@ -926,8 +899,8 @@ class _MainState extends StatelessWidget {
                     height: 48,
                     child: (shop.logoUrl ?? '').trim().isEmpty
                         ? const Icon(Icons.store)
-                        : Image.network(
-                            _homeMediaSrc(shop.logoUrl!),
+                        : Image(
+                            image: MediaService.imageProvider(shop.logoUrl!)!,
                             fit: BoxFit.cover,
                             errorBuilder: (_, _, _) => const Icon(Icons.store),
                           ),
@@ -1109,9 +1082,9 @@ class _MainState extends StatelessWidget {
           style: TextStyle(fontSize: 34 / 2, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
-        ...sales.take(4).map(
-              (s) => _SaleTile(sale: s, onTap: () => onOpenSale(s)),
-            ),
+        ...sales
+            .take(4)
+            .map((s) => _SaleTile(sale: s, onTap: () => onOpenSale(s))),
       ],
     );
   }

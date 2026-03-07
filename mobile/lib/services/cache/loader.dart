@@ -1,5 +1,6 @@
 import '../../data/models.dart';
 import '../api_client.dart';
+import '../media.dart';
 import 'local.dart';
 
 class CachedSalesPage {
@@ -47,7 +48,12 @@ class CacheLoader {
   }
 
   static Future<void> saveHomeSummaryCache(HomeSummary data) {
-    return LocalCache.saveHomeSummary(data.toJson());
+    return _saveHomeSummaryCache(data);
+  }
+
+  static Future<void> _saveHomeSummaryCache(HomeSummary data) async {
+    await MediaService.warmImage(data.shop.logoUrl);
+    await LocalCache.saveHomeSummary(data.toJson());
   }
 
   static Future<SettingsSummary?> loadOrFetchSettingsSummary(
@@ -84,7 +90,12 @@ class CacheLoader {
   }
 
   static Future<void> saveSettingsSummaryCache(SettingsSummary data) {
-    return LocalCache.saveSettingsSummary(data.toJson());
+    return _saveSettingsSummaryCache(data);
+  }
+
+  static Future<void> _saveSettingsSummaryCache(SettingsSummary data) async {
+    await MediaService.warmImage(data.shop.logoUrl);
+    await LocalCache.saveSettingsSummary(data.toJson());
   }
 
   static Future<List<SignatureItem>> loadOrFetchSignatures(
@@ -121,7 +132,12 @@ class CacheLoader {
   }
 
   static Future<void> saveSignaturesCache(List<SignatureItem> signatures) {
-    return LocalCache.saveSignatures(
+    return _saveSignaturesCache(signatures);
+  }
+
+  static Future<void> _saveSignaturesCache(List<SignatureItem> signatures) async {
+    await MediaService.warmImages(signatures.map((e) => e.imageUrl));
+    await LocalCache.saveSignatures(
       signatures.map((e) => e.toJson()).toList(),
     );
   }

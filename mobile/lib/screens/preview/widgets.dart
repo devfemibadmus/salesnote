@@ -109,24 +109,22 @@ class _PreviewShopAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final logo = shop?.logoUrl;
-    if (logo != null && logo.trim().isNotEmpty) {
-      final url = MediaService.resolveSrc(logo.trim());
-      if (url.isNotEmpty) {
-        return Container(
-          width: 74,
-          height: 74,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: const Color(0xFFCBD8EA)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Image.network(
-            url,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => _fallbackAvatar(),
-          ),
-        );
-      }
+    final provider = MediaService.imageProvider(logo);
+    if (provider != null) {
+      return Container(
+        width: 74,
+        height: 74,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFCBD8EA)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Image(
+          image: provider,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _fallbackAvatar(),
+        ),
+      );
     }
     return _fallbackAvatar();
   }
@@ -160,9 +158,8 @@ class _PreviewSignature extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final raw = signature?.imageUrl ?? '';
-    final url = raw.trim().isEmpty ? '' : MediaService.resolveSrc(raw);
-    if (url.isNotEmpty) {
+    final provider = MediaService.imageProvider(signature?.imageUrl);
+    if (provider != null) {
       return Center(
         child: Stack(
           alignment: Alignment.center,
@@ -171,8 +168,8 @@ class _PreviewSignature extends StatelessWidget {
               offset: const Offset(1.6, 0),
               child: Opacity(
                 opacity: 0.95,
-                child: Image.network(
-                  url,
+                child: Image(
+                  image: provider,
                   fit: BoxFit.contain,
                   color: const Color(0xFF111111),
                   colorBlendMode: BlendMode.srcATop,
@@ -185,8 +182,8 @@ class _PreviewSignature extends StatelessWidget {
               offset: const Offset(1.0, 0),
               child: Opacity(
                 opacity: 0.85,
-                child: Image.network(
-                  url,
+                child: Image(
+                  image: provider,
                   fit: BoxFit.contain,
                   color: const Color(0xFF111111),
                   colorBlendMode: BlendMode.srcATop,
@@ -199,8 +196,8 @@ class _PreviewSignature extends StatelessWidget {
               offset: const Offset(0.4, 0),
               child: Opacity(
                 opacity: 0.65,
-                child: Image.network(
-                  url,
+                child: Image(
+                  image: provider,
                   fit: BoxFit.contain,
                   color: const Color(0xFF111111),
                   colorBlendMode: BlendMode.srcATop,
@@ -209,8 +206,8 @@ class _PreviewSignature extends StatelessWidget {
                 ),
               ),
             ),
-            Image.network(
-              url,
+            Image(
+              image: provider,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) =>
                   const SizedBox.shrink(),

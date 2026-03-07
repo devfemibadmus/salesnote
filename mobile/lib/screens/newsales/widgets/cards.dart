@@ -35,8 +35,8 @@ class _SignatureCard extends StatelessWidget {
                   Positioned.fill(
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: Image.network(
-                        MediaService.resolveSrc(signature.imageUrl),
+                      child: Image(
+                        image: MediaService.imageProvider(signature.imageUrl)!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, error, stackTrace) => Container(
                           color: const Color(0xFFF2F6FB),

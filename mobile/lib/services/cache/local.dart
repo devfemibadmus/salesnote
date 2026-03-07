@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:hive/hive.dart';
 
@@ -234,6 +235,32 @@ class LocalCache {
         .map((e) => e.toString().trim())
         .where((e) => e.isNotEmpty)
         .toList();
+  }
+
+  static Future<void> saveCachedMedia(String url, Uint8List bytes) async {
+    if (url.trim().isEmpty || bytes.isEmpty) return;
+    final box = Hive.box<String>(_pageBox);
+    await box.put('media:${url.trim()}', base64Encode(bytes));
+  }
+
+  static Uint8List? loadCachedMedia(String url) {
+    final normalized = url.trim();
+    if (normalized.isEmpty) return null;
+    final box = Hive.box<String>(_pageBox);
+    final raw = box.get('media:$normalized');
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return base64Decode(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> deleteCachedMedia(String url) async {
+    final normalized = url.trim();
+    if (normalized.isEmpty) return;
+    final box = Hive.box<String>(_pageBox);
+    await box.delete('media:$normalized');
   }
 
   static Future<void> clearAll() async {

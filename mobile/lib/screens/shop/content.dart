@@ -357,8 +357,8 @@ class SettingsProfilePictureRow extends StatelessWidget {
                       Icons.storefront_rounded,
                       color: Color(0xFF64748B),
                     )
-                  : Image.network(
-                      MediaService.resolveSrc(logoUrl!),
+                  : Image(
+                      image: MediaService.imageProvider(logoUrl!)!,
                       fit: BoxFit.cover,
                       errorBuilder: (_, error, stackTrace) => const Icon(
                         Icons.storefront_rounded,
@@ -560,8 +560,8 @@ class SettingsSignatureRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
             clipBehavior: Clip.antiAlias,
-            child: Image.network(
-              MediaService.resolveSrc(signature.imageUrl),
+            child: Image(
+              image: MediaService.imageProvider(signature.imageUrl)!,
               fit: BoxFit.cover,
               errorBuilder: (_, error, stackTrace) =>
                   const Icon(Icons.draw_rounded, color: Color(0xFF64748B)),

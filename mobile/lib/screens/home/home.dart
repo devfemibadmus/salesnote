@@ -4,13 +4,13 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../app/config.dart';
 import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../../services/api_client.dart';
 import '../../services/cache/local.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
+import '../../services/media.dart';
 import '../../services/notification.dart';
 import '../../services/preview.dart';
 import '../../services/token_store.dart';
