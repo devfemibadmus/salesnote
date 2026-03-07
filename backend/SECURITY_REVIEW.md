@@ -18,6 +18,10 @@ This is a tracking document for backend security work. Findings are ordered by s
 | SEC-006 | Low | Open | Production logging defaults are too verbose |
 | SEC-007 | Medium | Implemented | Brute-force and spam protection is only partial on auth flows |
 | SEC-008 | Medium | Implemented | User-controlled values are inserted into HTML email templates without escaping |
+| SEC-009 | Medium | Implemented | Rate limiter failed open silently when Redis was unavailable |
+| SEC-010 | Low | Implemented | Sales handlers performed redundant JWT-only checks |
+| SEC-011 | Medium | Implemented | Email validation accepted obvious garbage addresses |
+| SEC-012 | Low | Implemented | Seed flow allowed passwords weaker than the active policy |
 
 ## Detailed Findings
 
@@ -230,6 +234,75 @@ This is a tracking document for backend security work. Findings are ordered by s
   - worker welcome email now escapes dynamic string fields before substitution
   - code digits continue to be escaped before rendering into the code-box markup
 
+### SEC-009: Rate limiter failed open silently when Redis was unavailable
+
+- Severity: Medium
+- Status: Implemented
+- Locations:
+  - `backend/src/api/middlewares/rate_limit.rs`
+- Current behavior:
+  - The rate limiter intentionally fails open when Redis is slow or unavailable.
+  - Before this fix, those bypasses happened with no warning in logs.
+- Risk:
+  - Auth endpoints can become effectively unthrottled during Redis outages.
+  - Operators have no visibility that brute-force protection is degraded.
+- Recommended fix:
+  - Keep fail-open if desired for availability, but emit structured warnings on Redis connection, increment, and expiry failures.
+- Implemented:
+  - Redis connection, increment, and expiry failures now emit `tracing::warn!` entries with route and requester context
+
+### SEC-010: Sales handlers performed redundant JWT-only checks
+
+- Severity: Low
+- Status: Implemented
+- Locations:
+  - `backend/src/api/handlers/sales.rs`
+- Current behavior:
+  - Several sales handlers manually re-ran `auth_claims(...)` even though the routes are already behind `AuthGuard`.
+  - Those checks only duplicated JWT parsing and did not add device-session validation.
+- Risk:
+  - Confusing, layered auth logic makes future changes easier to get wrong.
+  - Reviewers can incorrectly assume those handler checks are the active-session control.
+- Recommended fix:
+  - Remove the redundant checks and rely on route protection plus the SQL `AUTH_CTE` that validates active device sessions.
+- Implemented:
+  - removed the extra `auth_claims(...)` calls from sales list, get, update, and delete handlers
+
+### SEC-011: Email validation accepted obvious garbage addresses
+
+- Severity: Medium
+- Status: Implemented
+- Locations:
+  - `backend/src/api/handlers/auth.rs`
+- Current behavior:
+  - Validation only required a single `@`, non-empty parts, and a dot in the domain.
+- Risk:
+  - Invalid addresses can be stored in `shops.email`.
+  - Signup, login, and reset flows become less reliable and easier to abuse with junk identities.
+- Recommended fix:
+  - Enforce a stricter local-part and domain shape without adding an unnecessarily complex parser.
+- Implemented:
+  - added checks for dot placement, repeated dots, domain labels, hyphen placement, and allowed local-part characters
+
+### SEC-012: Seed flow allowed passwords weaker than the active policy
+
+- Severity: Low
+- Status: Implemented
+- Locations:
+  - `backend/src/bin/seed.rs`
+  - `backend/.env.example`
+- Current behavior:
+  - The seed helper accepted whatever `SALESNOTE__SEED_SHOP_PASSWORD` was supplied.
+  - The tracked example password was weaker than ideal for current policy.
+- Risk:
+  - A weak seed configuration can quietly persist into non-local environments.
+  - Demo or bootstrap accounts become easy targets if left enabled.
+- Recommended fix:
+  - Validate the seed password against the same policy as the main app and keep the example value compliant.
+- Implemented:
+  - seed now refuses passwords outside the configured min/max range
+  - example seed password was updated to a compliant default
+
 ## Requested Focus Areas
 
 ### Brute force
@@ -277,3 +350,4 @@ This is a tracking document for backend security work. Findings are ordered by s
 - This review is based on code inspection only.
 - No dynamic testing, fuzzing, dependency audit, or infrastructure validation was performed in this pass.
 - Reverse proxy behavior matters for SEC-004 and SEC-005. Confirm nginx and firewall posture before closing those items.
+- Review note: the JWT algorithm-pinning warning reported against `Validation::default()` was checked against `jsonwebtoken` v9 and is not a real issue in this repo because that default already pins `HS256`.

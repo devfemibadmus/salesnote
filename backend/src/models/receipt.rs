@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{Postgres, Row, Transaction, PgPool};
+use sqlx::{PgPool, Postgres, Row, Transaction};
 
 use crate::models::{IdPayload, Sale, ShopProfile, Signature};
 
@@ -38,7 +38,6 @@ pub struct ReceiptInsertPayload {
     pub shop_id: i64,
     pub input: ReceiptCreateInput,
 }
-
 
 impl Receipt {
     pub async fn set_created_at(
@@ -150,10 +149,7 @@ impl Receipt {
         })
     }
 
-    pub async fn list(
-        pool: &PgPool,
-        payload: &IdPayload,
-    ) -> Result<Vec<Receipt>, sqlx::Error> {
+    pub async fn list(pool: &PgPool, payload: &IdPayload) -> Result<Vec<Receipt>, sqlx::Error> {
         let rows = sqlx::query(
             "SELECT id, shop_id, sale_id, signature_id,
                     customer_name, customer_email, customer_phone,
@@ -167,10 +163,7 @@ impl Receipt {
         Ok(rows.into_iter().map(Receipt::from_row).collect())
     }
 
-    pub async fn find(
-        pool: &PgPool,
-        payload: &IdPayload,
-    ) -> Result<Option<Receipt>, sqlx::Error> {
+    pub async fn find(pool: &PgPool, payload: &IdPayload) -> Result<Option<Receipt>, sqlx::Error> {
         let row = sqlx::query(
             "SELECT id, shop_id, sale_id, signature_id,
                     customer_name, customer_email, customer_phone,

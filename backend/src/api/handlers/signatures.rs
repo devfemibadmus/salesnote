@@ -137,7 +137,11 @@ fn remove_signature_background(bytes: &[u8]) -> Result<Vec<u8>, HttpResponse> {
     Ok(output.into_inner())
 }
 
-fn save_signature_bytes_local(shop_id: i64, ts_millis: u128, bytes: &[u8]) -> Result<String, HttpResponse> {
+fn save_signature_bytes_local(
+    shop_id: i64,
+    ts_millis: u128,
+    bytes: &[u8],
+) -> Result<String, HttpResponse> {
     let filename = format!("sig_{shop_id}_{ts_millis}_processed.png");
     let rel_path = format!("uploads/signatures/{filename}");
     let dest = std::path::PathBuf::from("uploads")

@@ -122,11 +122,20 @@ fn build_signed_read_url(
     let signed_headers = "host";
     let canonical_uri = format!("/{}/{}", bucket, encode_path_keep_slashes(object_name));
     let canonical_query = vec![
-        ("X-Goog-Algorithm".to_string(), "GOOG4-RSA-SHA256".to_string()),
-        ("X-Goog-Credential".to_string(), percent_encode_query(&credential)),
+        (
+            "X-Goog-Algorithm".to_string(),
+            "GOOG4-RSA-SHA256".to_string(),
+        ),
+        (
+            "X-Goog-Credential".to_string(),
+            percent_encode_query(&credential),
+        ),
         ("X-Goog-Date".to_string(), timestamp.clone()),
         ("X-Goog-Expires".to_string(), expires.to_string()),
-        ("X-Goog-SignedHeaders".to_string(), signed_headers.to_string()),
+        (
+            "X-Goog-SignedHeaders".to_string(),
+            signed_headers.to_string(),
+        ),
     ]
     .into_iter()
     .map(|(key, value)| format!("{key}={value}"))
@@ -137,9 +146,8 @@ fn build_signed_read_url(
         "GET\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\nUNSIGNED-PAYLOAD"
     );
     let canonical_request_hash = hex::encode(Sha256::digest(canonical_request.as_bytes()));
-    let string_to_sign = format!(
-        "GOOG4-RSA-SHA256\n{timestamp}\n{scope}\n{canonical_request_hash}"
-    );
+    let string_to_sign =
+        format!("GOOG4-RSA-SHA256\n{timestamp}\n{scope}\n{canonical_request_hash}");
     let signature = hex::encode(signing_key.sign(string_to_sign.as_bytes()).to_vec());
 
     Ok(format!(

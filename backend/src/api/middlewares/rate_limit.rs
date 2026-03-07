@@ -171,22 +171,68 @@ where
             )
             .await;
 
-            if let Ok(Ok(mut conn)) = conn_result {
-                let count_result =
-                    timeout(Duration::from_millis(120), conn.incr(&redis_key, 1)).await;
-                if let Ok(Ok(count)) = count_result {
-                    let count: i64 = count;
-                    if count == 1 {
-                        let _ = timeout(
-                            Duration::from_millis(120),
-                            conn.expire::<_, ()>(&redis_key, 60),
-                        )
-                        .await;
-                    }
-                    if count as u32 > route_limit.max_per_minute {
-                        limited = true;
+            match conn_result {
+                Ok(Ok(mut conn)) => {
+                    let count_result =
+                        timeout(Duration::from_millis(120), conn.incr(&redis_key, 1)).await;
+                    match count_result {
+                        Ok(Ok(count)) => {
+                            let count: i64 = count;
+                            if count == 1 {
+                                let expire_result = timeout(
+                                    Duration::from_millis(120),
+                                    conn.expire::<_, ()>(&redis_key, 60),
+                                )
+                                .await;
+                                match expire_result {
+                                    Ok(Ok(())) => {}
+                                    Ok(Err(err)) => tracing::warn!(
+                                        route = route_limit.key,
+                                        requester = %key,
+                                        redis_key = %redis_key,
+                                        error = %err,
+                                        "rate limit expire failed open"
+                                    ),
+                                    Err(_) => tracing::warn!(
+                                        route = route_limit.key,
+                                        requester = %key,
+                                        redis_key = %redis_key,
+                                        "rate limit expire timed out; failing open"
+                                    ),
+                                }
+                            }
+                            if count as u32 > route_limit.max_per_minute {
+                                limited = true;
+                            }
+                        }
+                        Ok(Err(err)) => tracing::warn!(
+                            route = route_limit.key,
+                            requester = %key,
+                            redis_key = %redis_key,
+                            error = %err,
+                            "rate limit increment failed open"
+                        ),
+                        Err(_) => tracing::warn!(
+                            route = route_limit.key,
+                            requester = %key,
+                            redis_key = %redis_key,
+                            "rate limit increment timed out; failing open"
+                        ),
                     }
                 }
+                Ok(Err(err)) => tracing::warn!(
+                    route = route_limit.key,
+                    requester = %key,
+                    redis_key = %redis_key,
+                    error = %err,
+                    "rate limit redis connection failed open"
+                ),
+                Err(_) => tracing::warn!(
+                    route = route_limit.key,
+                    requester = %key,
+                    redis_key = %redis_key,
+                    "rate limit redis connection timed out; failing open"
+                ),
             }
 
             if limited {
@@ -195,10 +241,9 @@ where
                     StatusCode::TOO_MANY_REQUESTS,
                     "Too many requests. Try again later.",
                 );
-                let _ = response.headers_mut().insert(
-                    header::RETRY_AFTER,
-                    header::HeaderValue::from_static("60"),
-                );
+                let _ = response
+                    .headers_mut()
+                    .insert(header::RETRY_AFTER, header::HeaderValue::from_static("60"));
                 return Ok(ServiceResponse::new(req, response.map_into_right_body()));
             }
 

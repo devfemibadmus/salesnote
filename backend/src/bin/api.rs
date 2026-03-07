@@ -82,10 +82,8 @@ async fn main() -> std::io::Result<()> {
                 AuthRateLimits {
                     login_per_minute: settings.auth_login_rate_limit_per_minute,
                     register_per_minute: settings.auth_register_rate_limit_per_minute,
-                    register_verify_per_minute: settings
-                        .auth_register_verify_rate_limit_per_minute,
-                    forgot_password_per_minute: settings
-                        .auth_forgot_password_rate_limit_per_minute,
+                    register_verify_per_minute: settings.auth_register_verify_rate_limit_per_minute,
+                    forgot_password_per_minute: settings.auth_forgot_password_rate_limit_per_minute,
                     verify_code_per_minute: settings.auth_verify_code_rate_limit_per_minute,
                     reset_password_per_minute: settings.auth_reset_password_rate_limit_per_minute,
                 },

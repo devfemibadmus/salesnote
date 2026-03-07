@@ -4,7 +4,7 @@ use actix_web::{
     web, HttpRequest, HttpResponse, Responder,
 };
 use chrono_tz::Tz;
-use jsonwebtoken::{decode, DecodingKey, Validation};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use rand::Rng;
 use std::str::FromStr;
 
@@ -178,10 +178,7 @@ pub async fn verify_signup(
                         input.input.phone,
                         input.input.email
                     );
-                    return json_error(
-                        StatusCode::UNAUTHORIZED,
-                        "invalid or expired code",
-                    );
+                    return json_error(StatusCode::UNAUTHORIZED, "invalid or expired code");
                 }
             }
             return json_error(
@@ -602,14 +599,67 @@ fn validate_register(input: &AuthRegisterInput, state: &AppState) -> Result<(), 
 }
 
 fn is_valid_email(email: &str) -> bool {
-    let parts: Vec<&str> = email.split('@').collect();
-    if parts.len() != 2 {
+    let Some((local, domain)) = email.split_once('@') else {
+        return false;
+    };
+    if email.matches('@').count() != 1 {
         return false;
     }
-    if parts[0].is_empty() || parts[1].is_empty() {
+    if local.is_empty() || domain.is_empty() {
         return false;
     }
-    parts[1].contains('.')
+    if local.starts_with('.') || local.ends_with('.') || local.contains("..") {
+        return false;
+    }
+    if domain.starts_with('.') || domain.ends_with('.') || domain.contains("..") {
+        return false;
+    }
+    if !local.chars().all(|ch| {
+        ch.is_ascii_alphanumeric()
+            || matches!(
+                ch,
+                '.' | '!'
+                    | '#'
+                    | '$'
+                    | '%'
+                    | '&'
+                    | '\''
+                    | '*'
+                    | '+'
+                    | '-'
+                    | '/'
+                    | '='
+                    | '?'
+                    | '^'
+                    | '_'
+                    | '`'
+                    | '{'
+                    | '|'
+                    | '}'
+                    | '~'
+            )
+    }) {
+        return false;
+    }
+
+    let labels: Vec<&str> = domain.split('.').collect();
+    if labels.len() < 2 {
+        return false;
+    }
+    if labels.iter().any(|label| {
+        label.is_empty()
+            || label.len() > 63
+            || label.starts_with('-')
+            || label.ends_with('-')
+            || !label
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '-')
+    }) {
+        return false;
+    }
+
+    let tld = labels.last().copied().unwrap_or_default();
+    tld.len() >= 2 && tld.chars().all(|ch| ch.is_ascii_alphabetic())
 }
 
 fn validate_password(password: &str, state: &AppState) -> Result<(), String> {
@@ -708,7 +758,7 @@ pub fn auth_claims(headers: &HeaderMap, jwt_secret: &str) -> Result<Claims, Stat
     let data = decode::<Claims>(
         token,
         &DecodingKey::from_secret(jwt_secret.as_bytes()),
-        &Validation::default(),
+        &Validation::new(Algorithm::HS256),
     )
     .map_err(|_| StatusCode::UNAUTHORIZED)?;
 

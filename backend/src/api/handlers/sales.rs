@@ -1,9 +1,8 @@
 use actix_web::web::ReqData;
-use actix_web::{http::StatusCode, web, HttpRequest, Responder};
+use actix_web::{http::StatusCode, web, Responder};
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::Deserialize;
 
-use crate::api::handlers::auth;
 use crate::api::middlewares::auth::AuthDeviceId;
 use crate::api::response::{json_created, json_empty, json_error, json_ok};
 use crate::api::state::AppState;
@@ -136,16 +135,10 @@ pub struct SalesListQuery {
 
 pub async fn list_sales(
     state: web::Data<AppState>,
-    req: HttpRequest,
     shop_id: ReqData<i64>,
     device_id: ReqData<AuthDeviceId>,
     query: web::Query<SalesListQuery>,
 ) -> impl Responder {
-    // keep header validation for consistency; DB auth is embedded in SQL below.
-    if auth::auth_claims(req.headers(), &state.jwt_secret).is_err() {
-        return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
-    }
-
     let page_value = query.page.unwrap_or(1).max(1);
     let per_page_value = query.per_page.unwrap_or(50).clamp(1, 200);
     let include_items = query.include_items.unwrap_or(false);
@@ -309,16 +302,11 @@ pub async fn create_sale(
 
 pub async fn update_sale(
     state: web::Data<AppState>,
-    req: HttpRequest,
     shop_id: ReqData<i64>,
     device_id: ReqData<AuthDeviceId>,
     sale_id: web::Path<i64>,
     payload: web::Json<SaleUpdateInput>,
 ) -> impl Responder {
-    if auth::auth_claims(req.headers(), &state.jwt_secret).is_err() {
-        return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
-    }
-
     let input = payload.into_inner();
     if let Some(items) = &input.items {
         if items.is_empty() {
@@ -405,15 +393,10 @@ pub async fn update_sale(
 
 pub async fn get_sale(
     state: web::Data<AppState>,
-    req: HttpRequest,
     shop_id: ReqData<i64>,
     device_id: ReqData<AuthDeviceId>,
     sale_id: web::Path<i64>,
 ) -> impl Responder {
-    if auth::auth_claims(req.headers(), &state.jwt_secret).is_err() {
-        return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
-    }
-
     match Sale::get_authorized(
         &state.pool,
         &AuthorizedSaleGetPayload {
@@ -441,15 +424,10 @@ pub async fn get_sale(
 
 pub async fn delete_sale(
     state: web::Data<AppState>,
-    req: HttpRequest,
     shop_id: ReqData<i64>,
     device_id: ReqData<AuthDeviceId>,
     sale_id: web::Path<i64>,
 ) -> impl Responder {
-    if auth::auth_claims(req.headers(), &state.jwt_secret).is_err() {
-        return json_error(StatusCode::UNAUTHORIZED, "unauthorized");
-    }
-
     match Sale::delete_authorized(
         &state.pool,
         &AuthorizedSaleDeletePayload {

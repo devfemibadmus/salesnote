@@ -434,6 +434,18 @@ async fn main() -> std::io::Result<()> {
         return Ok(());
     }
 
+    let seed_password_chars = seed_password.chars().count();
+    if seed_password_chars < settings.password_min_chars
+        || seed_password_chars > settings.password_max_chars
+    {
+        tracing::error!(
+            "seed failed: SALESNOTE__SEED_SHOP_PASSWORD must be between {} and {} characters",
+            settings.password_min_chars,
+            settings.password_max_chars
+        );
+        return Ok(());
+    }
+
     let base_url = if seed_api_base_url.trim().is_empty() {
         to_base_url(&settings.bind)
     } else {
