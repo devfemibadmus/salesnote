@@ -11,21 +11,15 @@ class MediaService {
     final trimmed = src.trim();
     if (trimmed.isEmpty) return trimmed;
 
-    final uri = _toCanonicalUri(trimmed);
+    final uri = _toFetchUri(trimmed);
     if (uri == null) return trimmed;
-    if (!withCacheBust) return uri.toString();
-
-    final bust = LocalCache.getShopLogoCacheBust();
-    if (bust <= 0) return uri.toString();
-    final nextQuery = Map<String, String>.from(uri.queryParameters)
-      ..['cb'] = bust.toString();
-    return uri.replace(queryParameters: nextQuery).toString();
+    return uri.toString();
   }
 
   static String? canonicalUrl(String? src) {
     final trimmed = (src ?? '').trim();
     if (trimmed.isEmpty) return null;
-    return _toCanonicalUri(trimmed)?.toString();
+    return _toCacheKeyUri(trimmed)?.toString();
   }
 
   static Uint8List? loadCachedBytes(String? src) {
@@ -74,24 +68,24 @@ class MediaService {
     }
   }
 
-  static Uri? _toCanonicalUri(String src) {
+  static Uri? _toFetchUri(String src) {
     if (src.startsWith('http://') || src.startsWith('https://')) {
-      final uri = Uri.tryParse(src);
-      return _stripCacheBust(uri);
+      return Uri.tryParse(src);
     }
     final base = AppConfig.apiBaseUrl.endsWith('/')
         ? AppConfig.apiBaseUrl.substring(0, AppConfig.apiBaseUrl.length - 1)
         : AppConfig.apiBaseUrl;
     final path = src.startsWith('/') ? src.substring(1) : src;
-    final uri = Uri.tryParse('$base/$path');
-    return _stripCacheBust(uri);
+    return Uri.tryParse('$base/$path');
   }
 
-  static Uri? _stripCacheBust(Uri? uri) {
+  static Uri? _toCacheKeyUri(String src) {
+    final uri = _toFetchUri(src);
+    return _stripVolatileParts(uri);
+  }
+
+  static Uri? _stripVolatileParts(Uri? uri) {
     if (uri == null) return null;
-    if (!uri.queryParameters.containsKey('cb')) return uri;
-    final nextQuery = Map<String, String>.from(uri.queryParameters)
-      ..remove('cb');
-    return uri.replace(queryParameters: nextQuery.isEmpty ? null : nextQuery);
+    return uri.replace(queryParameters: null, fragment: null);
   }
 }

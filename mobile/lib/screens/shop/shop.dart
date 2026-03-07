@@ -315,19 +315,7 @@ class _ShopScreenState extends State<ShopScreen> {
 
     setState(() => _busy = true);
     try {
-      final updatedRaw = await _api.uploadShopLogo(image.path);
-      final cacheBust = DateTime.now().millisecondsSinceEpoch;
-      await LocalCache.setShopLogoCacheBust(cacheBust);
-      final updated = ShopProfile(
-        id: updatedRaw.id,
-        name: updatedRaw.name,
-        phone: updatedRaw.phone,
-        email: updatedRaw.email,
-        address: updatedRaw.address,
-        logoUrl: _withLogoCacheBust(updatedRaw.logoUrl, cacheBust),
-        timezone: updatedRaw.timezone,
-        createdAt: updatedRaw.createdAt,
-      );
+      final updated = await _api.uploadShopLogo(image.path);
       if (!mounted) return;
       setState(() => _shop = updated);
       await _saveSettingsCache();
@@ -342,16 +330,6 @@ class _ShopScreenState extends State<ShopScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  String? _withLogoCacheBust(String? src, int cacheBust) {
-    final value = (src ?? '').trim();
-    if (value.isEmpty) return src;
-    final uri = Uri.tryParse(value);
-    if (uri == null) return src;
-    final nextQuery = Map<String, String>.from(uri.queryParameters)
-      ..['cb'] = cacheBust.toString();
-    return uri.replace(queryParameters: nextQuery).toString();
   }
 
   Future<void> _editShopName() async {

@@ -13,7 +13,6 @@ class LocalCache {
   static const _onboardingKey = 'onboarding_complete';
   static const _notificationPromptCooldownKey = 'notification_prompt_cooldown';
   static const _notificationOptOutKey = 'notification_opt_out';
-  static const _shopLogoCacheBustKey = 'shop_logo_cache_bust';
   static const _preferredRegionCodeKey = 'preferred_region_code';
 
   static Future<void> init() async {
@@ -98,16 +97,6 @@ class LocalCache {
   static Future<void> setNotificationOptedOut(bool value) async {
     final box = Hive.box<bool>(_settingsBox);
     await box.put(_notificationOptOutKey, value);
-  }
-
-  static int getShopLogoCacheBust() {
-    final box = Hive.box<int>(_metaBox);
-    return box.get(_shopLogoCacheBustKey) ?? 0;
-  }
-
-  static Future<void> setShopLogoCacheBust(int value) async {
-    final box = Hive.box<int>(_metaBox);
-    await box.put(_shopLogoCacheBustKey, value);
   }
 
   static String? getPreferredRegionCode() {
