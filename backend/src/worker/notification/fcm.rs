@@ -25,12 +25,44 @@ struct FcmMessage<'a> {
     token: &'a str,
     notification: FcmNotification<'a>,
     data: BTreeMap<String, String>,
+    android: FcmAndroidConfig<'a>,
+    apns: FcmApnsConfig<'a>,
 }
 
 #[derive(Serialize)]
 struct FcmNotification<'a> {
     title: &'a str,
     body: &'a str,
+}
+
+#[derive(Serialize)]
+struct FcmAndroidConfig<'a> {
+    priority: &'a str,
+    notification: FcmAndroidNotification<'a>,
+}
+
+#[derive(Serialize)]
+struct FcmAndroidNotification<'a> {
+    sound: &'a str,
+    channel_id: &'a str,
+}
+
+#[derive(Serialize)]
+struct FcmApnsConfig<'a> {
+    headers: BTreeMap<&'a str, &'a str>,
+    payload: FcmApnsPayload<'a>,
+}
+
+#[derive(Serialize)]
+struct FcmApnsPayload<'a> {
+    aps: FcmAps<'a>,
+}
+
+#[derive(Serialize)]
+struct FcmAps<'a> {
+    sound: &'a str,
+    #[serde(rename = "content-available")]
+    content_available: u8,
 }
 
 #[derive(Serialize)]
@@ -91,6 +123,22 @@ pub async fn send_fcm_notification_with_data(
                 body: &body,
             },
             data,
+            android: FcmAndroidConfig {
+                priority: "high",
+                notification: FcmAndroidNotification {
+                    sound: "salesnote_notification",
+                    channel_id: "salesnote_alerts_v1",
+                },
+            },
+            apns: FcmApnsConfig {
+                headers: BTreeMap::from([("apns-priority", "10"), ("apns-push-type", "alert")]),
+                payload: FcmApnsPayload {
+                    aps: FcmAps {
+                        sound: "salesnote_notification.caf",
+                        content_available: 1,
+                    },
+                },
+            },
         },
     };
 

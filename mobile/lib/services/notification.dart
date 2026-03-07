@@ -1,7 +1,9 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../app/navigator.dart';
 import '../app/routes.dart';
@@ -50,6 +52,17 @@ class InAppNotification {
       isRead: json['is_read'] == true,
     );
   }
+}
+
+@pragma('vm:entry-point')
+Future<void> salesnoteFirebaseMessagingBackgroundHandler(
+  RemoteMessage message,
+) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  await Hive.initFlutter();
+  await LocalCache.init();
+  await NotificationService.handleBackgroundMessage(message);
 }
 
 class NotificationService {
@@ -246,6 +259,14 @@ class NotificationService {
   static Future<void> clearLocalState() async {
     unreadCount.value = 0;
     await _localNotifications.cancelAll();
+  }
+
+  static Future<void> handleBackgroundMessage(RemoteMessage message) async {
+    await _saveIncomingNotification(message.data, message.notification);
+  }
+
+  static void refreshUnreadCount() {
+    _refreshUnreadCount();
   }
 
   static List<InAppNotification> loadInbox() {

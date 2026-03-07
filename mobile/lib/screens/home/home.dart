@@ -92,6 +92,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     // Force lightweight rebuild on resume so locale/region currency formatting
     // re-runs even when no API refresh is triggered.
+    NotificationService.refreshUnreadCount();
     _syncHomeCurrencyFormatter();
     setState(() {
       if (_shop != null) {

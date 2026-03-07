@@ -274,7 +274,7 @@ pub async fn create_sale(
                             (String::from("sale_id"), sale_id.to_string()),
                         ];
                         for token in tokens {
-                            let _ = send_fcm_notification_with_data(
+                            if let Err(err) = send_fcm_notification_with_data(
                                 &token,
                                 title.clone(),
                                 body.clone(),
@@ -282,7 +282,15 @@ pub async fn create_sale(
                                 extra_data.clone(),
                                 &settings,
                             )
-                            .await;
+                            .await
+                            {
+                                tracing::warn!(
+                                    sale_id,
+                                    shop_id = shop_id_val,
+                                    error = %err,
+                                    "sale notification send failed"
+                                );
+                            }
                         }
                     }
                 }
