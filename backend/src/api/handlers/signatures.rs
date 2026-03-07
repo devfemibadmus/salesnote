@@ -177,7 +177,6 @@ async fn persist_signature(
             &object_name,
             "image/png",
             bytes,
-            state.gcs_public_base_url.as_deref(),
         )
         .await
         .map_err(|e| {
@@ -287,7 +286,12 @@ pub async fn create_signature(
         Ok(AuthorizedSignatureCreateResult::LimitReached) => {
             json_error(StatusCode::BAD_REQUEST, "signature limit reached")
         }
-        Ok(AuthorizedSignatureCreateResult::Created(signature)) => json_created(signature),
+        Ok(AuthorizedSignatureCreateResult::Created(mut signature)) => {
+            if let Err(resp) = crate::api::media::resolve_signature_media(&state, &mut signature) {
+                return resp;
+            }
+            json_created(signature)
+        }
         Err(e) => {
             tracing::error!("create signature error: {}", e);
             json_error(
@@ -312,7 +316,12 @@ pub async fn list_signatures(
     )
     .await
     {
-        Ok(Some(items)) => json_ok(items),
+        Ok(Some(mut items)) => {
+            if let Err(resp) = crate::api::media::resolve_signature_list_media(&state, &mut items) {
+                return resp;
+            }
+            json_ok(items)
+        }
         Ok(None) => json_error(StatusCode::UNAUTHORIZED, "unauthorized"),
         Err(e) => {
             tracing::error!("list signatures error: {}", e);

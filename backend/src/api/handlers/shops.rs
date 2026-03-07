@@ -245,7 +245,6 @@ async fn persist_logo(
             &object_name,
             "image/jpeg",
             bytes,
-            state.gcs_public_base_url.as_deref(),
         )
         .await
         .map_err(|e| {
@@ -299,7 +298,12 @@ pub async fn get_my_shop(
     )
     .await
     {
-        Ok(Some(shop)) => json_ok(shop),
+        Ok(Some(mut shop)) => {
+            if let Err(resp) = crate::api::media::resolve_shop_media(&state, &mut shop) {
+                return resp;
+            }
+            json_ok(shop)
+        }
         Ok(None) => json_error(actix_web::http::StatusCode::UNAUTHORIZED, "unauthorized"),
         Err(e) => {
             tracing::error!("get shop error: {}", e);
@@ -326,14 +330,19 @@ pub async fn get_settings_summary(
     .await
     {
         Ok(Some(SettingsSummary {
-            shop,
+            mut shop,
             devices,
             current_device_push_enabled,
-        })) => json_ok(SettingsSummaryResponse {
-            shop,
-            devices,
-            current_device_push_enabled,
-        }),
+        })) => {
+            if let Err(resp) = crate::api::media::resolve_shop_media(&state, &mut shop) {
+                return resp;
+            }
+            json_ok(SettingsSummaryResponse {
+                shop,
+                devices,
+                current_device_push_enabled,
+            })
+        }
         Ok(None) => json_error(actix_web::http::StatusCode::UNAUTHORIZED, "unauthorized"),
         Err(e) => {
             tracing::error!("get settings summary error: {}", e);
@@ -497,7 +506,12 @@ pub async fn update_my_shop(
     )
     .await
     {
-        Ok(Some(shop)) => json_ok(shop),
+        Ok(Some(mut shop)) => {
+            if let Err(resp) = crate::api::media::resolve_shop_media(&state, &mut shop) {
+                return resp;
+            }
+            json_ok(shop)
+        }
         Ok(None) => json_error(actix_web::http::StatusCode::UNAUTHORIZED, "unauthorized"),
         Err(e) => {
             tracing::error!("update shop error: {}", e);

@@ -26,7 +26,7 @@ pub struct AppState {
     pub smtp_from: String,
     pub dashboard_url: String,
     pub gcs_bucket: Option<String>,
-    pub gcs_public_base_url: Option<String>,
     pub gcs_key_json_path: Option<String>,
+    pub gcs_signed_url_ttl_secs: u32,
     pub redis: redis::Client,
 }

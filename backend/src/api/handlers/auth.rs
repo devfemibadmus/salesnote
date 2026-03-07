@@ -212,11 +212,16 @@ pub async fn verify_signup(
         }
     };
 
-    json_ok(AuthLoginResponse {
+    let mut response = AuthLoginResponse {
         access_token: token,
         refresh_token: session.refresh_token,
         shop: session.shop,
-    })
+    };
+    if let Err(resp) = crate::api::media::resolve_auth_login_response(&state, &mut response) {
+        return resp;
+    }
+
+    json_ok(response)
 }
 
 pub async fn login(
@@ -286,11 +291,16 @@ pub async fn login(
         }
     };
 
-    json_ok(AuthLoginResponse {
+    let mut response = AuthLoginResponse {
         access_token: token,
         refresh_token: session.refresh_token,
         shop: session.shop,
-    })
+    };
+    if let Err(resp) = crate::api::media::resolve_auth_login_response(&state, &mut response) {
+        return resp;
+    }
+
+    json_ok(response)
 }
 
 pub async fn refresh_token(
@@ -334,11 +344,16 @@ pub async fn refresh_token(
         }
     };
 
-    json_ok(AuthLoginResponse {
+    let mut response = AuthLoginResponse {
         access_token: token,
         refresh_token: refreshed.refresh_token,
         shop: refreshed.shop,
-    })
+    };
+    if let Err(resp) = crate::api::media::resolve_auth_login_response(&state, &mut response) {
+        return resp;
+    }
+
+    json_ok(response)
 }
 
 pub async fn forgot_password(

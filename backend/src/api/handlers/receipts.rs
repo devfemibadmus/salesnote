@@ -80,12 +80,17 @@ pub async fn create_receipt(
         }
     };
 
-    json_created(ReceiptDetail {
+    let mut detail = ReceiptDetail {
         receipt,
         shop,
         sale,
         signature: Some(signature),
-    })
+    };
+    if let Err(resp) = crate::api::media::resolve_receipt_detail(&state, &mut detail) {
+        return resp;
+    }
+
+    json_created(detail)
 }
 
 pub async fn list_receipts_handler(
@@ -152,10 +157,15 @@ pub async fn get_receipt(
         }
     };
 
-    json_ok(ReceiptDetail {
+    let mut detail = ReceiptDetail {
         receipt,
         shop,
         sale,
         signature,
-    })
+    };
+    if let Err(resp) = crate::api::media::resolve_receipt_detail(&state, &mut detail) {
+        return resp;
+    }
+
+    json_ok(detail)
 }

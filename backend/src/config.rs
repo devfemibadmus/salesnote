@@ -81,9 +81,9 @@ pub struct Settings {
     #[serde(default)]
     pub gcs_bucket: Option<String>,
     #[serde(default)]
-    pub gcs_public_base_url: Option<String>,
-    #[serde(default)]
     pub gcs_key_json_path: Option<String>,
+    #[serde(default = "default_gcs_signed_url_ttl_secs")]
+    pub gcs_signed_url_ttl_secs: u32,
     pub geoip_url: Option<String>,
     pub geoip_token: Option<String>,
     #[serde(default = "default_log_to_terminal")]
@@ -504,6 +504,10 @@ fn default_password_min_chars() -> usize {
 
 fn default_password_max_chars() -> usize {
     128
+}
+
+fn default_gcs_signed_url_ttl_secs() -> u32 {
+    900
 }
 
 fn default_enable_backtrace() -> bool {

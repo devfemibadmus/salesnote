@@ -14,7 +14,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 | SEC-002 | High | Implemented | Image decode path is vulnerable to memory/CPU exhaustion |
 | SEC-003 | Medium | Implemented | Signup flow leaks account existence |
 | SEC-004 | Medium | Implemented | Client IP and geo headers are trusted without a trusted-proxy boundary |
-| SEC-005 | Medium | Open | Uploaded files are exposed publicly under `/uploads` |
+| SEC-005 | Medium | Implemented | Uploaded files are exposed publicly under `/uploads` |
 | SEC-006 | Low | Open | Production logging defaults are too verbose |
 | SEC-007 | Medium | Implemented | Brute-force and spam protection is only partial on auth flows |
 | SEC-008 | Medium | Implemented | User-controlled values are inserted into HTML email templates without escaping |
@@ -128,7 +128,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 ### SEC-005: Uploaded files are exposed publicly under `/uploads`
 
 - Severity: Medium
-- Status: Open
+- Status: Implemented
 - Locations:
   - `backend/src/bin/api.rs:64`
   - `backend/src/api/handlers/shops.rs:305`
@@ -143,6 +143,10 @@ This is a tracking document for backend security work. Findings are ordered by s
   - Decide explicitly whether logos and signatures are meant to be public.
   - If not public, move them behind authenticated handlers or signed URLs.
   - If public is intentional, document that decision and avoid storing anything sensitive there.
+- Implemented:
+  - new GCS-backed uploads are now stored as internal `gcs://bucket/object` references instead of public URLs
+  - API responses resolve those references into short-lived signed read URLs
+  - bucket can remain private while mobile/web clients continue receiving usable `logo_url` and `image_url` fields
 
 ### SEC-006: Production logging defaults are too verbose
 

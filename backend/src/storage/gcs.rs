@@ -1,8 +1,15 @@
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, EncodingKey, Header};
 use reqwest::Url;
+use rsa::pkcs1v15::SigningKey;
+use rsa::pkcs8::DecodePrivateKey;
+use rsa::signature::{SignatureEncoding, Signer};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fs;
+
+const GCS_REFERENCE_PREFIX: &str = "gcs://";
+const GOOGLE_STORAGE_HOST: &str = "storage.googleapis.com";
 
 #[derive(Serialize)]
 struct Claims<'a> {
@@ -36,7 +43,6 @@ pub async fn upload_object(
     object_name: &str,
     content_type: &str,
     bytes: Vec<u8>,
-    public_base_url: Option<&str>,
 ) -> Result<String, String> {
     let access_token = fetch_access_token(key_json_path).await?;
 
@@ -62,16 +68,114 @@ pub async fn upload_object(
         return Err(format!("gcs upload error: {text}"));
     }
 
-    Ok(build_public_url(bucket, object_name, public_base_url))
+    Ok(build_object_reference(bucket, object_name))
 }
 
-fn build_public_url(bucket: &str, object_name: &str, public_base_url: Option<&str>) -> String {
-    let base = public_base_url
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
-        .map(|v| v.trim_end_matches('/').to_string())
-        .unwrap_or_else(|| format!("https://storage.googleapis.com/{bucket}"));
-    format!("{base}/{}", object_name.trim_start_matches('/'))
+pub fn resolve_media_url(
+    key_json_path: &str,
+    value: &str,
+    ttl_secs: u32,
+) -> Result<String, String> {
+    let Some((bucket, object_name)) = parse_object_reference(value) else {
+        return Ok(value.to_string());
+    };
+
+    build_signed_read_url(key_json_path, bucket, object_name, ttl_secs)
+}
+
+pub fn build_object_reference(bucket: &str, object_name: &str) -> String {
+    format!(
+        "{GCS_REFERENCE_PREFIX}{}/{}",
+        bucket.trim(),
+        object_name.trim_start_matches('/')
+    )
+}
+
+pub fn parse_object_reference(value: &str) -> Option<(&str, &str)> {
+    let path = value.strip_prefix(GCS_REFERENCE_PREFIX)?;
+    let (bucket, object_name) = path.split_once('/')?;
+    if bucket.trim().is_empty() || object_name.trim().is_empty() {
+        return None;
+    }
+    Some((bucket, object_name))
+}
+
+fn build_signed_read_url(
+    key_json_path: &str,
+    bucket: &str,
+    object_name: &str,
+    ttl_secs: u32,
+) -> Result<String, String> {
+    let service_account = load_service_account(key_json_path)?;
+    let private_key = service_account.private_key.replace("\\n", "\n");
+    let signing_key = SigningKey::<Sha256>::new(
+        rsa::RsaPrivateKey::from_pkcs8_pem(&private_key)
+            .map_err(|_| "invalid gcs private key".to_string())?,
+    );
+
+    let now = Utc::now();
+    let datestamp = now.format("%Y%m%d").to_string();
+    let timestamp = now.format("%Y%m%dT%H%M%SZ").to_string();
+    let scope = format!("{datestamp}/auto/storage/goog4_request");
+    let credential = format!("{}/{}", service_account.client_email, scope);
+    let expires = ttl_secs.clamp(1, 604_800);
+    let signed_headers = "host";
+    let canonical_uri = format!("/{}/{}", bucket, encode_path_keep_slashes(object_name));
+    let canonical_query = vec![
+        ("X-Goog-Algorithm".to_string(), "GOOG4-RSA-SHA256".to_string()),
+        ("X-Goog-Credential".to_string(), percent_encode_query(&credential)),
+        ("X-Goog-Date".to_string(), timestamp.clone()),
+        ("X-Goog-Expires".to_string(), expires.to_string()),
+        ("X-Goog-SignedHeaders".to_string(), signed_headers.to_string()),
+    ]
+    .into_iter()
+    .map(|(key, value)| format!("{key}={value}"))
+    .collect::<Vec<_>>()
+    .join("&");
+    let canonical_headers = format!("host:{GOOGLE_STORAGE_HOST}\n");
+    let canonical_request = format!(
+        "GET\n{canonical_uri}\n{canonical_query}\n{canonical_headers}\n{signed_headers}\nUNSIGNED-PAYLOAD"
+    );
+    let canonical_request_hash = hex::encode(Sha256::digest(canonical_request.as_bytes()));
+    let string_to_sign = format!(
+        "GOOG4-RSA-SHA256\n{timestamp}\n{scope}\n{canonical_request_hash}"
+    );
+    let signature = hex::encode(signing_key.sign(string_to_sign.as_bytes()).to_vec());
+
+    Ok(format!(
+        "https://{GOOGLE_STORAGE_HOST}{canonical_uri}?{canonical_query}&X-Goog-Signature={signature}"
+    ))
+}
+
+fn encode_path_keep_slashes(value: &str) -> String {
+    value
+        .split('/')
+        .map(percent_encode_path_segment)
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn percent_encode_path_segment(value: &str) -> String {
+    percent_encode(value.as_bytes(), false)
+}
+
+fn percent_encode_query(value: &str) -> String {
+    percent_encode(value.as_bytes(), true)
+}
+
+fn percent_encode(bytes: &[u8], encode_slash: bool) -> String {
+    let mut out = String::with_capacity(bytes.len());
+    for &b in bytes {
+        let keep = matches!(b, b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~')
+            || (!encode_slash && b == b'/');
+        if keep {
+            out.push(char::from(b));
+        } else {
+            out.push('%');
+            out.push_str(&format!("{b:02X}"));
+        }
+    }
+    out
 }
 
 async fn fetch_access_token(key_json_path: &str) -> Result<String, String> {

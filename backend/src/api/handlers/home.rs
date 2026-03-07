@@ -44,8 +44,13 @@ pub async fn home_summary(
 
     tracing::debug!("home_summary timing: single_query_total={}ms", total_ms,);
 
+    let mut shop = data.shop;
+    if let Err(resp) = crate::api::media::resolve_shop_media(&state, &mut shop) {
+        return resp;
+    }
+
     json_ok(HomeSummaryResponse {
-        shop: data.shop,
+        shop,
         analytics: data.analytics,
         recent_sales: data.recent_sales,
     })

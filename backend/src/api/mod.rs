@@ -1,5 +1,6 @@
 pub mod email;
 pub mod handlers;
+pub mod media;
 pub mod middlewares;
 pub mod request_origin;
 pub mod response;
