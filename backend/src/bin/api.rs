@@ -3,7 +3,10 @@ use std::net::SocketAddr;
 use actix_files::Files;
 use actix_web::{middleware::DefaultHeaders, middleware::Logger, web, App, HttpServer};
 
-use salesnote_backend::api::{middlewares::rate_limit::RateLimiter, routes, state};
+use salesnote_backend::api::{
+    middlewares::rate_limit::{AuthRateLimits, RateLimiter},
+    routes, state,
+};
 use salesnote_backend::{config, db};
 
 #[actix_web::main]
@@ -29,8 +32,14 @@ async fn main() -> std::io::Result<()> {
         jwt_secret: settings.jwt_secret.clone(),
         max_request_payload_bytes: settings.max_request_payload_bytes,
         profile_image_max_bytes: settings.profile_image_max_bytes,
+        profile_image_max_source_dimension: settings.profile_image_max_source_dimension,
+        profile_image_max_source_pixels: settings.profile_image_max_source_pixels,
         signature_image_max_bytes: settings.signature_image_max_bytes,
+        signature_image_max_source_dimension: settings.signature_image_max_source_dimension,
+        signature_image_max_source_pixels: settings.signature_image_max_source_pixels,
         refresh_token_days: settings.refresh_token_days,
+        password_min_chars: settings.password_min_chars,
+        password_max_chars: settings.password_max_chars,
         forgot_password_max_requests: settings.forgot_password_max_requests,
         forgot_password_window_minutes: settings.forgot_password_window_minutes,
         reset_code_max_incorrect_attempts: settings.reset_code_max_incorrect_attempts,
@@ -64,6 +73,16 @@ async fn main() -> std::io::Result<()> {
             .service(Files::new("/uploads", "uploads").prefer_utf8(true))
             .wrap(RateLimiter::new(
                 settings.rate_limit_per_minute,
+                AuthRateLimits {
+                    login_per_minute: settings.auth_login_rate_limit_per_minute,
+                    register_per_minute: settings.auth_register_rate_limit_per_minute,
+                    register_verify_per_minute: settings
+                        .auth_register_verify_rate_limit_per_minute,
+                    forgot_password_per_minute: settings
+                        .auth_forgot_password_rate_limit_per_minute,
+                    verify_code_per_minute: settings.auth_verify_code_rate_limit_per_minute,
+                    reset_password_per_minute: settings.auth_reset_password_rate_limit_per_minute,
+                },
                 state.redis.clone(),
             ))
             .configure(|cfg| routes::init_routes(cfg, state.clone()))

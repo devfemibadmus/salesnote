@@ -16,7 +16,18 @@ use crate::api::response::json_error;
 #[derive(Clone)]
 pub struct RateLimiter {
     pub max_per_minute: u32,
+    pub auth_limits: AuthRateLimits,
     pub redis: redis::Client,
+}
+
+#[derive(Clone)]
+pub struct AuthRateLimits {
+    pub login_per_minute: u32,
+    pub register_per_minute: u32,
+    pub register_verify_per_minute: u32,
+    pub forgot_password_per_minute: u32,
+    pub verify_code_per_minute: u32,
+    pub reset_password_per_minute: u32,
 }
 
 #[derive(Clone, Copy)]
@@ -26,38 +37,44 @@ struct RouteLimit {
 }
 
 impl RateLimiter {
-    pub fn new(max_per_minute: u32, redis: redis::Client) -> Self {
+    pub fn new(max_per_minute: u32, auth_limits: AuthRateLimits, redis: redis::Client) -> Self {
         Self {
             max_per_minute,
+            auth_limits,
             redis,
         }
     }
 
-    fn route_limit(method: &str, path: &str, fallback: u32) -> RouteLimit {
+    fn route_limit(
+        method: &str,
+        path: &str,
+        fallback: u32,
+        auth_limits: &AuthRateLimits,
+    ) -> RouteLimit {
         match (method, path) {
             ("POST", "/auth/login") => RouteLimit {
                 key: "auth_login",
-                max_per_minute: 10,
+                max_per_minute: auth_limits.login_per_minute,
             },
             ("POST", "/auth/register") => RouteLimit {
                 key: "auth_register",
-                max_per_minute: 5,
+                max_per_minute: auth_limits.register_per_minute,
             },
             ("POST", "/auth/register/verify") => RouteLimit {
                 key: "auth_register_verify",
-                max_per_minute: 10,
+                max_per_minute: auth_limits.register_verify_per_minute,
             },
             ("POST", "/auth/forgot-password") => RouteLimit {
                 key: "auth_forgot_password",
-                max_per_minute: 5,
+                max_per_minute: auth_limits.forgot_password_per_minute,
             },
             ("POST", "/auth/verify-code") => RouteLimit {
                 key: "auth_verify_code",
-                max_per_minute: 10,
+                max_per_minute: auth_limits.verify_code_per_minute,
             },
             ("POST", "/auth/reset-password") => RouteLimit {
                 key: "auth_reset_password",
-                max_per_minute: 10,
+                max_per_minute: auth_limits.reset_password_per_minute,
             },
             _ => RouteLimit {
                 key: "global",
@@ -82,6 +99,7 @@ where
         ok(RateLimiterMiddleware {
             service: Rc::new(service),
             max_per_minute: self.max_per_minute,
+            auth_limits: self.auth_limits.clone(),
             redis: self.redis.clone(),
         })
     }
@@ -90,6 +108,7 @@ where
 pub struct RateLimiterMiddleware<S> {
     service: Rc<S>,
     max_per_minute: u32,
+    auth_limits: AuthRateLimits,
     redis: redis::Client,
 }
 
@@ -112,11 +131,16 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let srv = self.service.clone();
         let max_per_minute = self.max_per_minute;
+        let auth_limits = self.auth_limits.clone();
         let redis = self.redis.clone();
 
         Box::pin(async move {
-            let route_limit =
-                RateLimiter::route_limit(req.method().as_str(), req.path(), max_per_minute);
+            let route_limit = RateLimiter::route_limit(
+                req.method().as_str(),
+                req.path(),
+                max_per_minute,
+                &auth_limits,
+            );
             let shop_id = req.extensions().get::<i64>().copied();
             let key = if let Some(shop_id) = shop_id {
                 format!("shop:{}", shop_id)

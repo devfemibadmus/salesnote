@@ -24,8 +24,6 @@ pub struct FcmSubscribeInput {
 
 const MAX_TEXT_FIELD_SIZE: usize = 1024 * 1024;
 const PROFILE_IMAGE_MAX_DIMENSION: u32 = 1600;
-const PROFILE_IMAGE_MAX_SOURCE_DIMENSION: u32 = 5000;
-const PROFILE_IMAGE_MAX_SOURCE_PIXELS: u64 = 16_000_000;
 const PROFILE_IMAGE_JPEG_QUALITY: u8 = 82;
 const MIN_SHOP_NAME_CHARS: usize = 3;
 const MAX_SHOP_NAME_CHARS: usize = 40;
@@ -33,8 +31,6 @@ const MIN_ADDRESS_CHARS: usize = 8;
 const MAX_ADDRESS_CHARS: usize = 40;
 const MIN_ADDRESS_WORDS: usize = 4;
 const MAX_ADDRESS_WORDS: usize = 10;
-const MIN_PASSWORD_CHARS: usize = 8;
-const MAX_PASSWORD_CHARS: usize = 128;
 
 #[derive(Debug, Serialize)]
 pub struct SettingsSummaryResponse {
@@ -50,15 +46,15 @@ fn count_words(value: &str) -> usize {
         .count()
 }
 
-fn validate_shop_patch(input: &ShopUpdateInput) -> Result<(), &'static str> {
+fn validate_shop_patch(input: &ShopUpdateInput, state: &AppState) -> Result<(), String> {
     if let Some(name) = input.name.as_deref() {
         let trimmed = name.trim();
         let chars = trimmed.chars().count();
         if chars < MIN_SHOP_NAME_CHARS {
-            return Err("shop name must be at least 3 characters");
+            return Err("shop name must be at least 3 characters".to_string());
         }
         if chars > MAX_SHOP_NAME_CHARS {
-            return Err("shop name must be 40 characters or less");
+            return Err("shop name must be 40 characters or less".to_string());
         }
     }
 
@@ -66,27 +62,33 @@ fn validate_shop_patch(input: &ShopUpdateInput) -> Result<(), &'static str> {
         let trimmed = address.trim();
         let chars = trimmed.chars().count();
         if chars < MIN_ADDRESS_CHARS {
-            return Err("address must be at least 8 characters");
+            return Err("address must be at least 8 characters".to_string());
         }
         if chars > MAX_ADDRESS_CHARS {
-            return Err("address must be 40 characters or less");
+            return Err("address must be 40 characters or less".to_string());
         }
         let words = count_words(trimmed);
         if words < MIN_ADDRESS_WORDS {
-            return Err("address must be at least 4 words");
+            return Err("address must be at least 4 words".to_string());
         }
         if words > MAX_ADDRESS_WORDS {
-            return Err("address must be 10 words or less");
+            return Err("address must be 10 words or less".to_string());
         }
     }
 
     if let Some(password) = input.password.as_deref() {
         let chars = password.chars().count();
-        if chars < MIN_PASSWORD_CHARS {
-            return Err("password must be at least 8 characters");
+        if chars < state.password_min_chars {
+            return Err(format!(
+                "password must be at least {} characters",
+                state.password_min_chars
+            ));
         }
-        if chars > MAX_PASSWORD_CHARS {
-            return Err("password must be 128 characters or less");
+        if chars > state.password_max_chars {
+            return Err(format!(
+                "password must be {} characters or less",
+                state.password_max_chars
+            ));
         }
     }
 
@@ -139,6 +141,7 @@ async fn read_text_field(field: &mut actix_multipart::Field) -> Result<String, H
 }
 
 async fn read_file_field_and_optimize_logo(
+    state: &AppState,
     field: &mut actix_multipart::Field,
     dest_path: &Path,
     max_size: usize,
@@ -167,8 +170,8 @@ async fn read_file_field_and_optimize_logo(
 
     inspect_image_bounds(
         &file_bytes,
-        PROFILE_IMAGE_MAX_SOURCE_DIMENSION,
-        PROFILE_IMAGE_MAX_SOURCE_PIXELS,
+        state.profile_image_max_source_dimension,
+        state.profile_image_max_source_pixels,
     )?;
 
     let mut image = image::load_from_memory(&file_bytes).map_err(|_| {
@@ -356,6 +359,7 @@ pub async fn update_my_shop(
                     let dest = PathBuf::from("uploads").join("logos").join(filename);
 
                     if let Err(resp) = read_file_field_and_optimize_logo(
+                        &state,
                         &mut field,
                         &dest,
                         state.profile_image_max_bytes,
@@ -431,8 +435,8 @@ pub async fn update_my_shop(
         }
     }
 
-    if let Err(message) = validate_shop_patch(&input) {
-        return json_error(StatusCode::BAD_REQUEST, message);
+    if let Err(message) = validate_shop_patch(&input, &state) {
+        return json_error(StatusCode::BAD_REQUEST, &message);
     }
 
     let password = input.password.clone();

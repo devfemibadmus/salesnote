@@ -17,9 +17,6 @@ use crate::models::{
     AuthorizedSignatureListPayload, Signature,
 };
 
-const SIGNATURE_IMAGE_MAX_SOURCE_DIMENSION: u32 = 5000;
-const SIGNATURE_IMAGE_MAX_SOURCE_PIXELS: u64 = 16_000_000;
-
 fn extension_from_mime(mime: &mime::Mime) -> Option<&'static str> {
     match (mime.type_().as_str(), mime.subtype().as_str()) {
         ("image", "jpeg") => Some("jpg"),
@@ -201,8 +198,8 @@ pub async fn create_signature(
                 };
             if let Err(resp) = inspect_image_bounds(
                 &file_bytes,
-                SIGNATURE_IMAGE_MAX_SOURCE_DIMENSION,
-                SIGNATURE_IMAGE_MAX_SOURCE_PIXELS,
+                state.signature_image_max_source_dimension,
+                state.signature_image_max_source_pixels,
             ) {
                 return resp;
             }

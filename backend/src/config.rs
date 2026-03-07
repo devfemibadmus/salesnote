@@ -26,8 +26,16 @@ pub struct Settings {
     pub max_request_payload_bytes: usize,
     #[serde(default = "default_profile_image_max_bytes")]
     pub profile_image_max_bytes: usize,
+    #[serde(default = "default_profile_image_max_source_dimension")]
+    pub profile_image_max_source_dimension: u32,
+    #[serde(default = "default_profile_image_max_source_pixels")]
+    pub profile_image_max_source_pixels: u64,
     #[serde(default = "default_signature_image_max_bytes")]
     pub signature_image_max_bytes: usize,
+    #[serde(default = "default_signature_image_max_source_dimension")]
+    pub signature_image_max_source_dimension: u32,
+    #[serde(default = "default_signature_image_max_source_pixels")]
+    pub signature_image_max_source_pixels: u64,
     #[serde(default = "default_pool_max_size")]
     pub pool_max_size: u32,
     #[serde(default = "default_pool_min_idle")]
@@ -35,12 +43,28 @@ pub struct Settings {
     pub jwt_secret: String,
     pub refresh_token_days: i64,
     pub rate_limit_per_minute: u32,
+    #[serde(default = "default_auth_login_rate_limit_per_minute")]
+    pub auth_login_rate_limit_per_minute: u32,
+    #[serde(default = "default_auth_register_rate_limit_per_minute")]
+    pub auth_register_rate_limit_per_minute: u32,
+    #[serde(default = "default_auth_register_verify_rate_limit_per_minute")]
+    pub auth_register_verify_rate_limit_per_minute: u32,
+    #[serde(default = "default_auth_forgot_password_rate_limit_per_minute")]
+    pub auth_forgot_password_rate_limit_per_minute: u32,
+    #[serde(default = "default_auth_verify_code_rate_limit_per_minute")]
+    pub auth_verify_code_rate_limit_per_minute: u32,
+    #[serde(default = "default_auth_reset_password_rate_limit_per_minute")]
+    pub auth_reset_password_rate_limit_per_minute: u32,
     #[serde(default = "default_forgot_password_max_requests")]
     pub forgot_password_max_requests: i64,
     #[serde(default = "default_forgot_password_window_minutes")]
     pub forgot_password_window_minutes: i64,
     #[serde(default = "default_reset_code_max_incorrect_attempts")]
     pub reset_code_max_incorrect_attempts: i64,
+    #[serde(default = "default_password_min_chars")]
+    pub password_min_chars: usize,
+    #[serde(default = "default_password_max_chars")]
+    pub password_max_chars: usize,
     pub redis_url: String,
     pub smtp_host: String,
     pub smtp_port: u16,
@@ -398,8 +422,24 @@ fn default_profile_image_max_bytes() -> usize {
     10 * 1024 * 1024
 }
 
+fn default_profile_image_max_source_dimension() -> u32 {
+    5_000
+}
+
+fn default_profile_image_max_source_pixels() -> u64 {
+    16_000_000
+}
+
 fn default_signature_image_max_bytes() -> usize {
     10 * 1024 * 1024
+}
+
+fn default_signature_image_max_source_dimension() -> u32 {
+    5_000
+}
+
+fn default_signature_image_max_source_pixels() -> u64 {
+    16_000_000
 }
 
 fn default_pool_max_size() -> u32 {
@@ -414,12 +454,44 @@ fn default_forgot_password_max_requests() -> i64 {
     2
 }
 
+fn default_auth_login_rate_limit_per_minute() -> u32 {
+    10
+}
+
+fn default_auth_register_rate_limit_per_minute() -> u32 {
+    5
+}
+
+fn default_auth_register_verify_rate_limit_per_minute() -> u32 {
+    10
+}
+
+fn default_auth_forgot_password_rate_limit_per_minute() -> u32 {
+    5
+}
+
+fn default_auth_verify_code_rate_limit_per_minute() -> u32 {
+    10
+}
+
+fn default_auth_reset_password_rate_limit_per_minute() -> u32 {
+    10
+}
+
 fn default_forgot_password_window_minutes() -> i64 {
     120
 }
 
 fn default_reset_code_max_incorrect_attempts() -> i64 {
     5
+}
+
+fn default_password_min_chars() -> usize {
+    8
+}
+
+fn default_password_max_chars() -> usize {
+    128
 }
 
 fn default_enable_backtrace() -> bool {
