@@ -3,14 +3,34 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../data/models.dart';
 import '../../../services/api_client.dart';
+import '../../../services/cache/local.dart';
+import '../../../services/device_info.dart';
 import '../../../services/token_store.dart';
 import 'reset_password.dart';
 
+enum VerifyCodeFlow { resetPassword, signup }
+
 class VerifyCode extends StatefulWidget {
-  const VerifyCode({super.key, required this.phoneOrEmail});
+  const VerifyCode({
+    super.key,
+    required this.phoneOrEmail,
+  })  : flow = VerifyCodeFlow.resetPassword,
+        registerInput = null,
+        preferredRegionCode = null;
+
+  const VerifyCode.signup({
+    super.key,
+    required this.phoneOrEmail,
+    required this.registerInput,
+    required this.preferredRegionCode,
+  }) : flow = VerifyCodeFlow.signup;
 
   final String phoneOrEmail;
+  final VerifyCodeFlow flow;
+  final RegisterInput? registerInput;
+  final String? preferredRegionCode;
 
   @override
   State<VerifyCode> createState() => _VerifyCodeState();
@@ -59,6 +79,27 @@ class _VerifyCodeState extends State<VerifyCode> {
         _loading = true;
         _errorText = null;
       });
+      if (widget.flow == VerifyCodeFlow.signup) {
+        final input = widget.registerInput!;
+        final device = await DeviceInfoService.getDeviceInfo().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => DeviceInfoData(),
+        );
+        await _api.verifySignupCode(
+          input,
+          code,
+          deviceName: device.name,
+          devicePlatform: device.platform,
+          deviceOs: device.os,
+        );
+        if (widget.preferredRegionCode != null) {
+          await LocalCache.setPreferredRegionCode(widget.preferredRegionCode);
+        }
+        if (!mounted) return;
+        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+        return;
+      }
+
       await _api.verifyResetCode(widget.phoneOrEmail, code);
       if (!mounted) return;
       Navigator.of(context).push(
@@ -80,7 +121,11 @@ class _VerifyCodeState extends State<VerifyCode> {
     if (_resendSeconds != 0 || _loading) return;
     try {
       setState(() => _loading = true);
-      await _api.forgotPassword(widget.phoneOrEmail);
+      if (widget.flow == VerifyCodeFlow.signup) {
+        await _api.register(widget.registerInput!);
+      } else {
+        await _api.forgotPassword(widget.phoneOrEmail);
+      }
       if (!mounted) return;
       _showError('Code resent.');
       _startResendTimer();
@@ -137,6 +182,7 @@ class _VerifyCodeState extends State<VerifyCode> {
 
   @override
   Widget build(BuildContext context) {
+    final isSignup = widget.flow == VerifyCodeFlow.signup;
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       body: GestureDetector(
@@ -152,8 +198,8 @@ class _VerifyCodeState extends State<VerifyCode> {
                 icon: const Icon(Icons.arrow_back_ios_new, size: 20),
               ),
               const SizedBox(height: 20),
-              const Text(
-                'Verify Code',
+              Text(
+                isSignup ? 'Verify Account' : 'Verify Code',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
@@ -161,8 +207,10 @@ class _VerifyCodeState extends State<VerifyCode> {
                 ),
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Enter the 6-digit code sent to your phone or email.',
+              Text(
+                isSignup
+                    ? 'Enter the 6-digit code sent to your email to create your account.'
+                    : 'Enter the 6-digit code sent to your phone or email.',
                 style: TextStyle(fontSize: 18, color: _textMuted, height: 1.4),
               ),
               const SizedBox(height: 32),
@@ -259,7 +307,9 @@ class _VerifyCodeState extends State<VerifyCode> {
                   ),
                   onPressed: _loading ? null : _verify,
                   child: Text(
-                    _loading ? 'Please wait...' : 'Verify',
+                    _loading
+                        ? 'Please wait...'
+                        : (isSignup ? 'Create account' : 'Verify'),
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                 ),

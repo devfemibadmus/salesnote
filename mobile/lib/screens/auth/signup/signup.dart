@@ -5,13 +5,12 @@ import 'package:country_picker/country_picker.dart';
 
 import '../../../data/models.dart';
 import '../../../services/api_client.dart';
-import '../../../services/cache/local.dart';
-import '../../../services/device_info.dart';
 import '../../../services/phone.dart';
 import '../../../services/region.dart';
 import '../../../services/token_store.dart';
 import '../../../services/timezone.dart';
 import '../../../services/validators.dart';
+import '../verify/verify_code.dart';
 import 'steps/contact.dart';
 import 'steps/final_step.dart';
 import 'steps/shop_name.dart';
@@ -133,18 +132,16 @@ class _SignupState extends State<Signup> {
 
     try {
       await _api.register(input);
-      final device = await DeviceInfoService.getDeviceInfo()
-          .timeout(const Duration(seconds: 2), onTimeout: () => DeviceInfoData());
-      await _api.login(
-        input.email,
-        input.password,
-        deviceName: device.name,
-        devicePlatform: device.platform,
-        deviceOs: device.os,
-      );
-      await LocalCache.setPreferredRegionCode(phoneRegion);
       if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false);
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VerifyCode.signup(
+            phoneOrEmail: input.email,
+            registerInput: input,
+            preferredRegionCode: phoneRegion,
+          ),
+        ),
+      );
     } catch (e) {
       _showError(_errorMessage(e));
     } finally {

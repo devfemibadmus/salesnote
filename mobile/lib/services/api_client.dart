@@ -177,11 +177,46 @@ class ApiClient {
       () =>
           _client.post(uri, headers: headers, body: jsonEncode(input.toJson())),
     );
-    final result = await _handle(
-      response,
-      (data) => ShopProfile.fromJson(data),
+    await _handle(response, (data) => data);
+    return AuthResult(
+      accessToken: '',
+      shop: ShopProfile(
+        id: '',
+        name: input.shopName,
+        phone: input.phone,
+        email: input.email,
+        address: input.address,
+        logoUrl: input.logoUrl,
+        timezone: input.timezone,
+        createdAt: '',
+      ),
     );
-    return AuthResult(accessToken: '', shop: result.data);
+  }
+
+  Future<AuthResult> verifySignupCode(
+    RegisterInput input,
+    String code, {
+    String? deviceName,
+    String? devicePlatform,
+    String? deviceOs,
+  }) async {
+    final uri = _uri('/auth/register/verify');
+    final headers = await _headers();
+    final payload = <String, dynamic>{
+      ...input.toJson(),
+      'code': code,
+      'device_name': deviceName,
+      'device_platform': devicePlatform,
+      'device_os': deviceOs,
+    };
+    final response = await _timedRequest(
+      'POST',
+      uri,
+      () => _client.post(uri, headers: headers, body: jsonEncode(payload)),
+    );
+    final result = await _handle(response, (data) => AuthResult.fromJson(data));
+    await _tokenStore.saveToken(result.data.accessToken);
+    return result.data;
   }
 
   Future<void> forgotPassword(String phoneOrEmail) async {

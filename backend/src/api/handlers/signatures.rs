@@ -161,12 +161,11 @@ pub async fn create_signature(
                 Ok(t) => t,
                 Err(_) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, "time error"),
             };
-            let file_bytes = match read_file_field_bytes(&mut field, state.signature_image_max_bytes)
-                .await
-            {
-                Ok(b) => b,
-                Err(resp) => return resp,
-            };
+            let file_bytes =
+                match read_file_field_bytes(&mut field, state.signature_image_max_bytes).await {
+                    Ok(b) => b,
+                    Err(resp) => return resp,
+                };
 
             let processed_filename = format!("sig_{}_{}_processed.png", *shop_id, ts.as_millis());
             let processed_rel_path = format!("uploads/signatures/{}", processed_filename);

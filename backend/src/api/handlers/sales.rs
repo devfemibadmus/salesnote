@@ -13,10 +13,7 @@ use crate::models::{
     AuthorizedSaleListPayload, AuthorizedSaleListResult, AuthorizedSaleUpdatePayload,
     AuthorizedSaleUpdateResult, DeviceSession, Sale, SaleInput, SaleUpdateInput,
 };
-use crate::{
-    config::Settings,
-    worker::notification::fcm::send_fcm_notification_with_data,
-};
+use crate::{config::Settings, worker::notification::fcm::send_fcm_notification_with_data};
 
 const MAX_ITEM_NAME_CHARS: usize = 20;
 const MAX_SALE_TOTAL: f64 = 9_999_999_999.99;
@@ -262,7 +259,7 @@ pub async fn create_sale(
                 .filter(|value| !value.is_empty())
                 .map(str::to_owned);
             let item_count = sale.items.len();
-            
+
             actix_web::rt::spawn(async move {
                 let settings = Settings::load();
                 if let Ok(tokens) = DeviceSession::get_fcm_tokens_for_shop(&pool, shop_id_val).await

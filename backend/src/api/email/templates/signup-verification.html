@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Verify your Salesnote account</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #f4f7fb;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #0f172a;
+      }
+      .wrapper {
+        width: 100%;
+        background: #f4f7fb;
+        padding: 32px 12px;
+      }
+      .card {
+        width: 100%;
+        max-width: 520px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 24px;
+        overflow: hidden;
+        border-top: 6px solid #2563eb;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+      }
+      .header {
+        padding: 40px 32px 16px;
+        text-align: center;
+      }
+      .logo {
+        border: 1px solid #dbe5f1;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      }
+      .logo-fallback {
+        width: 64px;
+        height: 64px;
+        line-height: 64px;
+        margin: 0 auto;
+        border-radius: 18px;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 28px;
+        font-weight: 800;
+        text-align: center;
+      }
+      .brand {
+        margin: 18px 0 0;
+        font-size: 28px;
+        font-weight: 800;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+      }
+      .content {
+        padding: 0 32px 32px;
+        text-align: center;
+      }
+      .eyebrow {
+        margin: 0 0 10px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #64748b;
+        letter-spacing: 1.8px;
+        text-transform: uppercase;
+      }
+      .title {
+        margin: 0 0 12px;
+        font-size: 30px;
+        line-height: 1.2;
+        font-weight: 800;
+        color: #0f172a;
+      }
+      .body {
+        margin: 0 auto 26px;
+        max-width: 420px;
+        font-size: 16px;
+        line-height: 1.65;
+        color: #475569;
+      }
+      .code-label {
+        margin: 0 0 12px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #64748b;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+      }
+      .code-table {
+        margin: 0 auto 28px;
+      }
+      .code-cell {
+        padding: 0 4px;
+      }
+      .code-box {
+        width: 52px;
+        height: 58px;
+        line-height: 58px;
+        border-radius: 14px;
+        background: #0f172a;
+        color: #ffffff;
+        font-size: 24px;
+        font-weight: 800;
+        text-align: center;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+      }
+      .note-box {
+        margin: 0 auto 24px;
+        max-width: 420px;
+        padding: 18px 20px;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #dbe5f1;
+      }
+      .note {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #475569;
+      }
+      .note strong {
+        color: #2563eb;
+      }
+      .footer {
+        padding: 22px 32px 28px;
+        text-align: center;
+        background: #f8fafc;
+        border-top: 1px solid #eef2f7;
+      }
+      .footer-copy {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.7;
+        color: #64748b;
+      }
+      .footer-link {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="card">
+        <tr>
+          <td class="header">
+            {{LOGO_BLOCK}}
+            <div class="brand">Salesnote</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="content">
+            <p class="eyebrow">Account verification</p>
+            <h1 class="title">Finish creating your account</h1>
+            <p class="body">
+              Hi {{SHOP_NAME}}, use the verification code below to confirm your email and finish setting up your Salesnote account.
+            </p>
+            <p class="code-label">Verification code</p>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="code-table">
+              <tr>
+                {{CODE_BOXES}}
+              </tr>
+            </table>
+            <div class="note-box">
+              <p class="note">
+                This code expires in <strong>10 minutes</strong>. If you did not start this signup, you can ignore this email.
+              </p>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td class="footer">
+            <p class="footer-copy">
+              Need help? <a href="https://salesnote.online" class="footer-link">Contact Support</a><br />
+              © {{YEAR}} Salesnote Nigeria Limited. All rights reserved.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </body>
+</html>

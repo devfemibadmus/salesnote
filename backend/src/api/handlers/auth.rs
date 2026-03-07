@@ -9,13 +9,13 @@ use rand::Rng;
 use std::str::FromStr;
 
 use crate::api::middlewares::auth::AuthDeviceId;
-use crate::api::response::{json_created, json_error, json_ok};
+use crate::api::response::{json_error, json_ok};
 use crate::api::state::AppState;
 use crate::models::{
     build_token, AuthForgotPasswordInput, AuthLoginInput, AuthLoginResponse, AuthRefreshInput,
-    AuthRegisterInput, AuthResetPasswordInput, AuthVerifyCodeInput, AuthorizedDeviceDeletePayload,
-    AuthorizedDeviceListPayload, Claims, DeviceSession, LoginOneStepPayload, LoginOneStepResult,
-    ResetPasswordResult, ShopAuthRecord, ShopProfile,
+    AuthRegisterInput, AuthResetPasswordInput, AuthVerifyCodeInput, AuthVerifySignupInput,
+    AuthorizedDeviceDeletePayload, AuthorizedDeviceListPayload, Claims, DeviceSession,
+    LoginOneStepPayload, LoginOneStepResult, ResetPasswordResult, ShopAuthRecord,
 };
 
 pub async fn register(
@@ -35,25 +35,174 @@ pub async fn register(
         return json_error(StatusCode::BAD_REQUEST, msg);
     }
 
-    match ShopProfile::create_with_welcome_email(
+    let mut rng = rand::thread_rng();
+    let code = format!("{:06}", rng.gen_range(0..=999_999));
+    let window_minutes = state.forgot_password_window_minutes.max(1);
+    let max_requests = state.forgot_password_max_requests.max(1);
+
+    match ShopAuthRecord::create_signup_verification_request(
         &state.pool,
-        &input,
-        &input.password,
-        &state.dashboard_url,
+        &input.phone,
+        &input.email,
+        &code,
+        window_minutes,
+        max_requests,
     )
     .await
     {
-        Ok(shop) => json_created(shop),
+        Ok(result) => {
+            if result.has_existing_shop {
+                return json_error(StatusCode::BAD_REQUEST, "phone or email already exists");
+            }
+            let max_requests_i32 = i32::try_from(max_requests).unwrap_or(i32::MAX);
+            if result.request_count >= max_requests_i32 {
+                return json_error(
+                    StatusCode::TOO_MANY_REQUESTS,
+                    "Too many requests. Try again later.",
+                );
+            }
+            let email = input.email.clone();
+            let shop_name = input.shop_name.clone();
+            let code_clone = code.clone();
+            actix_web::rt::spawn(async move {
+                let settings = crate::config::Settings::load();
+                let _ = crate::api::email::send_signup_verification_email_direct(
+                    &settings,
+                    &email,
+                    &shop_name,
+                    &code_clone,
+                )
+                .await;
+            });
+            json_ok("Verification code sent.")
+        }
         Err(e) => {
             tracing::error!("register error: {}", e);
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            )
+        }
+    }
+}
+
+pub async fn verify_signup(
+    state: web::Data<AppState>,
+    req: HttpRequest,
+    payload: web::Json<AuthVerifySignupInput>,
+) -> impl Responder {
+    let mut input = payload.into_inner();
+    input.input.shop_name = input.input.shop_name.trim().to_string();
+    input.input.phone = input.input.phone.trim().to_string();
+    input.input.email = input.input.email.trim().to_lowercase();
+    if let Some(address) = input.input.address.as_mut() {
+        *address = address.trim().to_string();
+    }
+    input.input.timezone = input.input.timezone.trim().to_string();
+
+    if let Err(msg) = validate_register(&input.input) {
+        return json_error(StatusCode::BAD_REQUEST, msg);
+    }
+
+    let code = input.code.trim();
+    if !is_valid_reset_code(code) {
+        return json_error(StatusCode::BAD_REQUEST, "invalid code");
+    }
+
+    let max_incorrect_attempts = state.reset_code_max_incorrect_attempts.max(1);
+    let verification = match ShopAuthRecord::verify_signup_code(
+        &state.pool,
+        &input.input.phone,
+        &input.input.email,
+        code,
+        max_incorrect_attempts,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::error!("verify signup flow error: {}", e);
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            );
+        }
+    };
+
+    if verification.too_many_attempts {
+        return json_error(
+            StatusCode::TOO_MANY_REQUESTS,
+            "Too many incorrect attempts. Request a new code.",
+        );
+    }
+
+    if !verification.has_pending_code || !verification.is_valid {
+        return json_error(StatusCode::UNAUTHORIZED, "invalid or expired code");
+    }
+
+    let ip_address = extract_client_ip(&req);
+    let user_agent = req
+        .headers()
+        .get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.to_string());
+    let location = build_location_from_headers(req.headers());
+
+    let session = match ShopAuthRecord::create_verified_signup_session(
+        &state.pool,
+        &input.input,
+        &state.dashboard_url,
+        input.device_name.as_ref().map(|v| v.trim().to_string()),
+        input.device_platform.as_ref().map(|v| v.trim().to_string()),
+        input.device_os.as_ref().map(|v| v.trim().to_string()),
+        ip_address,
+        location,
+        user_agent,
+        state.refresh_token_days,
+    )
+    .await
+    {
+        Ok(session) => session,
+        Err(e) => {
+            tracing::error!("verify signup create error: {}", e);
             if let sqlx::Error::Database(db_err) = &e {
                 if db_err.code().as_deref() == Some("23505") {
                     return json_error(StatusCode::BAD_REQUEST, "phone or email already exists");
                 }
             }
-            json_error(StatusCode::BAD_REQUEST, "phone or email already exists")
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Unable to create account right now.",
+            );
         }
-    }
+    };
+
+    let _ = ShopAuthRecord::clear_signup_verification_codes(
+        &state.pool,
+        &input.input.phone,
+        &input.input.email,
+    )
+    .await;
+
+    let token = match build_token(
+        session.shop.id,
+        Some(session.device_session_id),
+        &state.jwt_secret,
+    ) {
+        Ok(t) => t,
+        Err(_) => {
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Unable to create session. Please try again.",
+            );
+        }
+    };
+
+    json_ok(AuthLoginResponse {
+        access_token: token,
+        refresh_token: session.refresh_token,
+        shop: session.shop,
+    })
 }
 
 pub async fn login(
@@ -225,7 +374,7 @@ pub async fn forgot_password(
             let code_clone = code.clone();
             actix_web::rt::spawn(async move {
                 let settings = crate::config::Settings::load();
-                let _ = crate::worker::email::send_password_reset_email_direct(
+                let _ = crate::api::email::send_password_reset_email_direct(
                     &settings,
                     &shop_email,
                     &code_clone,

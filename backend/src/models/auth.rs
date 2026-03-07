@@ -42,6 +42,16 @@ pub struct AuthVerifyCodeInput {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct AuthVerifySignupInput {
+    #[serde(flatten)]
+    pub input: AuthRegisterInput,
+    pub code: String,
+    pub device_name: Option<String>,
+    pub device_platform: Option<String>,
+    pub device_os: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct AuthResetPasswordInput {
     pub phone_or_email: String,
     pub code: String,
@@ -162,6 +172,19 @@ pub struct ForgotPasswordResult {
 #[derive(Debug)]
 pub struct VerifyResetCodeResult {
     pub has_shop: bool,
+    pub is_valid: bool,
+    pub too_many_attempts: bool,
+}
+
+#[derive(Debug)]
+pub struct SignupVerificationRequestResult {
+    pub has_existing_shop: bool,
+    pub request_count: i32,
+}
+
+#[derive(Debug)]
+pub struct VerifySignupCodeResult {
+    pub has_pending_code: bool,
     pub is_valid: bool,
     pub too_many_attempts: bool,
 }
@@ -583,6 +606,217 @@ impl ShopAuthRecord {
         .await?;
 
         Ok(())
+    }
+
+    pub async fn create_signup_verification_request(
+        pool: &sqlx::PgPool,
+        phone: &str,
+        email: &str,
+        code: &str,
+        window_minutes: i64,
+        max_requests: i64,
+    ) -> Result<SignupVerificationRequestResult, sqlx::Error> {
+        let row = sqlx::query(
+            "WITH existing_shop AS (
+               SELECT 1
+               FROM shops
+               WHERE phone = $1 OR email = $2
+               LIMIT 1
+             ),
+             request_count AS (
+               SELECT
+                 CASE
+                   WHEN EXISTS(SELECT 1 FROM existing_shop) THEN 0
+                   ELSE (
+                     SELECT COUNT(*)::int
+                     FROM signup_verification_codes
+                     WHERE (phone = $1 OR email = $2)
+                       AND created_at >= NOW() - ($5 * interval '1 minute')
+                   )
+                 END AS cnt
+             ),
+             inserted_code AS (
+               INSERT INTO signup_verification_codes (phone, email, code, expires_at)
+               SELECT $1, $2, $3, NOW() + interval '10 minutes'
+               WHERE NOT EXISTS(SELECT 1 FROM existing_shop)
+                 AND (SELECT cnt FROM request_count) < $5
+               RETURNING id
+             )
+             SELECT
+               EXISTS(SELECT 1 FROM existing_shop) AS has_existing_shop,
+               (SELECT cnt FROM request_count) AS request_count",
+        )
+        .bind(phone)
+        .bind(email)
+        .bind(code)
+        .bind(window_minutes)
+        .bind(max_requests)
+        .fetch_one(pool)
+        .await?;
+
+        Ok(SignupVerificationRequestResult {
+            has_existing_shop: row.get("has_existing_shop"),
+            request_count: row.get("request_count"),
+        })
+    }
+
+    pub async fn verify_signup_code(
+        pool: &sqlx::PgPool,
+        phone: &str,
+        email: &str,
+        code: &str,
+        max_incorrect_attempts: i64,
+    ) -> Result<VerifySignupCodeResult, sqlx::Error> {
+        let row = sqlx::query(
+            "WITH latest_code AS (
+               SELECT id, code, failed_attempts
+               FROM signup_verification_codes
+               WHERE phone = $1
+                 AND email = $2
+                 AND expires_at > NOW()
+               ORDER BY created_at DESC
+               LIMIT 1
+             ),
+             valid_code AS (
+               SELECT id
+               FROM latest_code
+               WHERE code = $3
+                 AND failed_attempts < $4
+             ),
+             bumped AS (
+               UPDATE signup_verification_codes svc
+               SET failed_attempts = svc.failed_attempts + 1
+               WHERE svc.id = (
+                 SELECT id
+                 FROM latest_code
+                 WHERE code <> $3
+                   AND failed_attempts < $4
+               )
+               RETURNING svc.failed_attempts
+             )
+             SELECT
+               EXISTS(SELECT 1 FROM latest_code) AS has_pending_code,
+               EXISTS(SELECT 1 FROM valid_code) AS is_valid,
+               COALESCE(
+                 (SELECT failed_attempts FROM bumped LIMIT 1),
+                 (SELECT failed_attempts FROM latest_code LIMIT 1),
+                 0
+               ) AS failed_after_attempt",
+        )
+        .bind(phone)
+        .bind(email)
+        .bind(code)
+        .bind(max_incorrect_attempts)
+        .fetch_one(pool)
+        .await?;
+
+        let has_pending_code: bool = row.get("has_pending_code");
+        let is_valid: bool = row.get("is_valid");
+        let failed_after_attempt: i32 = row.get("failed_after_attempt");
+        let max_attempts_i32 = i32::try_from(max_incorrect_attempts).unwrap_or(i32::MAX);
+
+        Ok(VerifySignupCodeResult {
+            has_pending_code,
+            is_valid,
+            too_many_attempts: has_pending_code
+                && !is_valid
+                && failed_after_attempt >= max_attempts_i32,
+        })
+    }
+
+    pub async fn clear_signup_verification_codes(
+        pool: &sqlx::PgPool,
+        phone: &str,
+        email: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "DELETE FROM signup_verification_codes
+             WHERE phone = $1 OR email = $2",
+        )
+        .bind(phone)
+        .bind(email)
+        .execute(pool)
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn create_verified_signup_session(
+        pool: &sqlx::PgPool,
+        input: &AuthRegisterInput,
+        dashboard_url: &str,
+        device_name: Option<String>,
+        device_platform: Option<String>,
+        device_os: Option<String>,
+        ip_address: Option<String>,
+        location: Option<String>,
+        user_agent: Option<String>,
+        refresh_token_days: i64,
+    ) -> Result<LoginSessionResult, sqlx::Error> {
+        let refresh_token = generate_refresh_token();
+        let refresh_hash = hash_refresh_token(&refresh_token);
+
+        let row = sqlx::query(
+            "WITH inserted_shop AS (
+               INSERT INTO shops (name, phone, email, password_hash, address, logo_url, timezone)
+               VALUES ($1, $2, $3, crypt($4, gen_salt('bf', 12)), $5, $6, $7)
+               RETURNING id, name, phone, email, address, logo_url,
+                         total_revenue, total_orders, total_customers, timezone,
+                         created_at::text AS created_at
+             ),
+             inserted_email AS (
+               INSERT INTO email_outbox (to_email, template, payload)
+               SELECT email, 'welcome', json_build_object('shop_name', name, 'dashboard_url', $8)
+               FROM inserted_shop
+               RETURNING id
+             ),
+             inserted_device AS (
+               INSERT INTO device_sessions (shop_id, device_name, device_platform, device_os, ip_address, location, user_agent)
+               SELECT id, $9, $10, $11, $12, $13, $14
+               FROM inserted_shop
+               RETURNING id
+             ),
+             inserted_refresh AS (
+               INSERT INTO refresh_tokens (shop_id, device_session_id, token_hash, expires_at)
+               SELECT (SELECT id FROM inserted_shop), (SELECT id FROM inserted_device), $15, NOW() + ($16 || ' days')::interval
+               RETURNING id
+             )
+             SELECT
+               (SELECT id FROM inserted_device) AS device_id,
+               (SELECT row_to_json(inserted_shop) FROM inserted_shop) AS shop_json",
+        )
+        .bind(&input.shop_name)
+        .bind(&input.phone)
+        .bind(&input.email)
+        .bind(&input.password)
+        .bind(&input.address)
+        .bind(&input.logo_url)
+        .bind(&input.timezone)
+        .bind(dashboard_url)
+        .bind(device_name)
+        .bind(device_platform)
+        .bind(device_os)
+        .bind(ip_address)
+        .bind(location)
+        .bind(user_agent)
+        .bind(&refresh_hash)
+        .bind(refresh_token_days)
+        .fetch_one(pool)
+        .await?;
+
+        let device_session_id = row.get::<Option<i64>, _>("device_id").ok_or_else(|| {
+            sqlx::Error::Protocol("missing device session id from signup query".into())
+        })?;
+        let shop_json = row.get::<serde_json::Value, _>("shop_json");
+        let shop: ShopProfile = serde_json::from_value(shop_json).map_err(|e| {
+            sqlx::Error::Protocol(format!("invalid shop json from signup query: {}", e))
+        })?;
+
+        Ok(LoginSessionResult {
+            device_session_id,
+            shop,
+            refresh_token,
+        })
     }
 
     pub async fn create_refresh_token(

@@ -1,3 +1,4 @@
+pub mod email;
 pub mod handlers;
 pub mod middlewares;
 pub mod response;

@@ -162,7 +162,7 @@ jobs:
                   host: ${{ secrets.API_SSH_HOST }}
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
-                  source: "backend/src/worker/email/templates/*"
+                  source: "backend/src/api/email/templates/*"
                   target: "/home/salesnote/api/templates/email/"
                   strip_components: 5
                   overwrite: true
@@ -181,8 +181,6 @@ jobs:
                         sudo systemctl stop 'salesnote@*' || true
                       fi
                       test -f "${{ env.API_DIR }}/.deploy/api"
-                      test -f "/home/salesnote/api/templates/email/password-reset.html"
-                      test -f "/home/salesnote/api/templates/email/welcome.html"
                       test -f "/home/salesnote/api/templates/email/logo.jpg"
                       sudo install -m 755 "${{ env.API_DIR }}/.deploy/api" "${{ env.API_DIR }}/api"
                       sudo chmod +x "${{ env.API_DIR }}/api"
