@@ -7,7 +7,7 @@ use image::codecs::jpeg::JpegEncoder;
 use image::ImageReader;
 use serde::Serialize;
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::api::middlewares::auth::AuthDeviceId;
 use crate::api::response::{json_empty, json_error, json_ok};
@@ -143,9 +143,8 @@ async fn read_text_field(field: &mut actix_multipart::Field) -> Result<String, H
 async fn read_file_field_and_optimize_logo(
     state: &AppState,
     field: &mut actix_multipart::Field,
-    dest_path: &Path,
     max_size: usize,
-) -> Result<(), HttpResponse> {
+) -> Result<Vec<u8>, HttpResponse> {
     let mut size = 0usize;
     let mut file_bytes = Vec::new();
     while let Some(chunk) = field.next().await {
@@ -187,6 +186,25 @@ async fn read_file_field_and_optimize_logo(
         image = image.thumbnail(PROFILE_IMAGE_MAX_DIMENSION, PROFILE_IMAGE_MAX_DIMENSION);
     }
 
+    let mut output = Vec::new();
+    let mut encoder = JpegEncoder::new_with_quality(&mut output, PROFILE_IMAGE_JPEG_QUALITY);
+    if encoder.encode_image(&image).is_err() {
+        return Err(json_error(
+            actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+            "image processing error",
+        ));
+    }
+
+    Ok(output)
+}
+
+fn save_logo_bytes_local(shop_id: i64, bytes: &[u8]) -> Result<String, HttpResponse> {
+    let filename = format!("shop_{shop_id}.jpg");
+    let rel_path = format!("uploads/logos/{filename}");
+    let dest_path = std::path::PathBuf::from("uploads")
+        .join("logos")
+        .join(filename);
+
     if let Some(parent) = dest_path.parent() {
         if std::fs::create_dir_all(parent).is_err() {
             return Err(json_error(
@@ -195,22 +213,48 @@ async fn read_file_field_and_optimize_logo(
             ));
         }
     }
-    let file = std::fs::File::create(dest_path).map_err(|_| {
+
+    std::fs::write(&dest_path, bytes).map_err(|_| {
         json_error(
             actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
             "storage error",
         )
     })?;
-    let mut writer = std::io::BufWriter::new(file);
-    let mut encoder = JpegEncoder::new_with_quality(&mut writer, PROFILE_IMAGE_JPEG_QUALITY);
-    if encoder.encode_image(&image).is_err() {
-        return Err(json_error(
-            actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
-            "image processing error",
-        ));
+
+    Ok(rel_path)
+}
+
+async fn persist_logo(
+    state: &AppState,
+    shop_id: i64,
+    bytes: Vec<u8>,
+) -> Result<String, HttpResponse> {
+    if let Some(bucket) = state.gcs_bucket.as_deref() {
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| json_error(StatusCode::INTERNAL_SERVER_ERROR, "time error"))?;
+        let object_name = format!("logos/shop_{shop_id}_{}.jpg", ts.as_millis());
+        let key_path = state
+            .gcs_key_json_path
+            .as_deref()
+            .filter(|v| !v.trim().is_empty())
+            .unwrap_or("firebase-adminsdk.json");
+        return crate::storage::gcs::upload_object(
+            key_path,
+            bucket,
+            &object_name,
+            "image/jpeg",
+            bytes,
+            state.gcs_public_base_url.as_deref(),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("gcs logo upload error: {}", e);
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "storage error")
+        });
     }
 
-    Ok(())
+    save_logo_bytes_local(shop_id, &bytes)
 }
 
 fn inspect_image_bounds(
@@ -354,21 +398,22 @@ pub async fn update_my_shop(
                         }
                     };
 
-                    let filename = format!("shop_{}.jpg", *shop_id);
-                    let rel_path = format!("uploads/logos/{}", filename);
-                    let dest = PathBuf::from("uploads").join("logos").join(filename);
-
-                    if let Err(resp) = read_file_field_and_optimize_logo(
+                    let bytes = match read_file_field_and_optimize_logo(
                         &state,
                         &mut field,
-                        &dest,
                         state.profile_image_max_bytes,
                     )
                     .await
                     {
-                        return resp;
-                    }
-                    multipart_input.logo_url = Some(rel_path);
+                        Ok(bytes) => bytes,
+                        Err(resp) => return resp,
+                    };
+
+                    let logo_url = match persist_logo(&state, *shop_id, bytes).await {
+                        Ok(url) => url,
+                        Err(resp) => return resp,
+                    };
+                    multipart_input.logo_url = Some(logo_url);
                     continue;
                 }
 

@@ -5,7 +5,6 @@ use futures_util::StreamExt;
 use image::ImageFormat;
 use image::ImageReader;
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::api::middlewares::auth::AuthDeviceId;
@@ -104,7 +103,7 @@ fn inspect_image_bounds(
     Ok(())
 }
 
-fn remove_signature_background(bytes: &[u8], out_path: &Path) -> Result<(), HttpResponse> {
+fn remove_signature_background(bytes: &[u8]) -> Result<Vec<u8>, HttpResponse> {
     let img = image::load_from_memory(bytes).map_err(|_| {
         json_error(
             StatusCode::BAD_REQUEST,
@@ -131,7 +130,21 @@ fn remove_signature_background(bytes: &[u8], out_path: &Path) -> Result<(), Http
         p[3] = alpha;
     }
 
-    if let Some(parent) = out_path.parent() {
+    let mut output = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgba8(rgba)
+        .write_to(&mut output, ImageFormat::Png)
+        .map_err(|_| json_error(StatusCode::INTERNAL_SERVER_ERROR, "image processing error"))?;
+    Ok(output.into_inner())
+}
+
+fn save_signature_bytes_local(shop_id: i64, ts_millis: u128, bytes: &[u8]) -> Result<String, HttpResponse> {
+    let filename = format!("sig_{shop_id}_{ts_millis}_processed.png");
+    let rel_path = format!("uploads/signatures/{filename}");
+    let dest = std::path::PathBuf::from("uploads")
+        .join("signatures")
+        .join(filename);
+
+    if let Some(parent) = dest.parent() {
         if std::fs::create_dir_all(parent).is_err() {
             return Err(json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -140,10 +153,40 @@ fn remove_signature_background(bytes: &[u8], out_path: &Path) -> Result<(), Http
         }
     }
 
-    image::DynamicImage::ImageRgba8(rgba)
-        .save_with_format(out_path, ImageFormat::Png)
-        .map_err(|_| json_error(StatusCode::INTERNAL_SERVER_ERROR, "image processing error"))?;
-    Ok(())
+    std::fs::write(&dest, bytes)
+        .map_err(|_| json_error(StatusCode::INTERNAL_SERVER_ERROR, "storage error"))?;
+    Ok(rel_path)
+}
+
+async fn persist_signature(
+    state: &AppState,
+    shop_id: i64,
+    ts_millis: u128,
+    bytes: Vec<u8>,
+) -> Result<String, HttpResponse> {
+    if let Some(bucket) = state.gcs_bucket.as_deref() {
+        let object_name = format!("signatures/shop_{shop_id}/sig_{ts_millis}.png");
+        let key_path = state
+            .gcs_key_json_path
+            .as_deref()
+            .filter(|v| !v.trim().is_empty())
+            .unwrap_or("firebase-adminsdk.json");
+        return crate::storage::gcs::upload_object(
+            key_path,
+            bucket,
+            &object_name,
+            "image/png",
+            bytes,
+            state.gcs_public_base_url.as_deref(),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("gcs signature upload error: {}", e);
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "storage error")
+        });
+    }
+
+    save_signature_bytes_local(shop_id, ts_millis, &bytes)
 }
 
 pub async fn create_signature(
@@ -204,16 +247,16 @@ pub async fn create_signature(
                 return resp;
             }
 
-            let processed_filename = format!("sig_{}_{}_processed.png", *shop_id, ts.as_millis());
-            let processed_rel_path = format!("uploads/signatures/{}", processed_filename);
-            let processed_dest = PathBuf::from("uploads")
-                .join("signatures")
-                .join(processed_filename);
-
-            if let Err(resp) = remove_signature_background(&file_bytes, &processed_dest) {
-                return resp;
-            }
-            image_path = Some(processed_rel_path);
+            let processed_bytes = match remove_signature_background(&file_bytes) {
+                Ok(bytes) => bytes,
+                Err(resp) => return resp,
+            };
+            let stored_url =
+                match persist_signature(&state, *shop_id, ts.as_millis(), processed_bytes).await {
+                    Ok(url) => url,
+                    Err(resp) => return resp,
+                };
+            image_path = Some(stored_url);
             continue;
         }
     }

@@ -52,6 +52,9 @@ async fn main() -> std::io::Result<()> {
         smtp_password: settings.smtp_password.clone(),
         smtp_from: settings.smtp_from.clone(),
         dashboard_url: settings.dashboard_url.clone(),
+        gcs_bucket: settings.gcs_bucket.clone(),
+        gcs_public_base_url: settings.gcs_public_base_url.clone(),
+        gcs_key_json_path: settings.gcs_key_json_path.clone(),
         redis: redis::Client::open(settings.redis_url.clone())
             .expect("failed to init redis client"),
     };

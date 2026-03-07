@@ -78,6 +78,12 @@ pub struct Settings {
     pub dashboard_url: String,
     pub fcm_project_id: String,
     pub fcm_key_json_path: String,
+    #[serde(default)]
+    pub gcs_bucket: Option<String>,
+    #[serde(default)]
+    pub gcs_public_base_url: Option<String>,
+    #[serde(default)]
+    pub gcs_key_json_path: Option<String>,
     pub geoip_url: Option<String>,
     pub geoip_token: Option<String>,
     #[serde(default = "default_log_to_terminal")]
