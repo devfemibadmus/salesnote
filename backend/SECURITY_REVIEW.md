@@ -17,7 +17,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 | SEC-005 | Medium | Open | Uploaded files are exposed publicly under `/uploads` |
 | SEC-006 | Low | Open | Production logging defaults are too verbose |
 | SEC-007 | Medium | Implemented | Brute-force and spam protection is only partial on auth flows |
-| SEC-008 | Medium | Open | User-controlled values are inserted into HTML email templates without escaping |
+| SEC-008 | Medium | Implemented | User-controlled values are inserted into HTML email templates without escaping |
 
 ## Detailed Findings
 
@@ -195,7 +195,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 ### SEC-008: User-controlled values are inserted into HTML email templates without escaping
 
 - Severity: Medium
-- Status: Open
+- Status: Implemented
 - Locations:
   - `backend/src/api/email/mod.rs:165`
   - `backend/src/api/email/mod.rs:171`
@@ -213,6 +213,10 @@ This is a tracking document for backend security work. Findings are ordered by s
   - HTML-escape all user-controlled values before template substitution.
   - Add a small shared escaping helper for every dynamic template field, not just code digits.
   - Review web surfaces too if they render stored names/addresses as HTML anywhere.
+- Implemented:
+  - auth email templates now escape user-controlled string fields before substitution
+  - worker welcome email now escapes dynamic string fields before substitution
+  - code digits continue to be escaped before rendering into the code-box markup
 
 ## Requested Focus Areas
 

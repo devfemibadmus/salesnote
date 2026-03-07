@@ -159,16 +159,17 @@ fn build_signup_verification_code(data: SignupVerificationCodeData) -> EmailMess
     let code_boxes = render_code_boxes(&data.code);
     let logo_bytes = load_logo_bytes();
     let logo_block = render_logo_block(logo_bytes.is_some());
+    let shop_name = html_escape_str(&data.shop_name);
 
     let html_body = match template {
         Some(tpl) => tpl
-            .replace("{{SHOP_NAME}}", &data.shop_name)
+            .replace("{{SHOP_NAME}}", &shop_name)
             .replace("{{CODE_BOXES}}", &code_boxes)
             .replace("{{YEAR}}", &year)
             .replace("{{LOGO_BLOCK}}", &logo_block),
         None => format!(
             "<p>Hi {},</p><p>Use this verification code to complete your account creation:</p><p><strong>{}</strong></p>",
-            data.shop_name, data.code
+            shop_name, data.code
         ),
     };
 
@@ -247,7 +248,7 @@ fn render_code_boxes(code: &str) -> String {
     for ch in code.chars() {
         out.push_str(&format!(
             "<td class=\"code-cell\"><div class=\"code-box\">{}</div></td>",
-            html_escape(ch)
+            html_escape_char(ch)
         ));
     }
     out
@@ -261,7 +262,7 @@ fn render_logo_block(has_logo: bool) -> String {
     "<div class=\"logo-fallback\">S</div>".to_string()
 }
 
-fn html_escape(ch: char) -> String {
+fn html_escape_char(ch: char) -> String {
     match ch {
         '&' => "&amp;".to_string(),
         '<' => "&lt;".to_string(),
@@ -270,6 +271,10 @@ fn html_escape(ch: char) -> String {
         '\'' => "&#39;".to_string(),
         _ => ch.to_string(),
     }
+}
+
+fn html_escape_str(value: &str) -> String {
+    value.chars().map(html_escape_char).collect()
 }
 
 fn current_year() -> String {

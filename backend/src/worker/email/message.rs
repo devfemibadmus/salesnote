@@ -12,17 +12,19 @@ pub struct WelcomeData {
 pub fn build_welcome(data: WelcomeData) -> EmailMessage {
     let template = load_template("welcome.html");
     let year = current_year();
-    let logo_b64 = load_logo_base64().unwrap_or_default();
+    let logo_b64 = html_escape_str(&load_logo_base64().unwrap_or_default());
+    let shop_name = html_escape_str(&data.shop_name);
+    let dashboard_url = html_escape_str(&data.dashboard_url);
 
     let html_body = match template {
         Some(tpl) => tpl
-            .replace("{{SHOP_NAME}}", &data.shop_name)
-            .replace("{{DASHBOARD_URL}}", &data.dashboard_url)
+            .replace("{{SHOP_NAME}}", &shop_name)
+            .replace("{{DASHBOARD_URL}}", &dashboard_url)
             .replace("{{YEAR}}", &year)
             .replace("{{LOGO_URL}}", &logo_b64),
         None => format!(
             "<p>Hi {},</p><p>Welcome to Salesnote. You're ready to create e-receipts.</p>",
-            data.shop_name
+            shop_name
         ),
     };
 
@@ -116,4 +118,19 @@ fn load_logo_base64() -> Option<String> {
 fn current_year() -> String {
     let now = chrono::Utc::now();
     now.format("%Y").to_string()
+}
+
+fn html_escape_str(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            _ => out.push(ch),
+        }
+    }
+    out
 }
