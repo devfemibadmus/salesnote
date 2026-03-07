@@ -5,6 +5,7 @@ import '../data/models.dart';
 import '../screens/preview/preview.dart';
 import 'api_client.dart';
 import 'cache/loader.dart';
+import 'notice.dart';
 import 'token_store.dart';
 
 class PreviewService {
@@ -17,8 +18,6 @@ class PreviewService {
     if (navigator == null || _opening) {
       return;
     }
-    final messenger = ScaffoldMessenger.of(navigator.context);
-
     _opening = true;
     final api = ApiClient(TokenStore());
 
@@ -33,9 +32,7 @@ class PreviewService {
         if (loadingRoute.isActive) {
           navigator.pop();
         }
-        messenger.showSnackBar(
-          const SnackBar(content: Text('Unable to open sale preview.')),
-        );
+        AppNotice.show(navigator.context, 'Unable to open sale preview.');
         return;
       }
 

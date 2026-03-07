@@ -7,6 +7,7 @@ import '../../../data/models.dart';
 import '../../../services/api_client.dart';
 import '../../../services/cache/local.dart';
 import '../../../services/device_info.dart';
+import '../../../services/notice.dart';
 import '../../../services/token_store.dart';
 import 'reset_password.dart';
 
@@ -150,9 +151,7 @@ class _VerifyCodeState extends State<VerifyCode> {
 
   void _showError(String message) {
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    AppNotice.show(context, message);
   }
 
   String _errorMessage(Object error) {

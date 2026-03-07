@@ -14,6 +14,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../data/models.dart';
 import '../../services/currency.dart';
 import '../../services/media.dart';
+import '../../services/notice.dart';
 
 part 'loading.dart';
 part 'screen.dart';

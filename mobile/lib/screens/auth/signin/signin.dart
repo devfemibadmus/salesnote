@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../services/api_client.dart';
 import '../../../services/cache/local.dart';
 import '../../../services/device_info.dart';
+import '../../../services/notice.dart';
 import '../../../services/token_store.dart';
 
 import '../../../services/phone.dart';
@@ -107,9 +108,7 @@ class _SigninState extends State<Signin> {
 
   void _showError(String message) {
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    AppNotice.show(context, message);
   }
 
   String _errorMessage(Object error) {

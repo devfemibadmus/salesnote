@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/api_client.dart';
+import '../../../services/notice.dart';
 import '../../../services/token_store.dart';
 
 class ResetPassword extends StatefulWidget {
@@ -81,18 +82,12 @@ class _ResetPasswordState extends State<ResetPassword> {
       setState(() => _loading = true);
       await _api.resetPassword(widget.phoneOrEmail, widget.code, password.trim());
       if (!mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Password reset successful. Please sign in.')),
-      );
+      AppNotice.show(context, 'Password reset successful. Please sign in.');
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (e) {
       if (!mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.hideCurrentSnackBar();
       final message = e is ApiException ? e.message : e.toString();
-      messenger.showSnackBar(SnackBar(content: Text(message)));
+      AppNotice.show(context, message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

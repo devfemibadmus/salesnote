@@ -48,7 +48,10 @@ class SalesNoteApp extends StatelessWidget {
             statusBarIconBrightness: Brightness.dark,
           ),
           child: MediaQuery(
-            data: mediaQuery.copyWith(boldText: false),
+            data: mediaQuery.copyWith(
+              boldText: false,
+              textScaler: const TextScaler.linear(0.96),
+            ),
             child: child ?? const SizedBox.shrink(),
           ),
         );

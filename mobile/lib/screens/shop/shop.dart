@@ -13,6 +13,7 @@ import '../../data/models.dart';
 import '../../services/api_client.dart';
 import '../../services/cache/loader.dart';
 import '../../services/cache/local.dart';
+import '../../services/notice.dart';
 import '../../services/notification.dart';
 import '../../services/phone.dart';
 import '../../services/region.dart';
@@ -150,9 +151,7 @@ class _ShopScreenState extends State<ShopScreen> {
       final message = e is ApiException
           ? e.message
           : 'Unable to refresh settings.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      _showNotice(message);
     }
   }
 
@@ -169,18 +168,14 @@ class _ShopScreenState extends State<ShopScreen> {
         if (!mounted) return;
         setState(() => _pushEnabled = false);
         await _saveSettingsCache();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Push notifications turned off.')),
-        );
+        _showNotice('Push notifications turned off.');
       } catch (e) {
         if (!mounted) return;
         final message = _caughtErrorMessage(
           e,
           fallback: 'Unable to update notification setting.',
         );
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        _showNotice(message);
       } finally {
         if (mounted) setState(() => _busy = false);
       }
@@ -190,11 +185,7 @@ class _ShopScreenState extends State<ShopScreen> {
     final granted = await NotificationService.ensurePermissionEnabled(context);
     if (!mounted) return;
     if (!granted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Notification permission was not granted.'),
-        ),
-      );
+      _showNotice('Notification permission was not granted.');
       return;
     }
 
@@ -203,28 +194,20 @@ class _ShopScreenState extends State<ShopScreen> {
       final subscribed = await _subscribeCurrentDeviceFcm();
       if (!mounted) return;
       if (!subscribed) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to get device token. Please try again.'),
-          ),
-        );
+        _showNotice('Unable to get device token. Please try again.');
         return;
       }
       await LocalCache.setNotificationOptedOut(false);
       setState(() => _pushEnabled = true);
       await _saveSettingsCache();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Push notifications turned on.')),
-      );
+      _showNotice('Push notifications turned on.');
     } catch (e) {
       if (!mounted) return;
       final message = _caughtErrorMessage(
         e,
         fallback: 'Unable to update notification setting.',
       );
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      _showNotice(message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -247,6 +230,10 @@ class _ShopScreenState extends State<ShopScreen> {
     }
     final raw = error.toString().trim();
     return raw.isEmpty ? fallback : raw;
+  }
+
+  void _showNotice(String message) {
+    AppNotice.show(context, message);
   }
 
   Future<void> _saveSignaturesCache() async {
@@ -307,17 +294,13 @@ class _ShopScreenState extends State<ShopScreen> {
         _devices = _devices.where((d) => d.id != device.id).toList();
       });
       await _saveSettingsCache();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Device removed.')));
+      _showNotice('Device removed.');
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException
           ? e.message
           : 'Unable to remove device.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      _showNotice(message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -349,17 +332,13 @@ class _ShopScreenState extends State<ShopScreen> {
       setState(() => _shop = updated);
       await _saveSettingsCache();
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Profile picture updated.')));
+      _showNotice('Profile picture updated.');
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException
           ? e.message
           : 'Unable to upload profile picture.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      _showNotice(message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -640,9 +619,7 @@ class _ShopScreenState extends State<ShopScreen> {
 
     if (!mounted || result == null) return;
     if (result.errorMessage != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(result.errorMessage!)));
+      _showNotice(result.errorMessage!);
       return;
     }
     if (result.signature == null) return;
@@ -653,17 +630,13 @@ class _ShopScreenState extends State<ShopScreen> {
         _signatures = [created, ..._signatures];
       });
       await _saveSignaturesCache();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Signature added.')));
+      _showNotice('Signature added.');
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException
           ? e.message
           : 'Unable to add signature.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      _showNotice(message);
     }
   }
 
@@ -710,17 +683,13 @@ class _ShopScreenState extends State<ShopScreen> {
         _signatures = _signatures.where((s) => s.id != signature.id).toList();
       });
       await _saveSignaturesCache();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Signature deleted.')));
+      _showNotice('Signature deleted.');
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException
           ? e.message
           : 'Unable to delete signature.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      _showNotice(message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -815,15 +784,11 @@ class _ShopScreenState extends State<ShopScreen> {
         ),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(successMessage)));
+      _showNotice(successMessage);
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException ? e.message : 'Unable to update shop.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      _showNotice(message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -874,17 +839,13 @@ class _ShopScreenState extends State<ShopScreen> {
     final uri = Uri.tryParse(url);
     if (uri == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Invalid $label link.')));
+      _showNotice('Invalid $label link.');
       return;
     }
 
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Unable to open $label.')));
+      _showNotice('Unable to open $label.');
     }
   }
 

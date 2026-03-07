@@ -178,7 +178,7 @@ class SettingsMainView extends StatelessWidget {
           icon: const Icon(Icons.logout_rounded),
           label: const Text(
             'Logout',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
         ),
       ],
@@ -195,7 +195,7 @@ class SettingsHeader extends StatelessWidget {
     return Text(
       title,
       style: const TextStyle(
-        fontSize: 17,
+        fontSize: 15,
         fontWeight: FontWeight.w700,
         color: Color(0xFF0F172A),
       ),
@@ -212,8 +212,8 @@ class SettingsSectionTitle extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(
-        fontSize: 17,
-        letterSpacing: 1.3,
+        fontSize: 13,
+        letterSpacing: 1.1,
         fontWeight: FontWeight.w700,
         color: Color(0xFF64748B),
       ),
@@ -280,7 +280,7 @@ class SettingsInfoRow extends StatelessWidget {
                 Text(
                   label,
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF0F172A),
                   ),
@@ -290,7 +290,7 @@ class SettingsInfoRow extends StatelessWidget {
                   Text(
                     hint!,
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 12,
                       color: Color(0xFF64748B),
                       fontWeight: FontWeight.w500,
                     ),
@@ -308,7 +308,7 @@ class SettingsInfoRow extends StatelessWidget {
               softWrap: !singleLineValue,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 17,
+                fontSize: 15,
                 color: Color(0xFF94A3B8),
                 fontWeight: FontWeight.w500,
               ),
@@ -374,7 +374,7 @@ class SettingsProfilePictureRow extends StatelessWidget {
                   Text(
                     'Profile Picture',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF0F172A),
                     ),
@@ -411,7 +411,7 @@ class SettingsActionRow extends StatelessWidget {
               child: Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF0F172A),
                 ),
@@ -446,7 +446,7 @@ class SettingsSwitchRow extends StatelessWidget {
             child: Text(
               title,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF0F172A),
               ),
@@ -504,7 +504,7 @@ class SettingsDeviceRow extends StatelessWidget {
                   softWrap: false,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF0F172A),
                   ),
@@ -516,7 +516,7 @@ class SettingsDeviceRow extends StatelessWidget {
                   softWrap: false,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     color: Color(0xFF64748B),
                     fontWeight: FontWeight.w500,
                   ),
@@ -574,7 +574,7 @@ class SettingsSignatureRow extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 17,
+                fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF0F172A),
               ),

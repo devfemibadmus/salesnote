@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../services/api_client.dart';
+import '../../../services/notice.dart';
 import '../../../services/phone.dart';
 import '../../../services/region.dart';
 import '../../../services/token_store.dart';
@@ -93,9 +94,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
 
   void _showError(String message) {
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    AppNotice.show(context, message);
   }
 
   String _errorMessage(Object error) {

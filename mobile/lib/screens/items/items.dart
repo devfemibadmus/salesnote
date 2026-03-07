@@ -8,6 +8,7 @@ import '../../data/models.dart';
 import '../../services/api_client.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
+import '../../services/notice.dart';
 import '../../services/token_store.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/history.dart';
@@ -191,9 +192,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       final message = e is ApiException
           ? e.message
           : 'Unable to refresh items.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      AppNotice.show(context, message);
     }
   }
 
@@ -266,9 +265,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       final message = e is ApiException
           ? e.message
           : 'Unable to load more items.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      AppNotice.show(context, message);
     } finally {
       if (mounted) {
         setState(() => _loadingMore = false);

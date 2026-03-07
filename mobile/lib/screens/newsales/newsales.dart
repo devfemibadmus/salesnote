@@ -13,6 +13,7 @@ import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
 import '../../services/cache/local.dart';
 import '../../services/media.dart';
+import '../../services/notice.dart';
 import '../../services/phone.dart';
 import '../../services/region.dart';
 import '../../services/token_store.dart';
@@ -1500,9 +1501,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    AppNotice.show(context, message);
   }
 
   @override

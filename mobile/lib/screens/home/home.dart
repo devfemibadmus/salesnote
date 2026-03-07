@@ -11,6 +11,7 @@ import '../../services/cache/local.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
 import '../../services/media.dart';
+import '../../services/notice.dart';
 import '../../services/notification.dart';
 import '../../services/preview.dart';
 import '../../services/token_store.dart';
@@ -165,9 +166,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       // Keep current home UI during pull-to-refresh failures.
       if (refresh && hasCurrentUi) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
+        AppNotice.show(context, message);
       } else {
         setState(() => _error = message);
       }

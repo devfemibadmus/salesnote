@@ -105,14 +105,10 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
       final bytes = await _buildReceiptPdfBytes();
       await _savePdfToDevice(bytes);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PDF downloaded successfully.')),
-      );
+      AppNotice.show(context, 'PDF downloaded successfully.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to download PDF: $e')));
+      AppNotice.show(context, 'Failed to download PDF: $e');
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -123,12 +119,9 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
   Future<void> _handleDownloadImage() async {
     if (_busy) return;
     if (!_fitsSinglePage) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Image download is only available for single-page receipts.',
-          ),
-        ),
+      AppNotice.show(
+        context,
+        'Image download is only available for single-page receipts.',
       );
       return;
     }
@@ -137,14 +130,10 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
       final bytes = await _buildReceiptImageBytes();
       await _saveImageToDevice(bytes);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Image saved to gallery.')));
+      AppNotice.show(context, 'Image saved to gallery.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to download image: $e')));
+      AppNotice.show(context, 'Failed to download image: $e');
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -163,9 +152,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
       ], text: 'Salesnote receipt');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to share receipt: $e')));
+      AppNotice.show(context, 'Failed to share receipt: $e');
     } finally {
       if (mounted) {
         setState(() => _busy = false);
