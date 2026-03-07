@@ -29,6 +29,8 @@ const MIN_ADDRESS_CHARS: usize = 8;
 const MAX_ADDRESS_CHARS: usize = 40;
 const MIN_ADDRESS_WORDS: usize = 4;
 const MAX_ADDRESS_WORDS: usize = 10;
+const MIN_PASSWORD_CHARS: usize = 8;
+const MAX_PASSWORD_CHARS: usize = 128;
 
 #[derive(Debug, Serialize)]
 pub struct SettingsSummaryResponse {
@@ -71,6 +73,16 @@ fn validate_shop_patch(input: &ShopUpdateInput) -> Result<(), &'static str> {
         }
         if words > MAX_ADDRESS_WORDS {
             return Err("address must be 10 words or less");
+        }
+    }
+
+    if let Some(password) = input.password.as_deref() {
+        let chars = password.chars().count();
+        if chars < MIN_PASSWORD_CHARS {
+            return Err("password must be at least 8 characters");
+        }
+        if chars > MAX_PASSWORD_CHARS {
+            return Err("password must be 128 characters or less");
         }
     }
 

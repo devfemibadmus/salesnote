@@ -18,6 +18,9 @@ use crate::models::{
     LoginOneStepPayload, LoginOneStepResult, ResetPasswordResult, ShopAuthRecord,
 };
 
+const MIN_PASSWORD_CHARS: usize = 8;
+const MAX_PASSWORD_CHARS: usize = 128;
+
 pub async fn register(
     state: web::Data<AppState>,
     payload: web::Json<AuthRegisterInput>,
@@ -447,17 +450,8 @@ pub async fn reset_password(
     }
 
     let password = payload.new_password.trim();
-    if password.len() < 5 {
-        return json_error(
-            StatusCode::BAD_REQUEST,
-            "password must be at least 5 characters",
-        );
-    }
-    if password.len() > 20 {
-        return json_error(
-            StatusCode::BAD_REQUEST,
-            "password must be 20 characters or less",
-        );
+    if let Err(message) = validate_password(password) {
+        return json_error(StatusCode::BAD_REQUEST, message);
     }
     let max_incorrect_attempts = state.reset_code_max_incorrect_attempts.max(1);
 
@@ -603,11 +597,8 @@ fn validate_register(input: &AuthRegisterInput) -> Result<(), &'static str> {
         return Err("invalid email");
     }
 
-    if input.password.len() < 5 {
-        return Err("password must be at least 5 characters");
-    }
-    if input.password.len() > 20 {
-        return Err("password must be 20 characters or less");
+    if let Err(message) = validate_password(&input.password) {
+        return Err(message);
     }
 
     if input.timezone.is_empty() {
@@ -647,6 +638,17 @@ fn is_valid_email(email: &str) -> bool {
         return false;
     }
     parts[1].contains('.')
+}
+
+fn validate_password(password: &str) -> Result<(), &'static str> {
+    let chars = password.chars().count();
+    if chars < MIN_PASSWORD_CHARS {
+        return Err("password must be at least 8 characters");
+    }
+    if chars > MAX_PASSWORD_CHARS {
+        return Err("password must be 128 characters or less");
+    }
+    Ok(())
 }
 
 fn is_valid_phone(phone: &str) -> bool {

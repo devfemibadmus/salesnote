@@ -10,7 +10,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 
 | ID | Severity | Status | Title |
 | --- | --- | --- | --- |
-| SEC-001 | High | Open | Weak password policy |
+| SEC-001 | High | Implemented | Weak password policy |
 | SEC-002 | High | Open | Image decode path is vulnerable to memory/CPU exhaustion |
 | SEC-003 | Medium | Open | Signup flow leaks account existence |
 | SEC-004 | Medium | Open | Client IP and geo headers are trusted without a trusted-proxy boundary |
@@ -24,7 +24,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 ### SEC-001: Weak password policy
 
 - Severity: High
-- Status: Open
+- Status: Implemented
 - Locations:
   - `backend/src/api/handlers/auth.rs:450`
   - `backend/src/api/handlers/auth.rs:456`
@@ -41,6 +41,11 @@ This is a tracking document for backend security work. Findings are ordered by s
   - Move to a stronger policy such as minimum 8 or 10 characters and maximum at least 64 or 128.
   - Prefer allowing long passphrases over forcing special-character rules.
   - Apply the same validation in register, reset password, and shop password update paths.
+- Implemented:
+  - minimum password length changed to 8
+  - maximum password length changed to 128
+  - applied in register, reset password, and shop profile password update
+
 ### SEC-002: Image decode path is vulnerable to memory/CPU exhaustion
 
 - Severity: High
