@@ -12,7 +12,7 @@ This is a tracking document for mobile improvements. Items are ordered by fix pr
 | --- | --- | --- | --- |
 | MOB-001 | High | Implemented | Signed media cache keys are unstable |
 | MOB-002 | Medium | Implemented | API client crashes on non-JSON error responses |
-| MOB-003 | Medium | Open | Auth token is stored in SharedPreferences |
+| MOB-003 | Medium | Implemented | Auth token is stored in SharedPreferences |
 | MOB-004 | Low | Implemented | Suggestion query URL is built by raw string interpolation |
 
 ## Details
@@ -62,7 +62,7 @@ This is a tracking document for mobile improvements. Items are ordered by fix pr
 ### MOB-003: Auth token is stored in SharedPreferences
 
 - Severity: Medium
-- Status: Open
+- Status: Implemented
 - Locations:
   - `mobile/lib/services/token_store.dart`
 - Current behavior:
@@ -72,6 +72,10 @@ This is a tracking document for mobile improvements. Items are ordered by fix pr
   - Easier extraction on compromised devices or during local data inspection.
 - Recommended fix:
   - Move token storage to Keychain/Keystore via secure storage.
+- Implemented:
+  - auth token storage now uses `flutter_secure_storage`
+  - existing SharedPreferences tokens are migrated on first read so current users keep their session
+  - iOS runner entitlements now include Keychain Sharing for secure storage access
 
 ### MOB-004: Suggestion query URL is built by raw string interpolation
 
