@@ -4,4 +4,5 @@ class AppConfig {
   static const privacyPolicyUrl = 'https://salesnote.online';
   static const termsOfServiceUrl = 'https://salesnote.online';
   static const supportUrl = 'https://salesnote.online';
+  static const apptUrl = 'https://app.salesnote.online';
 }

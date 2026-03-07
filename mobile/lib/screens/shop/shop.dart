@@ -876,6 +876,8 @@ class _ShopScreenState extends State<ShopScreen> {
                   onEditAddress: _editAddress,
                   onAddSignature: _addSignature,
                   onDeleteSignature: _deleteSignature,
+                  onWebApp: () =>
+                      _openExternalUrl(AppConfig.apptUrl, 'web app'),
                   onPrivacy: () => _openExternalUrl(
                     AppConfig.privacyPolicyUrl,
                     'privacy policy',

@@ -23,6 +23,7 @@ class SettingsMainView extends StatelessWidget {
     required this.onPrivacy,
     required this.onTerms,
     required this.onSupport,
+    required this.onWebApp,
     required this.onLogout,
     required this.appVersion,
   });
@@ -44,6 +45,7 @@ class SettingsMainView extends StatelessWidget {
   final VoidCallback onPrivacy;
   final VoidCallback onTerms;
   final VoidCallback onSupport;
+  final VoidCallback onWebApp;
   final VoidCallback onLogout;
   final String appVersion;
 
@@ -155,6 +157,7 @@ class SettingsMainView extends StatelessWidget {
         const SizedBox(height: 8),
         SettingsWhiteCard(
           children: [
+            SettingsActionRow(title: 'Open Web App', onTap: onWebApp),
             SettingsActionRow(title: 'Privacy Policy', onTap: onPrivacy),
             SettingsActionRow(title: 'Terms of Service', onTap: onTerms),
             SettingsActionRow(title: 'Contact Support', onTap: onSupport),
