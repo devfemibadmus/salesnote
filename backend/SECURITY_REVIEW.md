@@ -16,7 +16,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 | SEC-004 | Medium | Open | Client IP and geo headers are trusted without a trusted-proxy boundary |
 | SEC-005 | Medium | Open | Uploaded files are exposed publicly under `/uploads` |
 | SEC-006 | Low | Open | Production logging defaults are too verbose |
-| SEC-007 | Medium | Open | Brute-force and spam protection is only partial on auth flows |
+| SEC-007 | Medium | Implemented | Brute-force and spam protection is only partial on auth flows |
 | SEC-008 | Medium | Open | User-controlled values are inserted into HTML email templates without escaping |
 
 ## Detailed Findings
@@ -158,7 +158,7 @@ This is a tracking document for backend security work. Findings are ordered by s
 ### SEC-007: Brute-force and spam protection is only partial on auth flows
 
 - Severity: Medium
-- Status: Open
+- Status: Implemented
 - Locations:
   - `backend/src/api/handlers/auth.rs:41`
   - `backend/src/api/handlers/auth.rs:58`
@@ -186,6 +186,11 @@ This is a tracking document for backend security work. Findings are ordered by s
   - Add a lightweight challenge on spam-prone endpoints, for example CAPTCHA on repeated attempts.
   - Consider separate per-IP and per-account throttles.
   - Log and alert on repeated abuse patterns.
+- Implemented:
+  - added stricter route-specific throttles for the public auth endpoints on top of the global limiter
+  - rate-limit keys are now scoped by route plus requester identity
+  - `Retry-After: 60` is returned on rate-limited responses
+  - no CAPTCHA was added
 
 ### SEC-008: User-controlled values are inserted into HTML email templates without escaping
 

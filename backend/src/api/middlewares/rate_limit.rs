@@ -3,6 +3,7 @@ use std::rc::Rc;
 use actix_web::{
     body::MessageBody,
     dev::{Service, ServiceRequest, ServiceResponse, Transform},
+    http::header,
     http::StatusCode,
     Error, HttpMessage,
 };
@@ -18,11 +19,50 @@ pub struct RateLimiter {
     pub redis: redis::Client,
 }
 
+#[derive(Clone, Copy)]
+struct RouteLimit {
+    key: &'static str,
+    max_per_minute: u32,
+}
+
 impl RateLimiter {
     pub fn new(max_per_minute: u32, redis: redis::Client) -> Self {
         Self {
             max_per_minute,
             redis,
+        }
+    }
+
+    fn route_limit(method: &str, path: &str, fallback: u32) -> RouteLimit {
+        match (method, path) {
+            ("POST", "/auth/login") => RouteLimit {
+                key: "auth_login",
+                max_per_minute: 10,
+            },
+            ("POST", "/auth/register") => RouteLimit {
+                key: "auth_register",
+                max_per_minute: 5,
+            },
+            ("POST", "/auth/register/verify") => RouteLimit {
+                key: "auth_register_verify",
+                max_per_minute: 10,
+            },
+            ("POST", "/auth/forgot-password") => RouteLimit {
+                key: "auth_forgot_password",
+                max_per_minute: 5,
+            },
+            ("POST", "/auth/verify-code") => RouteLimit {
+                key: "auth_verify_code",
+                max_per_minute: 10,
+            },
+            ("POST", "/auth/reset-password") => RouteLimit {
+                key: "auth_reset_password",
+                max_per_minute: 10,
+            },
+            _ => RouteLimit {
+                key: "global",
+                max_per_minute: fallback,
+            },
         }
     }
 }
@@ -75,6 +115,8 @@ where
         let redis = self.redis.clone();
 
         Box::pin(async move {
+            let route_limit =
+                RateLimiter::route_limit(req.method().as_str(), req.path(), max_per_minute);
             let shop_id = req.extensions().get::<i64>().copied();
             let key = if let Some(shop_id) = shop_id {
                 format!("shop:{}", shop_id)
@@ -86,7 +128,7 @@ where
             };
 
             let mut limited = false;
-            let redis_key = format!("rate:{}", key);
+            let redis_key = format!("rate:{}:{}", route_limit.key, key);
 
             // Fail-open fast: if Redis is slow/down, do not block request path.
             let conn_result = timeout(
@@ -107,7 +149,7 @@ where
                         )
                         .await;
                     }
-                    if count as u32 > max_per_minute {
+                    if count as u32 > route_limit.max_per_minute {
                         limited = true;
                     }
                 }
@@ -115,9 +157,13 @@ where
 
             if limited {
                 let (req, _pl) = req.into_parts();
-                let response = json_error(
+                let mut response = json_error(
                     StatusCode::TOO_MANY_REQUESTS,
                     "Too many requests. Try again later.",
+                );
+                let _ = response.headers_mut().insert(
+                    header::RETRY_AFTER,
+                    header::HeaderValue::from_static("60"),
                 );
                 return Ok(ServiceResponse::new(req, response.map_into_right_body()));
             }
