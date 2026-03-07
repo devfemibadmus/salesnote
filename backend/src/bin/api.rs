@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use actix_files::Files;
 use actix_web::{middleware::DefaultHeaders, middleware::Logger, web, App, HttpServer};
 
-use salesnote_backend::api::{routes, state};
+use salesnote_backend::api::{middlewares::rate_limit::RateLimiter, routes, state};
 use salesnote_backend::{config, db};
 
 #[actix_web::main]
@@ -62,8 +62,10 @@ async fn main() -> std::io::Result<()> {
                     .add(("Permissions-Policy", "interest-cohort=()")),
             )
             .service(Files::new("/uploads", "uploads").prefer_utf8(true))
-            // Temporarily disabled to isolate latency during troubleshooting.
-            // .wrap(RateLimiter::new(settings.rate_limit_per_minute, state.redis.clone()))
+            .wrap(RateLimiter::new(
+                settings.rate_limit_per_minute,
+                state.redis.clone(),
+            ))
             .configure(|cfg| routes::init_routes(cfg, state.clone()))
     })
     .bind(addr)?
