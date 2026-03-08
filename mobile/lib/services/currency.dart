@@ -1,6 +1,5 @@
-import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
-import 'cache/local.dart';
+
 import 'region.dart';
 
 class CurrencyService {
@@ -61,42 +60,18 @@ class CurrencyService {
   }
 
   static String? _resolveCurrencyCode() {
-    final preferredRegion = LocalCache.getPreferredRegionCode();
-    final region =
-        (preferredRegion ?? RegionService.getDeviceRegionCode()).toUpperCase();
+    final region = RegionService.resolveAccountRegionCode();
     final byRegion = _regionToCurrency[region];
     if (byRegion != null && byRegion.isNotEmpty) {
       return byRegion;
-    }
-
-    final platform = WidgetsBinding.instance.platformDispatcher.locale;
-    final candidates = <String>{
-      if (platform.countryCode != null && platform.countryCode!.isNotEmpty)
-        '${platform.languageCode}_${platform.countryCode!.toUpperCase()}',
-      if (region.isNotEmpty) '${platform.languageCode}_$region',
-      if (region.isNotEmpty) 'en_$region',
-      platform.languageCode,
-    };
-
-    for (final locale in candidates) {
-      try {
-        final simple = NumberFormat.simpleCurrency(locale: locale);
-        if ((simple.currencyName ?? '').isNotEmpty) return simple.currencyName;
-      } catch (_) {
-        continue;
-      }
     }
 
     return null;
   }
 
   static String _currentLocale() {
-    final platform = WidgetsBinding.instance.platformDispatcher.locale;
-    final country = platform.countryCode?.toUpperCase();
-    if (country != null && country.isNotEmpty) {
-      return '${platform.languageCode}_$country';
-    }
-    return platform.languageCode;
+    final region = RegionService.resolveAccountRegionCode();
+    return 'en_$region';
   }
 
   static String _currencySymbol(String code) {

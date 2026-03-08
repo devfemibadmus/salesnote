@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../services/api_client.dart';
@@ -31,6 +32,7 @@ class _SigninState extends State<Signin> {
 
   bool _loading = false;
   bool _showPassword = false;
+  Country? _country;
   late final String _deviceRegionCode;
 
   final _passwordFocusNode = FocusNode();
@@ -47,6 +49,11 @@ class _SigninState extends State<Signin> {
   void initState() {
     super.initState();
     _deviceRegionCode = RegionService.getDeviceRegionCode();
+    try {
+      _country = CountryParser.parseCountryCode(_deviceRegionCode);
+    } catch (_) {
+      _country = CountryParser.parseCountryCode('NG');
+    }
     _passwordFocusNode.addListener(() {
       setState(() {});
     });
@@ -69,12 +76,19 @@ class _SigninState extends State<Signin> {
       }
       loginValue = input;
     } else {
+      final selectedCountry = _country;
       final strictPhone = await PhoneService.normalizeE164(
         input,
-        _deviceRegionCode,
+        selectedCountry?.countryCode ?? _deviceRegionCode,
+        countryPhoneCode: selectedCountry?.phoneCode,
       );
       if (strictPhone == null) {
-        _showError('Enter a valid phone number.');
+        _showError(
+          RegionService.invalidPhoneMessage(
+            country: selectedCountry,
+            regionCode: _deviceRegionCode,
+          ),
+        );
         return;
       }
       loginValue = strictPhone;
@@ -94,7 +108,7 @@ class _SigninState extends State<Signin> {
         deviceOs: device.os,
       );
       final selectedRegion = !isEmail
-          ? _deviceRegionCode
+          ? (_country?.countryCode ?? _deviceRegionCode)
           : await PhoneService.regionCodeFromE164(auth.shop.phone);
       await LocalCache.setPreferredRegionCode(selectedRegion);
       if (!mounted) return;
@@ -165,28 +179,79 @@ class _SigninState extends State<Signin> {
                     ),
 
                     const SizedBox(height: 70),
-                    TextField(
-                      controller: _loginId,
-                      keyboardType: TextInputType.emailAddress,
-                      enabled: !_loading,
-                      decoration: InputDecoration(
-                        hintText: 'Enter Phone or Email',
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 18,
-                        ),
-                        border: OutlineInputBorder(
+                    Row(
+                      children: [
+                        InkWell(
                           borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                          onTap: _loading
+                              ? null
+                              : () {
+                                  showCountryPicker(
+                                    context: context,
+                                    showPhoneCode: true,
+                                    onSelect: (value) {
+                                      setState(() => _country = value);
+                                    },
+                                  );
+                                },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 16,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  _country?.flagEmoji ?? '🇳🇬',
+                                  style: const TextStyle(fontSize: 18),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '+${_country?.phoneCode ?? '234'}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF111827),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                const Icon(Icons.keyboard_arrow_down, size: 18),
+                              ],
+                            ),
+                          ),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _loginId,
+                            keyboardType: TextInputType.emailAddress,
+                            enabled: !_loading,
+                            decoration: InputDecoration(
+                              hintText: 'Enter Phone or Email',
+                              hintStyle: const TextStyle(
+                                color: Color(0xFF94A3B8),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 18,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     TextField(

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../services/api_client.dart';
 import '../../../services/notice.dart';
@@ -65,8 +64,11 @@ class _ForgotPasswordState extends State<ForgotPassword> {
         _deviceRegionCode,
       );
       if (normalized == null) {
-        setState(() => _errorText = 'Enter a valid phone number.');
-        _showError('Enter a valid phone number.');
+        final phoneErrorMessage = RegionService.invalidPhoneMessage(
+          regionCode: _deviceRegionCode,
+        );
+        setState(() => _errorText = phoneErrorMessage);
+        _showError(phoneErrorMessage);
         return;
       }
       phoneOrEmailValue = normalized;

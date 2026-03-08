@@ -416,13 +416,7 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   Future<String?> _showPhoneInputDialog({required String initial}) async {
-    final regionCode = RegionService.getDeviceRegionCode();
-    Country selectedCountry;
-    try {
-      selectedCountry = CountryParser.parseCountryCode(regionCode);
-    } catch (_) {
-      selectedCountry = CountryParser.parseCountryCode('NG');
-    }
+    Country selectedCountry = RegionService.resolveAccountCountry();
 
     final digitsOnly = initial.replaceAll(RegExp(r'\D'), '');
     var localInput = digitsOnly;
@@ -450,7 +444,9 @@ class _ShopScreenState extends State<ShopScreen> {
             countryPhoneCode: selectedCountry.phoneCode,
           );
           setLocalState(() {
-            errorText = valid ? null : 'Enter a valid phone number.';
+            errorText = valid
+                ? null
+                : RegionService.invalidPhoneMessage(country: selectedCountry);
           });
           if (valid) {
             FocusManager.instance.primaryFocus?.unfocus();
@@ -566,7 +562,9 @@ class _ShopScreenState extends State<ShopScreen> {
                   );
                   if (e164 == null) {
                     setLocalState(
-                      () => errorText = 'Enter a valid phone number.',
+                      () => errorText = RegionService.invalidPhoneMessage(
+                        country: selectedCountry,
+                      ),
                     );
                     return;
                   }

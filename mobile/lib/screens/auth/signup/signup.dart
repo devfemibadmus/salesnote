@@ -114,11 +114,15 @@ class _SignupState extends State<Signup> {
       countryPhoneCode: _country?.phoneCode,
     );
     if (phoneE164 == null) {
+      final phoneErrorMessage = RegionService.invalidPhoneMessage(
+        country: _country,
+        regionCode: phoneRegion,
+      );
       setState(() {
-        _phoneError = 'Enter a valid phone number.';
+        _phoneError = phoneErrorMessage;
         _submitting = false;
       });
-      _showError('Enter a valid phone number.');
+      _showError(phoneErrorMessage);
       return;
     }
 
@@ -249,7 +253,12 @@ class _SignupState extends State<Signup> {
       );
       if (!mounted) return;
       setState(() {
-        _phoneError = valid ? null : 'Enter a valid phone number.';
+        _phoneError = valid
+            ? null
+            : RegionService.invalidPhoneMessage(
+                country: _country,
+                regionCode: region,
+              );
       });
       if (valid) {
         FocusManager.instance.primaryFocus?.unfocus();
@@ -422,8 +431,12 @@ class _SignupState extends State<Signup> {
         countryPhoneCode: _country?.phoneCode,
       );
       if (!valid) {
-        setState(() => _phoneError = 'Enter a valid phone number.');
-        _showError('Enter a valid phone number.');
+        final phoneErrorMessage = RegionService.invalidPhoneMessage(
+          country: _country,
+          regionCode: region,
+        );
+        setState(() => _phoneError = phoneErrorMessage);
+        _showError(phoneErrorMessage);
       }
     }
 

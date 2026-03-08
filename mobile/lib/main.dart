@@ -7,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'app/navigator.dart';
 import 'app/router.dart';
 import 'app/theme.dart';
+import 'app/typography.dart';
 import 'screens/auth/auth.dart';
 import 'screens/home/home.dart';
 import 'screens/splash.dart';
@@ -53,10 +54,7 @@ class SalesNoteApp extends StatelessWidget {
             statusBarIconBrightness: Brightness.dark,
           ),
           child: MediaQuery(
-            data: mediaQuery.copyWith(
-              boldText: false,
-              textScaler: const TextScaler.linear(0.96),
-            ),
+            data: AppTypography.apply(mediaQuery),
             child: child ?? const SizedBox.shrink(),
           ),
         );

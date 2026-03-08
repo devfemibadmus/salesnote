@@ -49,18 +49,18 @@ class AppTheme {
     final text = theme.textTheme;
     return theme.copyWith(
       textTheme: text.copyWith(
-        headlineLarge: text.headlineLarge?.copyWith(fontSize: 30, fontWeight: FontWeight.w800),
-        headlineMedium: text.headlineMedium?.copyWith(fontSize: 26, fontWeight: FontWeight.w800),
-        headlineSmall: text.headlineSmall?.copyWith(fontSize: 22, fontWeight: FontWeight.w700),
-        titleLarge: text.titleLarge?.copyWith(fontSize: 18, fontWeight: FontWeight.w700),
-        titleMedium: text.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.w700),
-        titleSmall: text.titleSmall?.copyWith(fontSize: 14, fontWeight: FontWeight.w700),
-        bodyLarge: text.bodyLarge?.copyWith(fontSize: 16, height: 1.4),
-        bodyMedium: text.bodyMedium?.copyWith(fontSize: 15, height: 1.4),
+        headlineLarge: text.headlineLarge?.copyWith(fontSize: 28, fontWeight: FontWeight.w700),
+        headlineMedium: text.headlineMedium?.copyWith(fontSize: 24, fontWeight: FontWeight.w700),
+        headlineSmall: text.headlineSmall?.copyWith(fontSize: 21, fontWeight: FontWeight.w600),
+        titleLarge: text.titleLarge?.copyWith(fontSize: 17, fontWeight: FontWeight.w600),
+        titleMedium: text.titleMedium?.copyWith(fontSize: 15, fontWeight: FontWeight.w600),
+        titleSmall: text.titleSmall?.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+        bodyLarge: text.bodyLarge?.copyWith(fontSize: 15, height: 1.4),
+        bodyMedium: text.bodyMedium?.copyWith(fontSize: 14, height: 1.4),
         bodySmall: text.bodySmall?.copyWith(fontSize: 13, height: 1.35),
-        labelLarge: text.labelLarge?.copyWith(fontSize: 15, fontWeight: FontWeight.w700),
-        labelMedium: text.labelMedium?.copyWith(fontSize: 13, fontWeight: FontWeight.w600),
-        labelSmall: text.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w600),
+        labelLarge: text.labelLarge?.copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+        labelMedium: text.labelMedium?.copyWith(fontSize: 13, fontWeight: FontWeight.w500),
+        labelSmall: text.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w500),
       ),
     );
   }

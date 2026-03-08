@@ -83,7 +83,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   Future<void>? _signaturesRequest;
   late final String _currencySymbol;
   late final String _currencyLocale;
-  late final String _deviceRegionCode;
+  late final String _accountRegionCode;
 
   int _step = 0;
   bool _stepSwipeUnlocked = false;
@@ -93,7 +93,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   @override
   void initState() {
     super.initState();
-    _deviceRegionCode = RegionService.getDeviceRegionCode();
+    _accountRegionCode = RegionService.resolveAccountRegionCode();
     final ctx = CurrencyService.resolveContext();
     _currencyLocale = ctx.locale;
     _currencySymbol = ctx.symbol;
@@ -102,6 +102,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     unawaited(_initializeScreen());
     _customerNameController.addListener(_onCustomerNameChanged);
     _customerContactController.addListener(_saveDraftDebounced);
+  }
+
+  String _invalidPhoneMessage() {
+    return RegionService.invalidPhoneMessage(
+      country: _country,
+      regionCode: _accountRegionCode,
+    );
   }
 
   String _formatAmount(num amount, {int decimalDigits = 2}) {
@@ -178,11 +185,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   }
 
   void _initCountry() {
-    try {
-      _country = CountryParser.parseCountryCode(_deviceRegionCode);
-    } catch (_) {
-      _country = CountryParser.parseCountryCode('NG');
-    }
+    _country = RegionService.resolveAccountCountry();
   }
 
   Future<void> _loadSignatures() async {
@@ -707,7 +710,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     final contactInput = _customerContactController.text.trim();
     final isEmail = contactInput.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(contactInput);
     if (!isEmail) {
-      final region = _country?.countryCode ?? _deviceRegionCode;
+      final region = _country?.countryCode ?? _accountRegionCode;
       final valid = await PhoneService.isValid(
         contactInput,
         region,
@@ -715,7 +718,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       );
       if (!mounted) return;
       setState(() {
-        _phoneError = valid ? null : 'Enter a valid phone number.';
+        _phoneError = valid ? null : _invalidPhoneMessage();
         _customerContactTouched = true;
       });
     }
@@ -724,7 +727,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _showSnackBar(
         isEmail
             ? 'Enter a valid email.'
-            : 'Enter a valid phone number.',
+            : _invalidPhoneMessage(),
       );
       return;
     }
@@ -751,7 +754,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _showSnackBar(
           isEmail
               ? 'Enter a valid email.'
-              : 'Enter a valid phone number.',
+              : _invalidPhoneMessage(),
         );
       } else if (_selectedSignatureId == null ||
           _selectedSignatureId!.isEmpty) {
@@ -775,7 +778,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _showSnackBar(
           isEmail
               ? 'Enter a valid email.'
-              : 'Enter a valid phone number.',
+              : _invalidPhoneMessage(),
         );
         setState(() {
           _customerContactTouched = true;
@@ -908,7 +911,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _showSnackBar(
           isEmail
               ? 'Enter a valid email.'
-              : 'Enter a valid phone number.',
+              : _invalidPhoneMessage(),
         );
       } else if (_selectedSignatureId == null ||
           _selectedSignatureId!.isEmpty) {
@@ -985,7 +988,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       return raw.toLowerCase();
     }
     
-    final region = _country?.countryCode ?? _deviceRegionCode;
+    final region = _country?.countryCode ?? _accountRegionCode;
     return PhoneService.normalizeE164(
       raw,
       region,
@@ -1007,7 +1010,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     
     _phoneDebounce?.cancel();
     _phoneDebounce = Timer(const Duration(milliseconds: 300), () async {
-      final region = _country?.countryCode ?? _deviceRegionCode;
+      final region = _country?.countryCode ?? _accountRegionCode;
       final valid = await PhoneService.isValid(
         input,
         region,
@@ -1015,7 +1018,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       );
       if (!mounted) return;
       setState(() {
-        _phoneError = valid ? null : 'Enter a valid phone number.';
+        _phoneError = valid ? null : _invalidPhoneMessage();
       });
       if (valid) {
         FocusManager.instance.primaryFocus?.unfocus();
