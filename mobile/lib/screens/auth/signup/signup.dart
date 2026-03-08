@@ -5,6 +5,7 @@ import 'package:country_picker/country_picker.dart';
 
 import '../../../data/models.dart';
 import '../../../services/api_client.dart';
+import '../../../services/cache/local.dart';
 import '../../../services/notice.dart';
 import '../../../services/phone.dart';
 import '../../../services/region.dart';
@@ -17,7 +18,9 @@ import 'steps/final_step.dart';
 import 'steps/shop_name.dart';
 
 class Signup extends StatefulWidget {
-  const Signup({super.key});
+  const Signup({super.key, this.preferredRegionCode});
+
+  final String? preferredRegionCode;
 
   @override
   State<Signup> createState() => _SignupState();
@@ -67,7 +70,11 @@ class _SignupState extends State<Signup> {
   @override
   void initState() {
     super.initState();
-    _deviceRegionCode = RegionService.getDeviceRegionCode();
+    _deviceRegionCode =
+        (widget.preferredRegionCode?.trim().toUpperCase().isNotEmpty ?? false)
+        ? widget.preferredRegionCode!.trim().toUpperCase()
+        : (LocalCache.getPreferredRegionCode() ??
+              RegionService.getDeviceRegionCode());
     _initCountry();
   }
 
@@ -286,12 +293,6 @@ class _SignupState extends State<Signup> {
         phoneError: _phoneError,
         emailError: _emailError,
         country: _country,
-        onCountryChanged: (country) {
-          setState(() {
-            _country = country;
-            _phoneError = null;
-          });
-        },
         onPhoneChanged: (_) {
           _onPhoneChanged(_phone.text);
         },

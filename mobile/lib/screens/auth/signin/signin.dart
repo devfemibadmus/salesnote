@@ -7,10 +7,9 @@ import '../../../services/api_client.dart';
 import '../../../services/cache/local.dart';
 import '../../../services/device_info.dart';
 import '../../../services/notice.dart';
-import '../../../services/token_store.dart';
-
 import '../../../services/phone.dart';
 import '../../../services/region.dart';
+import '../../../services/token_store.dart';
 import '../../../services/validators.dart';
 import '../signup/signup.dart';
 import '../verify/forgot_password.dart';
@@ -25,44 +24,77 @@ class Signin extends StatefulWidget {
 class _SigninState extends State<Signin> {
   static const _primary = Color(0xFF007AFF);
   static const _textMuted = Color(0xFF64748B);
+  static const _textDark = Color(0xFF0F172A);
+  static const _surface = Colors.white;
 
   final _api = ApiClient(TokenStore());
   final _loginId = TextEditingController();
   final _password = TextEditingController();
+  final _pageController = PageController();
+  final _passwordFocusNode = FocusNode();
+  late final PageController _countrySelectorController;
+  late final List<Country> _countries;
 
   bool _loading = false;
   bool _showPassword = false;
   Country? _country;
   late final String _deviceRegionCode;
 
-  final _passwordFocusNode = FocusNode();
-
-  @override
-  void dispose() {
-    _loginId.dispose();
-    _password.dispose();
-    _passwordFocusNode.dispose();
-    super.dispose();
-  }
-
   @override
   void initState() {
     super.initState();
+    _countries = CountryService().getAll();
     _deviceRegionCode = RegionService.getDeviceRegionCode();
     try {
       _country = CountryParser.parseCountryCode(_deviceRegionCode);
     } catch (_) {
       _country = CountryParser.parseCountryCode('NG');
     }
+    final initialIndex = _countries.indexWhere(
+      (country) => country.countryCode == _country?.countryCode,
+    );
+    _countrySelectorController = PageController(
+      initialPage: initialIndex >= 0 ? initialIndex : 0,
+      viewportFraction: 0.9,
+    );
     _passwordFocusNode.addListener(() {
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     });
+  }
+
+  @override
+  void dispose() {
+    _loginId.dispose();
+    _password.dispose();
+    _pageController.dispose();
+    _countrySelectorController.dispose();
+    _passwordFocusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _goToPage(int index) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (!_pageController.hasClients) {
+      return;
+    }
+    await _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _login() async {
     final input = _loginId.text.trim();
     if (input.isEmpty) {
       _showError('Enter your phone or email.');
+      return;
+    }
+
+    if (_password.text.trim().isEmpty) {
+      _showError('Enter your password.');
       return;
     }
 
@@ -93,6 +125,7 @@ class _SigninState extends State<Signin> {
       }
       loginValue = strictPhone;
     }
+
     FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _loading = true);
     try {
@@ -116,7 +149,9 @@ class _SigninState extends State<Signin> {
     } catch (e) {
       _showError(_errorMessage(e));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -130,6 +165,316 @@ class _SigninState extends State<Signin> {
     return error.toString();
   }
 
+  InputDecoration _inputDecoration(String hintText) {
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+      filled: true,
+      fillColor: _surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: const BorderSide(color: Color(0xFFBFDBFE)),
+      ),
+    );
+  }
+
+  Widget _buildCountryPage() {
+    final country = _country ?? CountryParser.parseCountryCode('NG');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 8),
+          Center(
+            child: Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF007AFF), Color(0xFF0055CC)],
+                ),
+                borderRadius: BorderRadius.circular(26),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x29007AFF),
+                    blurRadius: 20,
+                    offset: Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.receipt_long_rounded,
+                color: Colors.white,
+                size: 46,
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'Choose your country',
+              style: TextStyle(
+                color: _textDark,
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'Swipe to set your phone sign-in country and your account region defaults, including currency. Email sign-in still works normally.',
+              style: TextStyle(
+                color: _textMuted,
+                fontSize: 16,
+                height: 1.45,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: PageView.builder(
+              controller: _countrySelectorController,
+              itemCount: _countries.length,
+              onPageChanged: (index) {
+                if (!mounted) return;
+                setState(() => _country = _countries[index]);
+              },
+              itemBuilder: (context, index) {
+                final item = _countries[index];
+                final isSelected = item.countryCode == country.countryCode;
+                return AnimatedOpacity(
+                  duration: const Duration(milliseconds: 220),
+                  opacity: isSelected ? 1 : 0.45,
+                  child: AnimatedScale(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    scale: isSelected ? 1 : 0.88,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              item.flagEmoji,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: isSelected ? 112 : 92),
+                            ),
+                            const SizedBox(height: 18),
+                            Text(
+                              item.name,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: _textDark,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '+${item.phoneCode}',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: _textMuted,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: SizedBox(
+              height: 58,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: _primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                onPressed: _loading ? null : () => _goToPage(1),
+                child: const Text(
+                  'Continue',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              _SigninStepDot(active: true),
+              SizedBox(width: 8),
+              _SigninStepDot(active: false),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCredentialsPage() {
+    final country = _country ?? CountryParser.parseCountryCode('NG');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                onPressed: _loading ? null : () => _goToPage(0),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+              ),
+              const Spacer(),
+              const _SigninStepDot(active: false),
+              const SizedBox(width: 8),
+              const _SigninStepDot(active: true),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Sign in',
+            style: TextStyle(
+              color: _textDark,
+              fontSize: 30,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Using ${country.name} for phone number validation.',
+            style: const TextStyle(
+              color: _textMuted,
+              fontSize: 16,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            controller: _loginId,
+            keyboardType: TextInputType.emailAddress,
+            enabled: !_loading,
+            decoration: _inputDecoration('Phone or Email'),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _password,
+            focusNode: _passwordFocusNode,
+            obscureText: !_showPassword,
+            enabled: !_loading,
+            decoration: _inputDecoration('Password').copyWith(
+              suffixIcon: _passwordFocusNode.hasFocus
+                  ? IconButton(
+                      onPressed: () =>
+                          setState(() => _showPassword = !_showPassword),
+                      icon: Icon(
+                        _showPassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: _loading
+                  ? null
+                  : () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ForgotPassword(),
+                        ),
+                      );
+                    },
+              child: const Text(
+                'Forgot Password?',
+                style: TextStyle(
+                  color: _textMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const Spacer(),
+          SizedBox(
+            height: 58,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: _primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+              onPressed: _loading ? null : _login,
+              child: Text(
+                _loading ? 'Please wait...' : 'Sign In',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 22),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                "Don't have a shop? ",
+                style: TextStyle(color: _textMuted),
+              ),
+              GestureDetector(
+                onTap: _loading
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => Signup(
+                              preferredRegionCode:
+                                  _country?.countryCode ?? _deviceRegionCode,
+                            ),
+                          ),
+                        );
+                      },
+                child: const Text(
+                  'Create a shop',
+                  style: TextStyle(
+                    color: _textMuted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -140,233 +485,34 @@ class _SigninState extends State<Signin> {
         child: SafeArea(
           child: AbsorbPointer(
             absorbing: _loading,
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 24,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 8),
-                    Center(
-                      child: Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF007AFF), Color(0xFF0055CC)],
-                          ),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x33007AFF),
-                              blurRadius: 20,
-                              offset: Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.receipt_long_rounded,
-                          color: Colors.white,
-                          size: 42,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 70),
-                    Row(
-                      children: [
-                        InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: _loading
-                              ? null
-                              : () {
-                                  showCountryPicker(
-                                    context: context,
-                                    showPhoneCode: true,
-                                    onSelect: (value) {
-                                      setState(() => _country = value);
-                                    },
-                                  );
-                                },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 16,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  _country?.flagEmoji ?? '🇳🇬',
-                                  style: const TextStyle(fontSize: 18),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '+${_country?.phoneCode ?? '234'}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF111827),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                const Icon(Icons.keyboard_arrow_down, size: 18),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: _loginId,
-                            keyboardType: TextInputType.emailAddress,
-                            enabled: !_loading,
-                            decoration: InputDecoration(
-                              hintText: 'Enter Phone or Email',
-                              hintStyle: const TextStyle(
-                                color: Color(0xFF94A3B8),
-                              ),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 18,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _password,
-                      focusNode: _passwordFocusNode,
-                      obscureText: !_showPassword,
-                      enabled: !_loading,
-                      decoration: InputDecoration(
-                        hintText: 'Password',
-                        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 18,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                        suffixIcon: _passwordFocusNode.hasFocus
-                            ? IconButton(
-                                onPressed: () => setState(
-                                  () => _showPassword = !_showPassword,
-                                ),
-                                icon: Icon(
-                                  _showPassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                ),
-                              )
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _loading
-                            ? null
-                            : () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const ForgotPassword(),
-                                  ),
-                                );
-                              },
-                        child: const Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            color: _textMuted,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: _primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                        ),
-                        onPressed: _loading ? null : _login,
-                        child: Text(
-                          _loading ? 'Please wait...' : 'Sign In',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          "Don't have a shop? ",
-                          style: TextStyle(color: _textMuted),
-                        ),
-                        GestureDetector(
-                          onTap: _loading
-                              ? null
-                              : () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => const Signup(),
-                                    ),
-                                  );
-                                },
-                          child: const Text(
-                            'Create a shop',
-                            style: TextStyle(
-                              color: _textMuted,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            child: PageView(
+              controller: _pageController,
+              children: [
+                _buildCountryPage(),
+                _buildCredentialsPage(),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SigninStepDot extends StatelessWidget {
+  const _SigninStepDot({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: active ? 30 : 8,
+      height: 8,
+      decoration: BoxDecoration(
+        color: active ? const Color(0xFF007AFF) : const Color(0xFFD1D5DB),
+        borderRadius: BorderRadius.circular(999),
       ),
     );
   }

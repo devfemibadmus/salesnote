@@ -23,11 +23,26 @@ class PhoneService {
     if (digits.isEmpty) return '';
 
     if (countryPhoneCode != null && countryPhoneCode.trim().isNotEmpty) {
+      final normalizedCountryCode = countryPhoneCode.trim();
+      if (digits.startsWith('00$normalizedCountryCode')) {
+        final result = '+${digits.substring(2)}';
+        // ignore: avoid_print
+        print('PhoneService._buildInputForValidation withInternationalPrefix digits="$digits" result="$result"');
+        return result;
+      }
+
+      if (digits.startsWith(normalizedCountryCode)) {
+        final result = '+$digits';
+        // ignore: avoid_print
+        print('PhoneService._buildInputForValidation withExistingCountryCode digits="$digits" result="$result"');
+        return result;
+      }
+
       var national = digits;
       if (national.startsWith('0')) {
         national = national.substring(1);
       }
-      final result = '+${countryPhoneCode.trim()}$national';
+      final result = '+$normalizedCountryCode$national';
       // ignore: avoid_print
       print('PhoneService._buildInputForValidation withCountry digits="$digits" national="$national" result="$result"');
       return result;

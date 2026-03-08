@@ -66,26 +66,42 @@ class SalesNoteApp extends StatelessWidget {
   }
 }
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
 
   @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  late final Future<_AuthGateBootstrap> _bootstrapFuture = _loadBootstrap();
+
+  Future<_AuthGateBootstrap> _loadBootstrap() async {
+    final onboardingComplete = await LocalCache.isOnboardingComplete();
+    final token = await TokenStore().getToken();
+    return _AuthGateBootstrap(
+      onboardingComplete: onboardingComplete,
+      token: token,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
-      future: Future.wait([
-        LocalCache.isOnboardingComplete(),
-        TokenStore().getToken(),
-      ]),
+    return FutureBuilder<_AuthGateBootstrap>(
+      future: _bootstrapFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const SplashScreen();
         }
-        final data = snapshot.data;
-        if (data == null || data.length != 2) {
-          return const SplashScreen();
+        if (snapshot.hasError) {
+          return const AuthScreen();
         }
-        final onboardingComplete = data[0] as bool;
-        final token = data[1] as String?;
+        final data = snapshot.data;
+        if (data == null) {
+          return const AuthScreen();
+        }
+        final onboardingComplete = data.onboardingComplete;
+        final token = data.token;
         if (token != null && token.isNotEmpty) {
           return const HomeScreen();
         }
@@ -96,4 +112,14 @@ class AuthGate extends StatelessWidget {
       },
     );
   }
+}
+
+class _AuthGateBootstrap {
+  const _AuthGateBootstrap({
+    required this.onboardingComplete,
+    required this.token,
+  });
+
+  final bool onboardingComplete;
+  final String? token;
 }
