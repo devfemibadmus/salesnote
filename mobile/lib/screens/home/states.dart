@@ -823,18 +823,28 @@ class _AutoMetricCardsState extends State<_AutoMetricCards> {
   @override
   Widget build(BuildContext context) {
     if (widget.cards.isEmpty) return const SizedBox.shrink();
-    return PageView.builder(
-      controller: _controller,
-      onPageChanged: (value) => _page = value,
-      itemBuilder: (context, index) {
-        final item = widget.cards[index % widget.cards.length];
-        return Padding(
-          padding: const EdgeInsets.only(right: 10),
-          child: _MetricCard(
-            title: item.title,
-            value: item.value,
-            deltaText: item.deltaText,
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final compact = width < 360;
+        final cardWidth = compact ? width - 18 : width * 0.8;
+        return PageView.builder(
+          controller: _controller,
+          onPageChanged: (value) => _page = value,
+          itemBuilder: (context, index) {
+            final item = widget.cards[index % widget.cards.length];
+            return Padding(
+              padding: EdgeInsets.only(right: compact ? 6 : 10),
+              child: SizedBox(
+                width: cardWidth,
+                child: _MetricCard(
+                  title: item.title,
+                  value: item.value,
+                  deltaText: item.deltaText,
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1011,20 +1021,18 @@ class _MainState extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 24),
-        Row(
-          children: [
-            const Text(
-              'Sales Trend',
-              style: TextStyle(fontSize: 34 / 2, fontWeight: FontWeight.w700),
-            ),
-            const Spacer(),
-            Container(
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 380;
+            final selector = Container(
               decoration: BoxDecoration(
                 color: const Color(0xFFE2E8F0),
                 borderRadius: BorderRadius.circular(12),
               ),
               padding: const EdgeInsets.all(3),
-              child: Row(
+              child: Wrap(
+                spacing: 0,
+                runSpacing: 0,
                 children: [
                   _TrendPill(
                     label: 'Daily',
@@ -1043,8 +1051,31 @@ class _MainState extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-          ],
+            );
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Sales Trend',
+                    style: TextStyle(fontSize: 34 / 2, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  selector,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                const Text(
+                  'Sales Trend',
+                  style: TextStyle(fontSize: 34 / 2, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                selector,
+              ],
+            );
+          },
         ),
         const SizedBox(height: 24),
         _Bars(bars: trendBars),

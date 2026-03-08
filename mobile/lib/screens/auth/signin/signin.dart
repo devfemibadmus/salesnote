@@ -185,151 +185,148 @@ class _SigninState extends State<Signin> {
 
   Widget _buildCountryPage() {
     final country = _country ?? CountryParser.parseCountryCode('NG');
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 12, 0, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 8),
-          Center(
-            child: Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFF007AFF), Color(0xFF0055CC)],
-                ),
-                borderRadius: BorderRadius.circular(26),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x29007AFF),
-                    blurRadius: 20,
-                    offset: Offset(0, 8),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxHeight;
+        final compact = height < 760;
+        final veryCompact = height < 680;
+        final topGap = veryCompact ? 8.0 : 14.0;
+        final titleGap = veryCompact ? 10.0 : 16.0;
+        final titleSize = veryCompact ? 25.0 : (compact ? 27.0 : 30.0);
+        final bodySize = veryCompact ? 14.0 : (compact ? 15.0 : 16.0);
+        final selectorGap = veryCompact ? 6.0 : 12.0;
+        final flagSelectedSize = veryCompact ? 88.0 : (compact ? 98.0 : 112.0);
+        final flagUnselectedSize = veryCompact ? 74.0 : (compact ? 82.0 : 92.0);
+        final countryNameSize = veryCompact ? 22.0 : (compact ? 24.0 : 28.0);
+        final countryCodeSize = veryCompact ? 16.0 : 18.0;
+        final buttonHeight = veryCompact ? 54.0 : 58.0;
+        final bottomGap = veryCompact ? 12.0 : 18.0;
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(0, compact ? 8 : 12, 0, compact ? 14 : 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(height: topGap),
+              SizedBox(height: titleGap),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Choose your country',
+                  style: TextStyle(
+                    color: _textDark,
+                    fontSize: titleSize,
+                    fontWeight: FontWeight.w800,
                   ),
-                ],
+                ),
               ),
-              child: const Icon(
-                Icons.receipt_long_rounded,
-                color: Colors.white,
-                size: 46,
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Swipe to set your phone sign-in country and your account region defaults, including currency. Email sign-in still works normally.',
+                  style: TextStyle(
+                    color: _textMuted,
+                    fontSize: bodySize,
+                    height: 1.45,
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(height: 28),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              'Choose your country',
-              style: TextStyle(
-                color: _textDark,
-                fontSize: 30,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              'Swipe to set your phone sign-in country and your account region defaults, including currency. Email sign-in still works normally.',
-              style: TextStyle(
-                color: _textMuted,
-                fontSize: 16,
-                height: 1.45,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: PageView.builder(
-              controller: _countrySelectorController,
-              itemCount: _countries.length,
-              onPageChanged: (index) {
-                if (!mounted) return;
-                setState(() => _country = _countries[index]);
-              },
-              itemBuilder: (context, index) {
-                final item = _countries[index];
-                final isSelected = item.countryCode == country.countryCode;
-                return AnimatedOpacity(
-                  duration: const Duration(milliseconds: 220),
-                  opacity: isSelected ? 1 : 0.45,
-                  child: AnimatedScale(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    scale: isSelected ? 1 : 0.88,
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              item.flagEmoji,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: isSelected ? 112 : 92),
+              SizedBox(height: selectorGap),
+              Expanded(
+                child: PageView.builder(
+                  controller: _countrySelectorController,
+                  itemCount: _countries.length,
+                  onPageChanged: (index) {
+                    if (!mounted) return;
+                    setState(() => _country = _countries[index]);
+                  },
+                  itemBuilder: (context, index) {
+                    final item = _countries[index];
+                    final isSelected = item.countryCode == country.countryCode;
+                    return AnimatedOpacity(
+                      duration: const Duration(milliseconds: 220),
+                      opacity: isSelected ? 1 : 0.45,
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutCubic,
+                        scale: isSelected ? 1 : 0.88,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  item.flagEmoji,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: isSelected
+                                        ? flagSelectedSize
+                                        : flagUnselectedSize,
+                                  ),
+                                ),
+                                SizedBox(height: veryCompact ? 12 : 18),
+                                Text(
+                                  item.name,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: _textDark,
+                                    fontSize: countryNameSize,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '+${item.phoneCode}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: _textMuted,
+                                    fontSize: countryCodeSize,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 18),
-                            Text(
-                              item.name,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: _textDark,
-                                fontSize: 28,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '+${item.phoneCode}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: _textMuted,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: SizedBox(
-              height: 58,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: _primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-                onPressed: _loading ? null : () => _goToPage(1),
-                child: const Text(
-                  'Continue',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    );
+                  },
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              _SigninStepDot(active: true),
-              SizedBox(width: 8),
-              _SigninStepDot(active: false),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: SizedBox(
+                  height: buttonHeight,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _primary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    onPressed: _loading ? null : () => _goToPage(1),
+                    child: const Text(
+                      'Continue',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: bottomGap),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  _SigninStepDot(active: true),
+                  SizedBox(width: 8),
+                  _SigninStepDot(active: false),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

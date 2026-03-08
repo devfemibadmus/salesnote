@@ -4,12 +4,16 @@ class AppTypography {
   AppTypography._();
 
   static const bool forceDisableDeviceBoldText = true;
-  static const TextScaler textScaler = TextScaler.noScaling;
+  static const double minTextScaleFactor = 1.0;
+  static const double maxTextScaleFactor = 1.15;
 
   static MediaQueryData apply(MediaQueryData mediaQuery) {
     return mediaQuery.copyWith(
       boldText: !forceDisableDeviceBoldText ? mediaQuery.boldText : false,
-      textScaler: textScaler,
+      textScaler: mediaQuery.textScaler.clamp(
+        minScaleFactor: minTextScaleFactor,
+        maxScaleFactor: maxTextScaleFactor,
+      ),
     );
   }
 }

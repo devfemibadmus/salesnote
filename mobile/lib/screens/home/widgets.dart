@@ -12,87 +12,111 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
     final isNegative = deltaText.contains('-');
     final deltaColor = isNegative
         ? const Color(0xFFEF4444)
         : const Color(0xFF10B981);
-    return Container(
-      width: screenWidth * 0.76,
-      height: 132,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: isNegative
-            ? Border.all(color: const Color(0xFFE5EAF1))
-            : Border.all(color: Colors.white),
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned(
-            right: -12,
-            top: -28,
-            child: Container(
-              width: 86,
-              height: 86,
-              decoration: BoxDecoration(
-                color: isNegative ? Color(0xFFF1F5F9) : Colors.white,
-                shape: BoxShape.circle,
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : MediaQuery.of(context).size.width * 0.76;
+        final compact = availableWidth < 260;
+        final cardHeight = compact ? 142.0 : 132.0;
+        final horizontalPadding = compact ? 16.0 : 20.0;
+        final titleSize = compact ? 12.0 : 14.0;
+        final valueSize = compact ? 23.0 : 27.0;
+        final deltaSize = compact ? 12.0 : 15.0;
+        final accentCircleSize = compact ? 72.0 : 86.0;
+        return Container(
+          width: availableWidth,
+          height: cardHeight,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: isNegative
+                ? Border.all(color: const Color(0xFFE5EAF1))
+                : Border.all(color: Colors.white),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.1,
-                    fontSize: 28 / 2,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                right: -12,
+                top: compact ? -18 : -28,
+                child: Container(
+                  width: accentCircleSize,
+                  height: accentCircleSize,
+                  decoration: BoxDecoration(
+                    color: isNegative ? const Color(0xFFF1F5F9) : Colors.white,
+                    shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 54 / 2,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
+              ),
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding,
+                  vertical: compact ? 12 : 10,
                 ),
-                const SizedBox(height: 6),
-                Row(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      isNegative
-                          ? Icons.trending_down_rounded
-                          : Icons.trending_up_rounded,
-                      size: 16,
-                      color: deltaColor,
-                    ),
-                    const SizedBox(width: 5),
                     Text(
-                      deltaText,
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: deltaColor,
+                        color: const Color(0xFF64748B),
                         fontWeight: FontWeight.w700,
-                        fontSize: 30 / 2,
+                        letterSpacing: 1.1,
+                        fontSize: titleSize,
                       ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: valueSize,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(
+                          isNegative
+                              ? Icons.trending_down_rounded
+                              : Icons.trending_up_rounded,
+                          size: compact ? 14 : 16,
+                          color: deltaColor,
+                        ),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            deltaText,
+                            maxLines: compact ? 2 : 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: deltaColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: deltaSize,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -278,11 +302,16 @@ class _TrendPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final compact = width < 360;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 12 : 18,
+          vertical: compact ? 8 : 8,
+        ),
         decoration: BoxDecoration(
           color: active ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
@@ -292,7 +321,7 @@ class _TrendPill extends StatelessWidget {
           style: TextStyle(
             color: active ? const Color(0xFF007AFF) : const Color(0xFF64748B),
             fontWeight: FontWeight.w700,
-            fontSize: 16,
+            fontSize: compact ? 14 : 16,
           ),
         ),
       ),

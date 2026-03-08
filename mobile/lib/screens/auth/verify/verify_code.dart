@@ -243,7 +243,7 @@ class _VerifyCodeState extends State<VerifyCode> {
                               ),
                             ),
                             child: Text(
-                              hasDigit ? text[index] : '-',
+                              hasDigit ? text[index] : '',
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w600,

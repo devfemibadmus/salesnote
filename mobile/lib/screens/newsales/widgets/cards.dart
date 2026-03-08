@@ -116,78 +116,104 @@ class _ItemCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: const Color(0xFFD8E2EE)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 340;
+              final titleSize = compact ? 16.0 : 18.0;
+              final unitSize = compact ? 14.0 : 15.0;
+              final totalLabelSize = compact ? 11.0 : 12.0;
+              final totalAmountSize = compact ? 17.0 : 20.0;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      item.productName,
-                      style: const TextStyle(
-                        color: Color(0xFF0E1930),
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: onDelete,
-                    child: const Padding(
-                      padding: EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.delete_outline_rounded,
-                        color: Color(0xFFE53935),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Unit: ${formatAmount(item.unitPrice, decimalDigits: 2)}',
-                style: const TextStyle(
-                  color: Color(0xFF60708A),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  _QuantityStepper(
-                    quantity: item.quantity,
-                    onMinus: onMinus,
-                    onPlus: onPlus,
-                    onSetQuantity: onSetQuantity,
-                  ),
-                  const Spacer(),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  Row(
                     children: [
-                      const Text(
-                        'TOTAL',
-                        style: TextStyle(
-                          color: Color(0xFF60708A),
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
+                      Expanded(
+                        child: Text(
+                          item.productName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: const Color(0xFF0E1930),
+                            fontSize: titleSize,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        formatAmount(item.lineTotal, decimalDigits: 2),
-                        style: const TextStyle(
-                          color: Color(0xFF1677E6),
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
+                      InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: onDelete,
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.delete_outline_rounded,
+                            color: Color(0xFFE53935),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Unit: ${formatAmount(item.unitPrice, decimalDigits: 2)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: const Color(0xFF60708A),
+                      fontSize: unitSize,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Flexible(
+                        flex: compact ? 9 : 7,
+                        child: _QuantityStepper(
+                          quantity: item.quantity,
+                          onMinus: onMinus,
+                          onPlus: onPlus,
+                          onSetQuantity: onSetQuantity,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: compact ? 8 : 6,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'TOTAL',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: const Color(0xFF60708A),
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: compact ? 1.2 : 1.5,
+                                fontSize: totalLabelSize,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              formatAmount(item.lineTotal, decimalDigits: 2),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                color: const Color(0xFF1677E6),
+                                fontSize: totalAmountSize,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ],
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),
