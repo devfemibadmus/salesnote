@@ -55,7 +55,7 @@ class _SigninState extends State<Signin> {
     );
     _countrySelectorController = PageController(
       initialPage: initialIndex >= 0 ? initialIndex : 0,
-      viewportFraction: 0.9,
+      viewportFraction: 0.62,
     );
     _passwordFocusNode.addListener(() {
       if (mounted) {
@@ -236,6 +236,8 @@ class _SigninState extends State<Signin> {
               Expanded(
                 child: PageView.builder(
                   controller: _countrySelectorController,
+                  clipBehavior: Clip.none,
+                  padEnds: true,
                   itemCount: _countries.length,
                   onPageChanged: (index) {
                     if (!mounted) return;
@@ -243,32 +245,50 @@ class _SigninState extends State<Signin> {
                   },
                   itemBuilder: (context, index) {
                     final item = _countries[index];
-                    final isSelected = item.countryCode == country.countryCode;
-                    return AnimatedOpacity(
-                      duration: const Duration(milliseconds: 220),
-                      opacity: isSelected ? 1 : 0.45,
-                      child: AnimatedScale(
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOutCubic,
-                        scale: isSelected ? 1 : 0.88,
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  item.flagEmoji,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: isSelected
-                                        ? flagSelectedSize
-                                        : flagUnselectedSize,
-                                  ),
+                    return AnimatedBuilder(
+                      animation: _countrySelectorController,
+                      builder: (context, child) {
+                        var page = _countrySelectorController.initialPage.toDouble();
+                        if (_countrySelectorController.hasClients) {
+                          page = _countrySelectorController.page ?? page;
+                        }
+                        final distance = (page - index).abs().clamp(0.0, 1.0);
+                        final scale = 1 - (distance * 0.34);
+                        final opacity = 1 - (distance * 0.48);
+                        final slideX = (page - index) * 30;
+
+                        return Transform.translate(
+                          offset: Offset(slideX, 0),
+                          child: Transform.scale(
+                            scale: scale,
+                            child: Opacity(
+                              opacity: opacity.clamp(0.22, 1.0),
+                              child: child,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Center(
+                        child: SizedBox.expand(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                item.flagEmoji,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: item.countryCode == country.countryCode
+                                      ? flagSelectedSize
+                                      : flagUnselectedSize,
                                 ),
-                                SizedBox(height: veryCompact ? 12 : 18),
-                                Text(
+                              ),
+                              SizedBox(height: veryCompact ? 12 : 18),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(
                                   item.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: _textDark,
@@ -276,18 +296,18 @@ class _SigninState extends State<Signin> {
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '+${item.phoneCode}',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: _textMuted,
-                                    fontSize: countryCodeSize,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '+${item.phoneCode}',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: _textMuted,
+                                  fontSize: countryCodeSize,
+                                  fontWeight: FontWeight.w700,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
