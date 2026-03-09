@@ -18,13 +18,10 @@ import 'services/token_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(
     salesnoteFirebaseMessagingBackgroundHandler,
   );
-  await Hive.initFlutter();
-  await LocalCache.init();
-  
+
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     systemNavigationBarColor: Colors.white,
     systemNavigationBarIconBrightness: Brightness.dark,
@@ -77,6 +74,9 @@ class _AuthGateState extends State<AuthGate> {
   late final Future<_AuthGateBootstrap> _bootstrapFuture = _loadBootstrap();
 
   Future<_AuthGateBootstrap> _loadBootstrap() async {
+    await Firebase.initializeApp();
+    await Hive.initFlutter();
+    await LocalCache.init();
     final onboardingComplete = await LocalCache.isOnboardingComplete();
     final hasSession = await TokenStore().hasSessionHint();
     return _AuthGateBootstrap(

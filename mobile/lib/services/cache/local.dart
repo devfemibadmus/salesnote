@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:hive/hive.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalCache {
   static const _receiptsBox = 'receipts_cache';
@@ -14,14 +17,123 @@ class LocalCache {
   static const _notificationPromptCooldownKey = 'notification_prompt_cooldown';
   static const _notificationOptOutKey = 'notification_opt_out';
   static const _preferredRegionCodeKey = 'preferred_region_code';
+  static const _cacheSchemaVersionKey = 'cache_schema_version';
+  static const _cacheSchemaVersion = 3;
+  static Future<void>? _initFuture;
+  static const _allBoxes = <String>[
+    _receiptsBox,
+    _receiptDetailBox,
+    _salesDraftBox,
+    _settingsBox,
+    _metaBox,
+    _pageBox,
+  ];
 
   static Future<void> init() async {
-    await Hive.openBox<String>(_receiptsBox);
-    await Hive.openBox<String>(_receiptDetailBox);
-    await Hive.openBox<String>(_salesDraftBox);
-    await Hive.openBox<bool>(_settingsBox);
-    await Hive.openBox<int>(_metaBox);
-    await Hive.openBox<String>(_pageBox);
+    _initFuture ??= _initializeWithRecovery().catchError((error) {
+      _initFuture = null;
+      throw error;
+    });
+    return _initFuture!;
+  }
+
+  static Future<void> _initializeWithRecovery() async {
+    await _migrateCacheSchemaIfNeeded();
+    try {
+      await _openAllBoxes();
+    } catch (_) {
+      await _deleteAllHiveArtifacts();
+      await _openAllBoxes();
+    }
+  }
+
+  static Future<void> _migrateCacheSchemaIfNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedVersion = prefs.getInt(_cacheSchemaVersionKey) ?? 0;
+    if (storedVersion == _cacheSchemaVersion) {
+      return;
+    }
+
+    await _deleteAllHiveArtifacts();
+    await prefs.setInt(_cacheSchemaVersionKey, _cacheSchemaVersion);
+  }
+
+  static Future<void> _openAllBoxes() async {
+    await _openBoxSafely<String>(_receiptsBox);
+    await _openBoxSafely<String>(_receiptDetailBox);
+    await _openBoxSafely<String>(_salesDraftBox);
+    await _openBoxSafely<bool>(_settingsBox);
+    await _openBoxSafely<int>(_metaBox);
+    await _openBoxSafely<String>(_pageBox);
+  }
+
+  static Future<void> _openBoxSafely<T>(String name) async {
+    if (Hive.isBoxOpen(name)) return;
+
+    try {
+      await Hive.openBox<T>(name);
+    } catch (error) {
+      // Recover from incompatible or corrupted on-device Hive boxes left by older builds.
+      await _deleteAllHiveArtifacts();
+      await Hive.openBox<T>(name);
+    }
+  }
+
+  static Future<void> _deleteBoxFiles(String name) async {
+    final directory = await getApplicationDocumentsDirectory();
+    final normalized = name.toLowerCase();
+    await for (final entry in directory.list(followLinks: false)) {
+      final fileName = entry.uri.pathSegments.isEmpty
+          ? ''
+          : entry.uri.pathSegments.last.toLowerCase();
+      if (!fileName.startsWith(normalized)) {
+        continue;
+      }
+
+      try {
+        if (entry is File) {
+          if (await entry.exists()) {
+            await entry.delete();
+          }
+        } else if (entry is Directory) {
+          if (await entry.exists()) {
+            await entry.delete(recursive: true);
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> _deleteAllHiveArtifacts() async {
+    for (final name in _allBoxes) {
+      await _deleteBoxFiles(name);
+    }
+
+    final directory = await getApplicationDocumentsDirectory();
+    await for (final entry in directory.list(followLinks: false)) {
+      final fileName = entry.uri.pathSegments.isEmpty
+          ? ''
+          : entry.uri.pathSegments.last.toLowerCase();
+      final isHiveArtifact =
+          fileName.endsWith('.hive') ||
+          fileName.endsWith('.hivec') ||
+          fileName.endsWith('.lock');
+      if (!isHiveArtifact) {
+        continue;
+      }
+
+      try {
+        if (entry is File) {
+          if (await entry.exists()) {
+            await entry.delete();
+          }
+        } else if (entry is Directory) {
+          if (await entry.exists()) {
+            await entry.delete(recursive: true);
+          }
+        }
+      } catch (_) {}
+    }
   }
 
   static Future<void> saveReceipts(List<Map<String, dynamic>> receipts) async {
@@ -271,4 +383,5 @@ class LocalCache {
       await settingsBox.put(_notificationOptOutKey, true);
     }
   }
+
 }
