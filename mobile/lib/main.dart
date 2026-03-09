@@ -78,10 +78,10 @@ class _AuthGateState extends State<AuthGate> {
 
   Future<_AuthGateBootstrap> _loadBootstrap() async {
     final onboardingComplete = await LocalCache.isOnboardingComplete();
-    final token = await TokenStore().getToken();
+    final hasSession = await TokenStore().hasSessionHint();
     return _AuthGateBootstrap(
       onboardingComplete: onboardingComplete,
-      token: token,
+      hasSession: hasSession,
     );
   }
 
@@ -101,8 +101,8 @@ class _AuthGateState extends State<AuthGate> {
           return const AuthScreen();
         }
         final onboardingComplete = data.onboardingComplete;
-        final token = data.token;
-        if (token != null && token.isNotEmpty) {
+        final hasSession = data.hasSession;
+        if (hasSession) {
           return const HomeScreen();
         }
         if (!onboardingComplete) {
@@ -117,9 +117,10 @@ class _AuthGateState extends State<AuthGate> {
 class _AuthGateBootstrap {
   const _AuthGateBootstrap({
     required this.onboardingComplete,
-    required this.token,
+    required this.hasSession,
   });
 
   final bool onboardingComplete;
-  final String? token;
+  final bool hasSession;
 }
+

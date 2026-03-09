@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class TokenStore {
   static const _key = 'auth_token';
+  static const _sessionKey = 'has_auth_session';
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
   static const Duration _storageTimeout = Duration(seconds: 3);
 
@@ -13,7 +14,13 @@ class TokenStore {
 
     // Remove the legacy copy after a successful secure write.
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_sessionKey, true);
     await prefs.remove(_key);
+  }
+
+  Future<bool> hasSessionHint() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_sessionKey) ?? false;
   }
 
   Future<String?> getToken() async {
@@ -22,6 +29,8 @@ class TokenStore {
           .read(key: _key)
           .timeout(_storageTimeout);
       if (secureToken != null && secureToken.isNotEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_sessionKey, true);
         return secureToken;
       }
     } catch (_) {
@@ -34,6 +43,7 @@ class TokenStore {
     final prefs = await SharedPreferences.getInstance();
     final legacyToken = prefs.getString(_key);
     if (legacyToken == null || legacyToken.isEmpty) {
+      await prefs.remove(_sessionKey);
       return null;
     }
 
@@ -42,8 +52,10 @@ class TokenStore {
           .write(key: _key, value: legacyToken)
           .timeout(_storageTimeout);
     } catch (_) {
+      await prefs.remove(_sessionKey);
       return null;
     }
+    await prefs.setBool(_sessionKey, true);
     await prefs.remove(_key);
     return legacyToken;
   }
@@ -54,6 +66,11 @@ class TokenStore {
     } catch (_) {}
 
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_sessionKey);
     await prefs.remove(_key);
   }
 }
+
+
+
+
