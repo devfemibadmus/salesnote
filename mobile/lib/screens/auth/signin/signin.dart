@@ -1,11 +1,12 @@
 import 'dart:async';
-
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../services/api_client.dart';
 import '../../../services/cache/local.dart';
 import '../../../services/device_info.dart';
+import '../../../services/flag.dart';
+import '../../../services/media.dart';
 import '../../../services/notice.dart';
 import '../../../services/phone.dart';
 import '../../../services/region.dart';
@@ -37,7 +38,8 @@ class _SigninState extends State<Signin> {
 
   bool _loading = false;
   bool _showPassword = false;
-  Country? _country;
+  Timer? _countrySettleTimer;
+  late final ValueNotifier<Country> _selectedCountry;
   late final String _deviceRegionCode;
 
   @override
@@ -45,22 +47,24 @@ class _SigninState extends State<Signin> {
     super.initState();
     _countries = CountryService().getAll();
     _deviceRegionCode = RegionService.getDeviceRegionCode();
+    Country initCountry;
     try {
-      _country = CountryParser.parseCountryCode(_deviceRegionCode);
+      initCountry = CountryParser.parseCountryCode(_deviceRegionCode);
     } catch (_) {
-      _country = CountryParser.parseCountryCode('NG');
+      initCountry = CountryParser.parseCountryCode('NG');
     }
+    _selectedCountry = ValueNotifier(initCountry);
     final initialIndex = _countries.indexWhere(
-      (country) => country.countryCode == _country?.countryCode,
+      (c) => c.countryCode == initCountry.countryCode,
     );
+    final seedIndex = initialIndex >= 0 ? initialIndex : 0;
+    final basePage = _countries.length * 1000;
     _countrySelectorController = PageController(
-      initialPage: initialIndex >= 0 ? initialIndex : 0,
-      viewportFraction: 0.62,
+      initialPage: basePage + seedIndex,
+      viewportFraction: 0.50,
     );
     _passwordFocusNode.addListener(() {
-      if (mounted) {
-        setState(() {});
-      }
+      if (mounted) setState(() {});
     });
   }
 
@@ -70,15 +74,15 @@ class _SigninState extends State<Signin> {
     _password.dispose();
     _pageController.dispose();
     _countrySelectorController.dispose();
+    _countrySettleTimer?.cancel();
     _passwordFocusNode.dispose();
+    _selectedCountry.dispose();
     super.dispose();
   }
 
   Future<void> _goToPage(int index) async {
     FocusManager.instance.primaryFocus?.unfocus();
-    if (!_pageController.hasClients) {
-      return;
-    }
+    if (!_pageController.hasClients) return;
     await _pageController.animateToPage(
       index,
       duration: const Duration(milliseconds: 280),
@@ -92,7 +96,6 @@ class _SigninState extends State<Signin> {
       _showError('Enter your phone or email.');
       return;
     }
-
     if (_password.text.trim().isEmpty) {
       _showError('Enter your password.');
       return;
@@ -108,11 +111,11 @@ class _SigninState extends State<Signin> {
       }
       loginValue = input;
     } else {
-      final selectedCountry = _country;
+      final selectedCountry = _selectedCountry.value;
       final strictPhone = await PhoneService.normalizeE164(
         input,
-        selectedCountry?.countryCode ?? _deviceRegionCode,
-        countryPhoneCode: selectedCountry?.phoneCode,
+        selectedCountry.countryCode,
+        countryPhoneCode: selectedCountry.phoneCode,
       );
       if (strictPhone == null) {
         _showError(
@@ -141,7 +144,7 @@ class _SigninState extends State<Signin> {
         deviceOs: device.os,
       );
       final selectedRegion = !isEmail
-          ? (_country?.countryCode ?? _deviceRegionCode)
+          ? _selectedCountry.value.countryCode
           : await PhoneService.regionCodeFromE164(auth.shop.phone);
       await LocalCache.setPreferredRegionCode(selectedRegion);
       if (!mounted) return;
@@ -165,6 +168,30 @@ class _SigninState extends State<Signin> {
     return error.toString();
   }
 
+  int _wrapCountryIndex(int index) {
+    final length = _countries.length;
+    return ((index % length) + length) % length;
+  }
+
+  void _scheduleCountrySettle() {
+    _countrySettleTimer?.cancel();
+    _countrySettleTimer = Timer(const Duration(milliseconds: 140), () async {
+      if (!mounted || !_countrySelectorController.hasClients) {
+        return;
+      }
+      final page = _countrySelectorController.page;
+      if (page == null) {
+        return;
+      }
+      final targetPage = page.round();
+      await _countrySelectorController.animateToPage(
+        targetPage,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
   InputDecoration _inputDecoration(String hintText) {
     return InputDecoration(
       hintText: hintText,
@@ -184,7 +211,6 @@ class _SigninState extends State<Signin> {
   }
 
   Widget _buildCountryPage() {
-    final country = _country ?? CountryParser.parseCountryCode('NG');
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = constraints.maxHeight;
@@ -195,15 +221,16 @@ class _SigninState extends State<Signin> {
         final titleSize = veryCompact ? 25.0 : (compact ? 27.0 : 30.0);
         final bodySize = veryCompact ? 14.0 : (compact ? 15.0 : 16.0);
         final selectorGap = veryCompact ? 6.0 : 12.0;
-        final flagSelectedSize = veryCompact ? 88.0 : (compact ? 98.0 : 112.0);
-        final flagUnselectedSize = veryCompact ? 74.0 : (compact ? 82.0 : 92.0);
-        final countryNameSize = veryCompact ? 22.0 : (compact ? 24.0 : 28.0);
-        final countryCodeSize = veryCompact ? 16.0 : 18.0;
+        final flagHeight = veryCompact ? 68.0 : (compact ? 78.0 : 88.0);
+        final flagWidth = flagHeight * (4 / 3);
+        final countryNameSize = veryCompact ? 18.0 : (compact ? 20.0 : 22.0);
+        final countryCodeSize = veryCompact ? 14.0 : 15.0;
         final buttonHeight = veryCompact ? 54.0 : 58.0;
         final bottomGap = veryCompact ? 12.0 : 18.0;
 
         return Padding(
-          padding: EdgeInsets.fromLTRB(0, compact ? 8 : 12, 0, compact ? 14 : 20),
+          padding: EdgeInsets.fromLTRB(
+              0, compact ? 8 : 12, 0, compact ? 14 : 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -224,7 +251,9 @@ class _SigninState extends State<Signin> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Text(
-                  'Swipe to set your phone sign-in country and your account region defaults, including currency. Email sign-in still works normally.',
+                  'Swipe to set your phone sign-in country and your account '
+                  'region defaults, including currency. Email sign-in still '
+                  'works normally.',
                   style: TextStyle(
                     color: _textMuted,
                     fontSize: bodySize,
@@ -234,85 +263,109 @@ class _SigninState extends State<Signin> {
               ),
               SizedBox(height: selectorGap),
               Expanded(
-                child: PageView.builder(
-                  controller: _countrySelectorController,
-                  clipBehavior: Clip.none,
-                  padEnds: true,
-                  itemCount: _countries.length,
-                  onPageChanged: (index) {
-                    if (!mounted) return;
-                    setState(() => _country = _countries[index]);
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification is ScrollUpdateNotification) {
+                      _countrySettleTimer?.cancel();
+                    } else if (notification is ScrollEndNotification) {
+                      _scheduleCountrySettle();
+                    }
+                    return false;
                   },
-                  itemBuilder: (context, index) {
-                    final item = _countries[index];
+                  child: PageView.builder(
+                    controller: _countrySelectorController,
+                    pageSnapping: false,
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    padEnds: true,
+                    onPageChanged: (index) {
+                      _selectedCountry.value =
+                          _countries[_wrapCountryIndex(index)];
+                    },
+                    itemBuilder: (context, index) {
+                    final item = _countries[_wrapCountryIndex(index)];
+                    final flagProvider = MediaService.imageProvider(
+                      FlagService.iconUrl(item.countryCode),
+                      withCacheBust: false,
+                    );
                     return AnimatedBuilder(
                       animation: _countrySelectorController,
-                      builder: (context, child) {
-                        var page = _countrySelectorController.initialPage.toDouble();
-                        if (_countrySelectorController.hasClients) {
+                      builder: (context, _) {
+                        double page = index.toDouble();
+                        if (_countrySelectorController.position.haveDimensions) {
                           page = _countrySelectorController.page ?? page;
+                        } else {
+                          page = _countrySelectorController.initialPage.toDouble();
                         }
-                        final distance = (page - index).abs().clamp(0.0, 1.0);
-                        final scale = 1 - (distance * 0.34);
-                        final opacity = 1 - (distance * 0.48);
-                        final slideX = (page - index) * 30;
-
+                        final distance = (page - index).abs().clamp(0.0, 1.2);
+                        final scale =
+                            (1.12 - (distance * 0.28)).clamp(0.74, 1.12);
+                        final opacity = (1.0 - (distance * 0.45)).clamp(0.28, 1.0);
+                        final slideX = (page - index) * 10;
                         return Transform.translate(
                           offset: Offset(slideX, 0),
                           child: Transform.scale(
                             scale: scale,
                             child: Opacity(
-                              opacity: opacity.clamp(0.22, 1.0),
-                              child: child,
+                              opacity: opacity,
+                              child: ClipRect(
+                                child: Center(
+                                  child: SizedBox.expand(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        SizedBox(
+                                          width: flagWidth,
+                                          height: flagHeight,
+                                          child: flagProvider == null
+                                              ? const SizedBox.shrink()
+                                              : Image(
+                                                  image: flagProvider,
+                                                  fit: BoxFit.contain,
+                                                  filterQuality:
+                                                      FilterQuality.medium,
+                                                ),
+                                        ),
+                                        SizedBox(height: veryCompact ? 12 : 18),
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                          ),
+                                          child: Text(
+                                            item.name,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: _textDark,
+                                              fontSize: countryNameSize,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '+${item.phoneCode}',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: _textMuted,
+                                            fontSize: countryCodeSize,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         );
                       },
-                      child: Center(
-                        child: SizedBox.expand(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                item.flagEmoji,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: item.countryCode == country.countryCode
-                                      ? flagSelectedSize
-                                      : flagUnselectedSize,
-                                ),
-                              ),
-                              SizedBox(height: veryCompact ? 12 : 18),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                child: Text(
-                                  item.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: _textDark,
-                                    fontSize: countryNameSize,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '+${item.phoneCode}',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: _textMuted,
-                                  fontSize: countryCodeSize,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     );
                   },
+                  ),
                 ),
               ),
               Padding(
@@ -329,7 +382,8 @@ class _SigninState extends State<Signin> {
                     onPressed: _loading ? null : () => _goToPage(1),
                     child: const Text(
                       'Continue',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
@@ -351,7 +405,6 @@ class _SigninState extends State<Signin> {
   }
 
   Widget _buildCredentialsPage() {
-    final country = _country ?? CountryParser.parseCountryCode('NG');
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
       child: Column(
@@ -379,12 +432,15 @@ class _SigninState extends State<Signin> {
             ),
           ),
           const SizedBox(height: 10),
-          Text(
-            'Using ${country.name} for phone number validation.',
-            style: const TextStyle(
-              color: _textMuted,
-              fontSize: 16,
-              height: 1.45,
+          ValueListenableBuilder<Country>(
+            valueListenable: _selectedCountry,
+            builder: (context, country, _) => Text(
+              'Using ${country.name} for phone number validation.',
+              style: const TextStyle(
+                color: _textMuted,
+                fontSize: 16,
+                height: 1.45,
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -472,7 +528,7 @@ class _SigninState extends State<Signin> {
                           MaterialPageRoute(
                             builder: (_) => Signup(
                               preferredRegionCode:
-                                  _country?.countryCode ?? _deviceRegionCode,
+                                  _selectedCountry.value.countryCode,
                             ),
                           ),
                         );

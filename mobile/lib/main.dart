@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -13,6 +16,7 @@ import 'screens/home/home.dart';
 import 'screens/splash.dart';
 import 'screens/onboarding/onboarding.dart';
 import 'services/cache/local.dart';
+import 'services/flag.dart';
 import 'services/notification.dart';
 import 'services/token_store.dart';
 
@@ -74,11 +78,50 @@ class _AuthGateState extends State<AuthGate> {
   late final Future<_AuthGateBootstrap> _bootstrapFuture = _loadBootstrap();
 
   Future<_AuthGateBootstrap> _loadBootstrap() async {
+    final stopwatch = Stopwatch()..start();
+    developer.log('bootstrap:start', name: 'SalesnoteBootstrap');
+
+    developer.log('bootstrap:firebase:init', name: 'SalesnoteBootstrap');
     await Firebase.initializeApp();
+    developer.log(
+      'bootstrap:firebase:done ${stopwatch.elapsedMilliseconds}ms',
+      name: 'SalesnoteBootstrap',
+    );
+
+    developer.log('bootstrap:hive:init', name: 'SalesnoteBootstrap');
     await Hive.initFlutter();
+    developer.log(
+      'bootstrap:hive:done ${stopwatch.elapsedMilliseconds}ms',
+      name: 'SalesnoteBootstrap',
+    );
+
+    developer.log('bootstrap:cache:init', name: 'SalesnoteBootstrap');
     await LocalCache.init();
+    developer.log(
+      'bootstrap:cache:done ${stopwatch.elapsedMilliseconds}ms',
+      name: 'SalesnoteBootstrap',
+    );
+
+    unawaited(FlagService.warmAllFlags());
+
+    developer.log('bootstrap:onboarding:read', name: 'SalesnoteBootstrap');
     final onboardingComplete = await LocalCache.isOnboardingComplete();
+    developer.log(
+      'bootstrap:onboarding:done ${stopwatch.elapsedMilliseconds}ms',
+      name: 'SalesnoteBootstrap',
+    );
+
+    developer.log('bootstrap:session:read', name: 'SalesnoteBootstrap');
     final hasSession = await TokenStore().hasSessionHint();
+    developer.log(
+      'bootstrap:session:done ${stopwatch.elapsedMilliseconds}ms',
+      name: 'SalesnoteBootstrap',
+    );
+
+    developer.log(
+      'bootstrap:done ${stopwatch.elapsedMilliseconds}ms',
+      name: 'SalesnoteBootstrap',
+    );
     return _AuthGateBootstrap(
       onboardingComplete: onboardingComplete,
       hasSession: hasSession,

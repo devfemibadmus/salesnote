@@ -7,6 +7,7 @@ import '../app/config.dart';
 import 'cache/local.dart';
 
 class MediaService {
+  static final http.Client _client = http.Client();
   static String resolveSrc(String src, {bool withCacheBust = true}) {
     final trimmed = src.trim();
     if (trimmed.isEmpty) return trimmed;
@@ -44,28 +45,59 @@ class MediaService {
     return NetworkImage(resolved);
   }
 
-  static Future<void> warmImage(String? src) async {
+  static Future<bool> warmImage(String? src) async {
     final key = canonicalUrl(src);
-    if (key == null || key.isEmpty) return;
+    if (key == null || key.isEmpty) return false;
 
     final url = resolveSrc(src!, withCacheBust: false);
-    if (url.isEmpty) return;
+    if (url.isEmpty) return false;
 
     try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode < 200 || response.statusCode >= 300) return;
-      if (response.bodyBytes.isEmpty) return;
+      final response = await _client
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 6));
+      if (response.statusCode < 200 || response.statusCode >= 300) return false;
+      if (response.bodyBytes.isEmpty) return false;
       await LocalCache.saveCachedMedia(key, response.bodyBytes);
+      return true;
     } catch (_) {}
+    return false;
   }
 
-  static Future<void> warmImages(Iterable<String?> sources) async {
+  static Future<int> warmImages(
+    Iterable<String?> sources, {
+    int concurrency = 6,
+  }) async {
     final seen = <String>{};
+    final queue = <String?>[];
     for (final src in sources) {
       final key = canonicalUrl(src);
-      if (key == null || !seen.add(key)) continue;
-      await warmImage(src);
+      if (key == null || !seen.add(key)) {
+        continue;
+      }
+      queue.add(src);
     }
+
+    var successCount = 0;
+    var cursor = 0;
+
+    Future<void> worker() async {
+      while (true) {
+        if (cursor >= queue.length) return;
+        final currentIndex = cursor;
+        cursor++;
+        if (await warmImage(queue[currentIndex])) {
+          successCount++;
+        }
+      }
+    }
+
+    final workers = List.generate(
+      concurrency.clamp(1, 12),
+      (_) => worker(),
+    );
+    await Future.wait(workers);
+    return successCount;
   }
 
   static Uri? _toFetchUri(String src) {
