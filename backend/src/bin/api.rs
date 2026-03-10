@@ -28,6 +28,13 @@ async fn main() -> std::io::Result<()> {
     .await
     .expect("failed to init database");
 
+    let redis = if settings.use_redis {
+        Some(redis::Client::open(settings.redis_url.clone()).expect("failed to init redis client"))
+    } else {
+        tracing::warn!("Redis disabled via SALESNOTE__USE_REDIS=false");
+        None
+    };
+
     let app_state = state::AppState {
         pool,
         jwt_secret: settings.jwt_secret.clone(),
@@ -55,8 +62,7 @@ async fn main() -> std::io::Result<()> {
         gcs_bucket: settings.gcs_bucket.clone(),
         gcs_key_json_path: settings.gcs_key_json_path.clone(),
         gcs_signed_url_ttl_secs: settings.gcs_signed_url_ttl_secs,
-        redis: redis::Client::open(settings.redis_url.clone())
-            .expect("failed to init redis client"),
+        redis,
     };
 
     let addr: SocketAddr = settings.bind.parse().expect("invalid bind addr");

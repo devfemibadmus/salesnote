@@ -20,7 +20,7 @@ pub struct RateLimiter {
     pub max_per_minute: u32,
     pub auth_limits: AuthRateLimits,
     pub trusted_proxies: Vec<IpNet>,
-    pub redis: redis::Client,
+    pub redis: Option<redis::Client>,
 }
 
 #[derive(Clone)]
@@ -44,7 +44,7 @@ impl RateLimiter {
         max_per_minute: u32,
         auth_limits: AuthRateLimits,
         trusted_proxies: Vec<IpNet>,
-        redis: redis::Client,
+        redis: Option<redis::Client>,
     ) -> Self {
         Self {
             max_per_minute,
@@ -120,7 +120,7 @@ pub struct RateLimiterMiddleware<S> {
     max_per_minute: u32,
     auth_limits: AuthRateLimits,
     trusted_proxies: Vec<IpNet>,
-    redis: redis::Client,
+    redis: Option<redis::Client>,
 }
 
 impl<S, B> Service<ServiceRequest> for RateLimiterMiddleware<S>
@@ -164,75 +164,77 @@ where
             let mut limited = false;
             let redis_key = format!("rate:{}:{}", route_limit.key, key);
 
-            // Fail-open fast: if Redis is slow/down, do not block request path.
-            let conn_result = timeout(
-                Duration::from_millis(120),
-                redis.get_multiplexed_async_connection(),
-            )
-            .await;
+            if let Some(redis) = redis {
+                // Fail-open fast: if Redis is slow/down, do not block request path.
+                let conn_result = timeout(
+                    Duration::from_millis(120),
+                    redis.get_multiplexed_async_connection(),
+                )
+                .await;
 
-            match conn_result {
-                Ok(Ok(mut conn)) => {
-                    let count_result =
-                        timeout(Duration::from_millis(120), conn.incr(&redis_key, 1)).await;
-                    match count_result {
-                        Ok(Ok(count)) => {
-                            let count: i64 = count;
-                            if count == 1 {
-                                let expire_result = timeout(
-                                    Duration::from_millis(120),
-                                    conn.expire::<_, ()>(&redis_key, 60),
-                                )
-                                .await;
-                                match expire_result {
-                                    Ok(Ok(())) => {}
-                                    Ok(Err(err)) => tracing::warn!(
-                                        route = route_limit.key,
-                                        requester = %key,
-                                        redis_key = %redis_key,
-                                        error = %err,
-                                        "rate limit expire failed open"
-                                    ),
-                                    Err(_) => tracing::warn!(
-                                        route = route_limit.key,
-                                        requester = %key,
-                                        redis_key = %redis_key,
-                                        "rate limit expire timed out; failing open"
-                                    ),
+                match conn_result {
+                    Ok(Ok(mut conn)) => {
+                        let count_result =
+                            timeout(Duration::from_millis(120), conn.incr(&redis_key, 1)).await;
+                        match count_result {
+                            Ok(Ok(count)) => {
+                                let count: i64 = count;
+                                if count == 1 {
+                                    let expire_result = timeout(
+                                        Duration::from_millis(120),
+                                        conn.expire::<_, ()>(&redis_key, 60),
+                                    )
+                                    .await;
+                                    match expire_result {
+                                        Ok(Ok(())) => {}
+                                        Ok(Err(err)) => tracing::warn!(
+                                            route = route_limit.key,
+                                            requester = %key,
+                                            redis_key = %redis_key,
+                                            error = %err,
+                                            "rate limit expire failed open"
+                                        ),
+                                        Err(_) => tracing::warn!(
+                                            route = route_limit.key,
+                                            requester = %key,
+                                            redis_key = %redis_key,
+                                            "rate limit expire timed out; failing open"
+                                        ),
+                                    }
+                                }
+                                if count as u32 > route_limit.max_per_minute {
+                                    limited = true;
                                 }
                             }
-                            if count as u32 > route_limit.max_per_minute {
-                                limited = true;
-                            }
+                            Ok(Err(err)) => tracing::warn!(
+                                route = route_limit.key,
+                                requester = %key,
+                                redis_key = %redis_key,
+                                error = %err,
+                                "rate limit increment failed open"
+                            ),
+                            Err(_) => tracing::warn!(
+                                route = route_limit.key,
+                                requester = %key,
+                                redis_key = %redis_key,
+                                "rate limit increment timed out; failing open"
+                            ),
                         }
-                        Ok(Err(err)) => tracing::warn!(
-                            route = route_limit.key,
-                            requester = %key,
-                            redis_key = %redis_key,
-                            error = %err,
-                            "rate limit increment failed open"
-                        ),
-                        Err(_) => tracing::warn!(
-                            route = route_limit.key,
-                            requester = %key,
-                            redis_key = %redis_key,
-                            "rate limit increment timed out; failing open"
-                        ),
                     }
+                    Ok(Err(err)) => tracing::warn!(
+                        route = route_limit.key,
+                        requester = %key,
+                        redis_key = %redis_key,
+                        error = %err,
+                        "rate limit redis connection failed open"
+                    ),
+                    Err(_) => tracing::warn!(
+                        route = route_limit.key,
+                        requester = %key,
+                        redis_key = %redis_key,
+                        "rate limit redis connection timed out; failing open"
+                    ),
                 }
-                Ok(Err(err)) => tracing::warn!(
-                    route = route_limit.key,
-                    requester = %key,
-                    redis_key = %redis_key,
-                    error = %err,
-                    "rate limit redis connection failed open"
-                ),
-                Err(_) => tracing::warn!(
-                    route = route_limit.key,
-                    requester = %key,
-                    redis_key = %redis_key,
-                    "rate limit redis connection timed out; failing open"
-                ),
             }
 
             if limited {

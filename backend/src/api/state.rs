@@ -28,5 +28,5 @@ pub struct AppState {
     pub gcs_bucket: Option<String>,
     pub gcs_key_json_path: Option<String>,
     pub gcs_signed_url_ttl_secs: u32,
-    pub redis: redis::Client,
+    pub redis: Option<redis::Client>,
 }

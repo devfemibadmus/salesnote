@@ -67,6 +67,8 @@ pub struct Settings {
     pub password_min_chars: usize,
     #[serde(default = "default_password_max_chars")]
     pub password_max_chars: usize,
+    #[serde(default = "default_use_redis")]
+    pub use_redis: bool,
     pub redis_url: String,
     pub smtp_host: String,
     pub smtp_port: u16,
@@ -504,6 +506,10 @@ fn default_password_min_chars() -> usize {
 
 fn default_password_max_chars() -> usize {
     128
+}
+
+fn default_use_redis() -> bool {
+    true
 }
 
 fn default_gcs_signed_url_ttl_secs() -> u32 {
