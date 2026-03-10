@@ -837,7 +837,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
       final createdSale = await _api.createSale(input);
       await _updateLocalCachesAfterSaleCreate(createdSale);
-      unawaited(_refreshPostCreateCachesAfterSaleCreate());
+      unawaited(_refreshPostCreateCachesAfterSaleCreate(createdSale.status));
       await _clearActiveDraftAfterSubmit();
       if (!mounted) return null;
       _showSnackBar(_successMessage);
@@ -852,7 +852,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   }
 
   Future<void> _updateLocalCachesAfterSaleCreate(Sale createdSale) async {
-    final salesCache = CacheLoader.loadSalesPageCache(includeItems: false);
+    final salesCache = CacheLoader.loadSalesPageCache(
+      includeItems: false,
+      status: createdSale.status,
+    );
     if (salesCache != null) {
       try {
         final cachedSales = salesCache.sales;
@@ -862,6 +865,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         ];
         await CacheLoader.saveSalesPageCache(
           includeItems: false,
+          status: createdSale.status,
           data: CachedSalesPage(
             sales: deduped,
             page: salesCache.page,
@@ -871,8 +875,11 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       } catch (_) {}
     }
 
-    final itemsCache = CacheLoader.loadSalesPageCache(includeItems: true);
-    if (itemsCache != null) {
+    final itemsCache = CacheLoader.loadSalesPageCache(
+      includeItems: true,
+      status: SaleStatus.paid,
+    );
+    if (itemsCache != null && createdSale.isPaidReceipt) {
       try {
         final cachedSales = itemsCache.sales;
         final deduped = <Sale>[
@@ -881,6 +888,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         ];
         await CacheLoader.saveSalesPageCache(
           includeItems: true,
+          status: SaleStatus.paid,
           data: CachedSalesPage(
             sales: deduped,
             page: itemsCache.page,
@@ -901,18 +909,31 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     await CacheLoader.saveItemSuggestionsCache(merged.toList());
   }
 
-  Future<void> _refreshPostCreateCachesAfterSaleCreate() async {
+  Future<void> _refreshPostCreateCachesAfterSaleCreate(SaleStatus status) async {
     final bgApi = ApiClient(TokenStore());
     try {
-      await Future.wait<void>([
-        CacheLoader.fetchAndCacheHomeSummary(bgApi),
+      final tasks = <Future<void>>[
         CacheLoader.fetchAndCacheSalesPage(
           bgApi,
           includeItems: false,
           page: 1,
           perPage: _salesRefreshPerPage,
+          status: status,
         ).then((_) {}),
-      ]);
+      ];
+      if (status == SaleStatus.paid) {
+        tasks.add(CacheLoader.fetchAndCacheHomeSummary(bgApi));
+        tasks.add(
+          CacheLoader.fetchAndCacheSalesPage(
+            bgApi,
+            includeItems: true,
+            page: 1,
+            perPage: _salesRefreshPerPage,
+            status: SaleStatus.paid,
+          ).then((_) {}),
+        );
+      }
+      await Future.wait<void>(tasks);
     } catch (_) {
       // Ignore refresh failure; local optimistic caches are already updated.
     } finally {

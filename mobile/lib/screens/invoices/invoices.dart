@@ -67,6 +67,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     _invoiceLocale = ctx.locale;
     _invoiceCurrencySymbol = ctx.symbol;
     _searchController.addListener(_onSearchChanged);
+    PreviewService.cacheRevision.addListener(_onPreviewCacheChanged);
     _loadInvoicesFromCacheOrApi();
   }
 
@@ -79,14 +80,17 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
   }
 
   Future<void> _loadInvoicesFromCacheOrApi() async {
-    final cached = CacheLoader.loadSalesPageCache(includeItems: false);
+    final cached = CacheLoader.loadSalesPageCache(
+      includeItems: false,
+      status: SaleStatus.invoice,
+    );
     if (cached != null) {
       if (!mounted) return;
       setState(() {
         _sales = cached.sales;
         _page = cached.page;
         _hasMore = cached.hasMore;
-        _baseDataKnownEmpty = _invoiceRows(cached.sales).isEmpty;
+        _baseDataKnownEmpty = cached.sales.isEmpty;
         _error = null;
         _loading = false;
       });
@@ -136,13 +140,14 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
           includeItems: false,
           page: 1,
           perPage: _perPage,
+          status: SaleStatus.invoice,
         );
         if (mounted) {
           setState(() {
             _sales = loaded.sales;
             _page = loaded.page;
             _hasMore = loaded.hasMore;
-            _baseDataKnownEmpty = _invoiceRows(loaded.sales).isEmpty;
+            _baseDataKnownEmpty = loaded.sales.isEmpty;
             _error = null;
             _loading = false;
           });
@@ -159,8 +164,27 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     _api.dispose();
     _searchDebounce?.cancel();
     _searchController.removeListener(_onSearchChanged);
+    PreviewService.cacheRevision.removeListener(_onPreviewCacheChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onPreviewCacheChanged() {
+    if (!mounted) return;
+    if (_hasActiveFiltersForQuery(_query.trim())) {
+      unawaited(_refreshInvoicesInBackground());
+      return;
+    }
+    final cached = CacheLoader.loadSalesPageCache(
+      includeItems: false,
+      status: SaleStatus.invoice,
+    );
+    setState(() {
+      _sales = cached?.sales ?? <Sale>[];
+      _page = cached?.page ?? 1;
+      _hasMore = cached?.hasMore ?? true;
+      _baseDataKnownEmpty = _sales.isEmpty;
+    });
   }
 
   void _onSearchChanged() {
@@ -235,6 +259,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         includeItems: false,
         page: 1,
         perPage: perPage,
+        status: SaleStatus.invoice,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
@@ -246,7 +271,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         _page = loaded.page;
         _hasMore = !hasActiveFilters && loaded.hasMore;
         if (!hasActiveFilters) {
-          _baseDataKnownEmpty = _invoiceRows(loaded.sales).isEmpty;
+          _baseDataKnownEmpty = loaded.sales.isEmpty;
         }
       });
     } catch (e) {
@@ -269,6 +294,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         includeItems: false,
         page: 1,
         perPage: perPage,
+        status: SaleStatus.invoice,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
@@ -280,7 +306,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         _page = loaded.page;
         _hasMore = !hasActiveFilters && loaded.hasMore;
         if (!hasActiveFilters) {
-          _baseDataKnownEmpty = _invoiceRows(loaded.sales).isEmpty;
+          _baseDataKnownEmpty = loaded.sales.isEmpty;
         }
         _error = null;
       });
@@ -300,6 +326,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
         includeItems: false,
         page: nextPage,
         perPage: _perPage,
+        status: SaleStatus.invoice,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
@@ -319,6 +346,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
       if (activeQuery.isEmpty) {
         await CacheLoader.saveSalesPageCache(
           includeItems: false,
+          status: SaleStatus.invoice,
           data: CachedSalesPage(sales: _sales, page: _page, hasMore: _hasMore),
         );
       }
@@ -335,19 +363,14 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     }
   }
 
-  List<Sale> _invoiceRows(List<Sale> source) {
-    return source.where((sale) => sale.isInvoice).toList();
-  }
-
   List<Sale> get _filteredInvoices {
-    final invoices = _invoiceRows(_sales);
     final normalized = _query.trim().toLowerCase();
     final hasSearch = normalized.isNotEmpty;
     final hasDates = _startDate != null || _endDate != null;
 
-    if (!hasSearch && !hasDates) return invoices;
+    if (!hasSearch && !hasDates) return _sales;
 
-    return invoices.where((sale) {
+    return _sales.where((sale) {
       if (hasSearch) {
         final customer = (sale.customerName ?? '').toLowerCase();
         final idText = sale.id.toLowerCase();
@@ -371,7 +394,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
     return query.isNotEmpty || _startDate != null || _endDate != null;
   }
 
-  bool get _isDataEmpty => !_loading && _invoiceRows(_sales).isEmpty;
+  bool get _isDataEmpty => !_loading && _sales.isEmpty;
 
   bool get _shouldShowFullEmptyState =>
       _isDataEmpty && _query.trim().isEmpty && _startDate == null && _endDate == null && _baseDataKnownEmpty;

@@ -145,9 +145,10 @@ class CacheLoader {
   static Future<CachedSalesPage?> loadOrFetchSalesPage(
     ApiClient api, {
     required bool includeItems,
+    SaleStatus? status,
     required int perPage,
   }) async {
-    final cached = loadSalesPageCache(includeItems: includeItems);
+    final cached = loadSalesPageCache(includeItems: includeItems, status: status);
     if (cached != null) return cached;
 
     try {
@@ -155,13 +156,18 @@ class CacheLoader {
         page: 1,
         perPage: perPage,
         includeItems: includeItems,
+        status: status,
       );
       final pageData = CachedSalesPage(
         sales: sales,
         page: 1,
         hasMore: sales.length == perPage,
       );
-      await saveSalesPageCache(includeItems: includeItems, data: pageData);
+      await saveSalesPageCache(
+        includeItems: includeItems,
+        status: status,
+        data: pageData,
+      );
       return pageData;
     } catch (_) {
       return null;
@@ -173,6 +179,7 @@ class CacheLoader {
     required bool includeItems,
     required int page,
     required int perPage,
+    SaleStatus? status,
     String? searchQuery,
     DateTime? startDate,
     DateTime? endDate,
@@ -181,6 +188,7 @@ class CacheLoader {
       page: page,
       perPage: perPage,
       includeItems: includeItems,
+      status: status,
       searchQuery: searchQuery,
       startDate: startDate,
       endDate: endDate,
@@ -196,14 +204,24 @@ class CacheLoader {
         startDate == null &&
         endDate == null;
     if (shouldCacheFirstPage) {
-      await saveSalesPageCache(includeItems: includeItems, data: pageData);
+      await saveSalesPageCache(
+        includeItems: includeItems,
+        status: status,
+        data: pageData,
+      );
     }
 
     return pageData;
   }
 
-  static CachedSalesPage? loadSalesPageCache({required bool includeItems}) {
-    final raw = LocalCache.loadSalesPage(includeItems: includeItems);
+  static CachedSalesPage? loadSalesPageCache({
+    required bool includeItems,
+    SaleStatus? status,
+  }) {
+    final raw = LocalCache.loadSalesPage(
+      includeItems: includeItems,
+      status: status,
+    );
     if (raw == null) return null;
     try {
       final salesRaw = (raw['sales'] as List).cast<dynamic>();
@@ -220,10 +238,12 @@ class CacheLoader {
 
   static Future<void> saveSalesPageCache({
     required bool includeItems,
+    SaleStatus? status,
     required CachedSalesPage data,
   }) {
     return LocalCache.saveSalesPage(
       includeItems: includeItems,
+      status: status,
       sales: data.sales.map((e) => e.toJson()).toList(),
       page: data.page,
       hasMore: data.hasMore,

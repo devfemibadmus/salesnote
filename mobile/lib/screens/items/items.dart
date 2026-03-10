@@ -73,7 +73,10 @@ class _ItemsScreenState extends State<ItemsScreen> {
   }
 
   Future<void> _loadItemsFromCacheOrApi() async {
-    final cached = CacheLoader.loadSalesPageCache(includeItems: true);
+    final cached = CacheLoader.loadSalesPageCache(
+      includeItems: true,
+      status: SaleStatus.paid,
+    );
     if (cached != null) {
       if (!mounted) return;
       setState(() {
@@ -173,6 +176,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
         includeItems: true,
         page: 1,
         perPage: perPage,
+        status: SaleStatus.paid,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
@@ -207,6 +211,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
         includeItems: true,
         page: 1,
         perPage: perPage,
+        status: SaleStatus.paid,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
@@ -238,6 +243,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
         includeItems: true,
         page: nextPage,
         perPage: _perPage,
+        status: SaleStatus.paid,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
@@ -257,6 +263,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       if (activeQuery.isEmpty) {
         await CacheLoader.saveSalesPageCache(
           includeItems: true,
+          status: SaleStatus.paid,
           data: CachedSalesPage(sales: _sales, page: _page, hasMore: _hasMore),
         );
       }

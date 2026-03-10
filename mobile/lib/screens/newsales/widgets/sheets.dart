@@ -125,7 +125,10 @@ class _AddItemSheetState extends State<_AddItemSheet> {
       return;
     }
 
-    final cachedItemsPage = CacheLoader.loadSalesPageCache(includeItems: true);
+    final cachedItemsPage = CacheLoader.loadSalesPageCache(
+      includeItems: true,
+      status: SaleStatus.paid,
+    );
     if (cachedItemsPage != null) {
       final names = _extractItemNamesFromSales(cachedItemsPage.sales);
       if (names.isNotEmpty) {
@@ -179,6 +182,7 @@ class _AddItemSheetState extends State<_AddItemSheet> {
         includeItems: true,
         page: 1,
         perPage: 100,
+        status: SaleStatus.paid,
       );
       final sales = loaded.sales;
       final names = <String>{};
@@ -197,7 +201,11 @@ class _AddItemSheetState extends State<_AddItemSheet> {
       _rebuildVisibleSuggestions();
       if (mounted) setState(() {});
       await CacheLoader.saveItemSuggestionsCache(_itemSuggestionsCache);
-      await CacheLoader.saveSalesPageCache(includeItems: true, data: loaded);
+      await CacheLoader.saveSalesPageCache(
+        includeItems: true,
+        status: SaleStatus.paid,
+        data: loaded,
+      );
     } catch (_) {}
   }
 

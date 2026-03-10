@@ -6,6 +6,8 @@ import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../data/models.dart';
+
 class LocalCache {
   static const _receiptsBox = 'receipts_cache';
   static const _receiptDetailBox = 'receipt_detail_cache';
@@ -242,24 +244,37 @@ class LocalCache {
 
   static Future<void> saveSalesPage({
     required bool includeItems,
+    SaleStatus? status,
     required List<Map<String, dynamic>> sales,
     required int page,
     required bool hasMore,
   }) async {
     final box = Hive.box<String>(_pageBox);
-    final key = includeItems ? 'items_page' : 'sales_page';
+    final key = _salesPageKey(includeItems: includeItems, status: status);
     await box.put(
       key,
       jsonEncode({'sales': sales, 'page': page, 'has_more': hasMore}),
     );
   }
 
-  static Map<String, dynamic>? loadSalesPage({required bool includeItems}) {
+  static Map<String, dynamic>? loadSalesPage({
+    required bool includeItems,
+    SaleStatus? status,
+  }) {
     final box = Hive.box<String>(_pageBox);
-    final key = includeItems ? 'items_page' : 'sales_page';
+    final key = _salesPageKey(includeItems: includeItems, status: status);
     final raw = box.get(key);
     if (raw == null) return null;
     return jsonDecode(raw) as Map<String, dynamic>;
+  }
+
+  static String _salesPageKey({
+    required bool includeItems,
+    SaleStatus? status,
+  }) {
+    final prefix = includeItems ? 'items_page' : 'sales_page';
+    final suffix = status == null ? 'all' : status.name;
+    return '${prefix}_$suffix';
   }
 
   static Future<void> saveSettingsSummary(Map<String, dynamic> data) async {

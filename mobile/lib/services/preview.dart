@@ -12,6 +12,7 @@ class PreviewService {
   PreviewService._();
 
   static bool _opening = false;
+  static final ValueNotifier<int> cacheRevision = ValueNotifier<int>(0);
 
   static Future<void> openById(String saleId) async {
     final navigator = AppNavigator.key.currentState;
@@ -95,6 +96,13 @@ class PreviewService {
                     signature: signature,
                   )
               : null,
+          onDelete: saleDetail.isInvoice
+              ? () => _deleteInvoice(
+                    api: api,
+                    navigator: navigator,
+                    saleId: saleId,
+                  )
+              : null,
         ),
       );
 
@@ -119,6 +127,10 @@ class PreviewService {
         SaleUpdateInput(status: SaleStatus.paid),
       );
       await _updateSaleCaches(updatedSale);
+      try {
+        await CacheLoader.fetchAndCacheHomeSummary(api);
+      } catch (_) {}
+      _notifyCacheChanged();
       if (!previewContext.mounted || !navigator.mounted) return;
       AppNotice.show(previewContext, 'Invoice marked as paid.');
       await navigator.pushReplacement(
@@ -162,15 +174,62 @@ class PreviewService {
     }
   }
 
+  static Future<void> _deleteInvoice({
+    required ApiClient api,
+    required NavigatorState navigator,
+    required String saleId,
+  }) async {
+    final previewContext = navigator.context;
+    try {
+      await api.deleteSale(saleId);
+      await _removeDeletedInvoiceCaches(saleId);
+      _notifyCacheChanged();
+      if (!previewContext.mounted || !navigator.mounted) return;
+      AppNotice.show(previewContext, 'Invoice deleted.');
+      navigator.pop();
+    } catch (e) {
+      if (!navigator.mounted) return;
+      AppNotice.show(
+        navigator.context,
+        e is ApiException ? e.message : 'Unable to delete invoice.',
+      );
+    }
+  }
+
   static Future<void> _updateSaleCaches(Sale updatedSale) async {
     await CacheLoader.saveSalePreviewCache(updatedSale);
-    final salesCache = CacheLoader.loadSalesPageCache(includeItems: false);
-    if (salesCache != null) {
-      final next = salesCache.sales
-          .map((sale) => sale.id == updatedSale.id ? updatedSale : sale)
+
+    final invoiceCache = CacheLoader.loadSalesPageCache(
+      includeItems: false,
+      status: SaleStatus.invoice,
+    );
+    if (invoiceCache != null) {
+      final next = invoiceCache.sales
+          .where((sale) => sale.id != updatedSale.id)
           .toList();
       await CacheLoader.saveSalesPageCache(
         includeItems: false,
+        status: SaleStatus.invoice,
+        data: CachedSalesPage(
+          sales: next,
+          page: invoiceCache.page,
+          hasMore: invoiceCache.hasMore,
+        ),
+      );
+    }
+
+    final salesCache = CacheLoader.loadSalesPageCache(
+      includeItems: false,
+      status: SaleStatus.paid,
+    );
+    if (salesCache != null) {
+      final next = <Sale>[
+        updatedSale,
+        ...salesCache.sales.where((sale) => sale.id != updatedSale.id),
+      ];
+      await CacheLoader.saveSalesPageCache(
+        includeItems: false,
+        status: SaleStatus.paid,
         data: CachedSalesPage(
           sales: next,
           page: salesCache.page,
@@ -178,13 +237,19 @@ class PreviewService {
         ),
       );
     }
-    final itemsCache = CacheLoader.loadSalesPageCache(includeItems: true);
+
+    final itemsCache = CacheLoader.loadSalesPageCache(
+      includeItems: true,
+      status: SaleStatus.paid,
+    );
     if (itemsCache != null) {
-      final next = itemsCache.sales
-          .map((sale) => sale.id == updatedSale.id ? updatedSale : sale)
-          .toList();
+      final next = <Sale>[
+        updatedSale,
+        ...itemsCache.sales.where((sale) => sale.id != updatedSale.id),
+      ];
       await CacheLoader.saveSalesPageCache(
         includeItems: true,
+        status: SaleStatus.paid,
         data: CachedSalesPage(
           sales: next,
           page: itemsCache.page,
@@ -192,5 +257,30 @@ class PreviewService {
         ),
       );
     }
+  }
+
+  static Future<void> _removeDeletedInvoiceCaches(String saleId) async {
+    final invoiceCache = CacheLoader.loadSalesPageCache(
+      includeItems: false,
+      status: SaleStatus.invoice,
+    );
+    if (invoiceCache != null) {
+      final next = invoiceCache.sales
+          .where((sale) => sale.id != saleId)
+          .toList();
+      await CacheLoader.saveSalesPageCache(
+        includeItems: false,
+        status: SaleStatus.invoice,
+        data: CachedSalesPage(
+          sales: next,
+          page: invoiceCache.page,
+          hasMore: invoiceCache.hasMore,
+        ),
+      );
+    }
+  }
+
+  static void _notifyCacheChanged() {
+    cacheRevision.value = cacheRevision.value + 1;
   }
 }

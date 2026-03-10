@@ -23,6 +23,7 @@ class SalePreviewScreen extends StatefulWidget {
     this.createdAt,
     this.onCreate,
     this.onMarkAsPaid,
+    this.onDelete,
     this.onDownloadPdf,
   });
 
@@ -46,6 +47,7 @@ class SalePreviewScreen extends StatefulWidget {
   final DateTime? createdAt;
   final Future<String?> Function()? onCreate;
   final Future<void> Function()? onMarkAsPaid;
+  final Future<void> Function()? onDelete;
   final Future<void> Function()? onDownloadPdf;
 
   @override
@@ -54,7 +56,9 @@ class SalePreviewScreen extends StatefulWidget {
 
 class _SalePreviewScreenState extends State<SalePreviewScreen> {
   static const double _singlePageOverflowTolerancePx = 28;
-  bool _busy = false;
+  bool _documentBusy = false;
+  bool _statusBusy = false;
+  bool _deleteBusy = false;
   bool _fitsSinglePage = false;
   late final String _currencySymbol;
   late final String _currencyLocale;
@@ -92,31 +96,43 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
   }
 
   Future<void> _handleCreate() async {
-    if (_busy || widget.onCreate == null) return;
-    setState(() => _busy = true);
+    if (_isAnyBusy || widget.onCreate == null) return;
+    setState(() => _statusBusy = true);
     final createdSaleId = await widget.onCreate!.call();
     if (!mounted) return;
-    setState(() => _busy = false);
+    setState(() => _statusBusy = false);
     if (createdSaleId != null && createdSaleId.isNotEmpty) {
       Navigator.of(context).pop(createdSaleId);
     }
   }
 
   Future<void> _handleMarkAsPaid() async {
-    if (_busy || widget.onMarkAsPaid == null) return;
-    setState(() => _busy = true);
+    if (_isAnyBusy || widget.onMarkAsPaid == null) return;
+    setState(() => _statusBusy = true);
     try {
       await widget.onMarkAsPaid!.call();
     } finally {
       if (mounted) {
-        setState(() => _busy = false);
+        setState(() => _statusBusy = false);
+      }
+    }
+  }
+
+  Future<void> _handleDelete() async {
+    if (_isAnyBusy || widget.onDelete == null) return;
+    setState(() => _deleteBusy = true);
+    try {
+      await widget.onDelete!.call();
+    } finally {
+      if (mounted) {
+        setState(() => _deleteBusy = false);
       }
     }
   }
 
   Future<void> _handleDownloadPdf() async {
-    if (_busy) return;
-    setState(() => _busy = true);
+    if (_isAnyBusy) return;
+    setState(() => _documentBusy = true);
     try {
       final bytes = await _buildReceiptPdfBytes();
       await _savePdfToDevice(bytes);
@@ -127,13 +143,13 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
       AppNotice.show(context, 'Failed to download PDF: $e');
     } finally {
       if (mounted) {
-        setState(() => _busy = false);
+        setState(() => _documentBusy = false);
       }
     }
   }
 
   Future<void> _handleDownloadImage() async {
-    if (_busy) return;
+    if (_isAnyBusy) return;
     if (!_fitsSinglePage) {
       AppNotice.show(
         context,
@@ -141,7 +157,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
       );
       return;
     }
-    setState(() => _busy = true);
+    setState(() => _documentBusy = true);
     try {
       final bytes = await _buildReceiptImageBytes();
       await _saveImageToDevice(bytes);
@@ -152,14 +168,14 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
       AppNotice.show(context, 'Failed to download image: $e');
     } finally {
       if (mounted) {
-        setState(() => _busy = false);
+        setState(() => _documentBusy = false);
       }
     }
   }
 
   Future<void> _handleShare() async {
-    if (_busy) return;
-    setState(() => _busy = true);
+    if (_isAnyBusy) return;
+    setState(() => _documentBusy = true);
     try {
       final bytes = await _buildReceiptPdfBytes();
       final fileName = _receiptFileName('pdf');
@@ -171,10 +187,12 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
       AppNotice.show(context, 'Failed to share receipt: $e');
     } finally {
       if (mounted) {
-        setState(() => _busy = false);
+        setState(() => _documentBusy = false);
       }
     }
   }
+
+  bool get _isAnyBusy => _documentBusy || _statusBusy || _deleteBusy;
 
   Widget _buildReceiptActionButton({
     required IconData icon,
@@ -205,6 +223,8 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
   Widget _buildCreatedSaleActions() {
     final showMarkAsPaid =
         widget.status == SaleStatus.invoice && widget.onMarkAsPaid != null;
+    final showDelete =
+        widget.status == SaleStatus.invoice && widget.onDelete != null;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -214,7 +234,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
               child: _buildReceiptActionButton(
                 icon: Icons.picture_as_pdf_outlined,
                 label: 'PDF',
-                onPressed: _busy ? null : _handleDownloadPdf,
+                onPressed: _isAnyBusy ? null : _handleDownloadPdf,
               ),
             ),
             const SizedBox(width: 10),
@@ -222,7 +242,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
               child: _buildReceiptActionButton(
                 icon: Icons.image_outlined,
                 label: 'Image',
-                onPressed: (_busy || !_fitsSinglePage)
+                onPressed: (_isAnyBusy || !_fitsSinglePage)
                     ? null
                     : _handleDownloadImage,
               ),
@@ -232,7 +252,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
               child: _buildReceiptActionButton(
                 icon: Icons.share_outlined,
                 label: 'Share',
-                onPressed: _busy ? null : _handleShare,
+                onPressed: _isAnyBusy ? null : _handleShare,
               ),
             ),
           ],
@@ -255,7 +275,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
             width: double.infinity,
             height: 56,
             child: ElevatedButton.icon(
-              onPressed: _busy ? null : _handleMarkAsPaid,
+              onPressed: _isAnyBusy ? null : _handleMarkAsPaid,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF1677E6),
                 foregroundColor: Colors.white,
@@ -263,7 +283,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              icon: _busy
+              icon: _statusBusy
                   ? const SizedBox(
                       width: 18,
                       height: 18,
@@ -274,7 +294,41 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                     )
                   : const Icon(Icons.check_circle_outline_rounded),
               label: Text(
-                _busy ? 'Updating...' : 'Mark as paid',
+                _statusBusy ? 'Updating...' : 'Mark as paid',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        ],
+        if (showDelete) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: OutlinedButton.icon(
+              onPressed: _isAnyBusy ? null : _handleDelete,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFD14343),
+                side: const BorderSide(color: Color(0xFFF2B8B8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              icon: _deleteBusy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFD14343),
+                      ),
+                    )
+                  : const Icon(Icons.delete_outline_rounded),
+              label: Text(
+                _deleteBusy ? 'Deleting...' : 'Delete invoice',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -328,7 +382,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     final customerBottomValue = customerContact.isNotEmpty ? customerName : '';
 
     return PopScope(
-      canPop: !_busy,
+      canPop: !_isAnyBusy,
       child: Scaffold(
         backgroundColor: const Color(0xFFF3F4F6),
         body: SafeArea(
@@ -339,7 +393,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      onPressed: _busy
+                      onPressed: _isAnyBusy
                           ? null
                           : () => Navigator.of(context).pop(),
                       icon: const Icon(
@@ -732,7 +786,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                         width: double.infinity,
                         height: 58,
                         child: ElevatedButton.icon(
-                          onPressed: _busy ? null : _handleCreate,
+                          onPressed: _isAnyBusy ? null : _handleCreate,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF1677E6),
                             foregroundColor: Colors.white,
@@ -742,7 +796,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                             elevation: 6,
                             shadowColor: const Color(0x331677E6),
                           ),
-                          icon: _busy
+                          icon: _statusBusy
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
@@ -753,7 +807,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                                 )
                               : const Icon(Icons.check_rounded),
                           label: Text(
-                            _busy
+                            _statusBusy
                                 ? 'Creating...'
                                 : (widget.status == SaleStatus.invoice
                                       ? 'Create Invoice'

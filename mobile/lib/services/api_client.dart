@@ -530,6 +530,7 @@ class ApiClient {
     int? page,
     int? perPage,
     bool includeItems = true,
+    SaleStatus? status,
     String? searchQuery,
     DateTime? startDate,
     DateTime? endDate,
@@ -548,6 +549,9 @@ class ApiClient {
       if (page != null) query['page'] = page.toString();
       if (perPage != null) query['per_page'] = perPage.toString();
       query['include_items'] = includeItems.toString();
+      if (status != null) {
+        query['status'] = status.name;
+      }
       if (normalizedSearch != null && normalizedSearch.isNotEmpty) {
         query['q'] = normalizedSearch;
       }

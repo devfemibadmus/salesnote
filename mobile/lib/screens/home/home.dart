@@ -88,8 +88,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     _syncHomeCurrencyFormatter();
     WidgetsBinding.instance.addObserver(this);
+    PreviewService.cacheRevision.addListener(_onPreviewCacheChanged);
     _loadHomeFromCacheOrApi();
     WidgetsBinding.instance.addPostFrameCallback((_) => _setupNotifications());
+  }
+
+  void _onPreviewCacheChanged() {
+    if (!mounted) return;
+    final data = CacheLoader.loadHomeSummaryCache();
+    if (data != null) {
+      final mergedShop = _mergeShopWithSettingsCache(data.shop);
+      setState(() {
+        _shop = mergedShop;
+        _analytics = data.analytics;
+        _sales = data.recentSales;
+        _error = null;
+        _loading = false;
+      });
+      return;
+    }
+    unawaited(_refreshHomeInBackground());
   }
 
   @override
@@ -322,6 +340,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    PreviewService.cacheRevision.removeListener(_onPreviewCacheChanged);
     WidgetsBinding.instance.removeObserver(this);
     _api.dispose();
     super.dispose();

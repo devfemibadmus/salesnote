@@ -155,6 +155,7 @@ pub struct AuthorizedSaleListPayload {
     pub page: i64,
     pub per_page: i64,
     pub include_items: bool,
+    pub status: Option<SaleStatus>,
     pub search_query: Option<String>,
     pub start_date: Option<NaiveDate>,
     pub end_date: Option<NaiveDate>,
@@ -314,6 +315,7 @@ impl Sale {
               FROM sales
               WHERE shop_id = $1
                 AND EXISTS (SELECT 1 FROM auth_active)
+                AND ($9::text IS NULL OR status = $9::text)
                 AND (
                   $5::text IS NULL
                   OR customer_name ILIKE CONCAT('%', $5::text, '%')
@@ -384,6 +386,7 @@ impl Sale {
             .bind(payload.include_items)
             .bind(payload.start_date)
             .bind(payload.end_date)
+            .bind(payload.status.map(|status| status.as_str()))
             .fetch_one(pool)
             .await?;
 

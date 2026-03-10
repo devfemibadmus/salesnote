@@ -50,10 +50,6 @@ class _SalesScreenState extends State<SalesScreen> {
   DateTime? _endDate;
   Timer? _searchDebounce;
 
-  List<Sale> _receiptRows(List<Sale> source) {
-    return source.where((sale) => sale.isPaidReceipt).toList();
-  }
-
   void _goTo(String route, {bool reset = false}) {
     _api.cancelInFlight();
     if (!mounted) return;
@@ -71,6 +67,7 @@ class _SalesScreenState extends State<SalesScreen> {
     _salesLocale = ctx.locale;
     _salesCurrencySymbol = ctx.symbol;
     _searchController.addListener(_onSearchChanged);
+    PreviewService.cacheRevision.addListener(_onPreviewCacheChanged);
     _loadSalesFromCacheOrApi();
   }
 
@@ -83,14 +80,17 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   Future<void> _loadSalesFromCacheOrApi() async {
-    final cached = CacheLoader.loadSalesPageCache(includeItems: false);
+    final cached = CacheLoader.loadSalesPageCache(
+      includeItems: false,
+      status: SaleStatus.paid,
+    );
     if (cached != null) {
       if (!mounted) return;
       setState(() {
         _sales = cached.sales;
         _page = cached.page;
         _hasMore = cached.hasMore;
-        _baseDataKnownEmpty = _receiptRows(cached.sales).isEmpty;
+        _baseDataKnownEmpty = cached.sales.isEmpty;
         _error = null;
         _loading = false;
       });
@@ -140,13 +140,14 @@ class _SalesScreenState extends State<SalesScreen> {
           includeItems: false,
           page: 1,
           perPage: _perPage,
+          status: SaleStatus.paid,
         );
         if (mounted) {
           setState(() {
             _sales = loaded.sales;
             _page = loaded.page;
             _hasMore = loaded.hasMore;
-            _baseDataKnownEmpty = _receiptRows(loaded.sales).isEmpty;
+            _baseDataKnownEmpty = loaded.sales.isEmpty;
             _error = null;
             _loading = false;
           });
@@ -163,8 +164,27 @@ class _SalesScreenState extends State<SalesScreen> {
     _api.dispose();
     _searchDebounce?.cancel();
     _searchController.removeListener(_onSearchChanged);
+    PreviewService.cacheRevision.removeListener(_onPreviewCacheChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onPreviewCacheChanged() {
+    if (!mounted) return;
+    if (_hasActiveFiltersForQuery(_query.trim())) {
+      unawaited(_refreshSalesInBackground());
+      return;
+    }
+    final cached = CacheLoader.loadSalesPageCache(
+      includeItems: false,
+      status: SaleStatus.paid,
+    );
+    setState(() {
+      _sales = cached?.sales ?? <Sale>[];
+      _page = cached?.page ?? 1;
+      _hasMore = cached?.hasMore ?? true;
+      _baseDataKnownEmpty = _sales.isEmpty;
+    });
   }
 
   void _onSearchChanged() {
@@ -239,6 +259,7 @@ class _SalesScreenState extends State<SalesScreen> {
         includeItems: false,
         page: 1,
         perPage: perPage,
+        status: SaleStatus.paid,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
@@ -250,7 +271,7 @@ class _SalesScreenState extends State<SalesScreen> {
         _page = loaded.page;
         _hasMore = !hasActiveFilters && loaded.hasMore;
         if (!hasActiveFilters) {
-          _baseDataKnownEmpty = _receiptRows(loaded.sales).isEmpty;
+          _baseDataKnownEmpty = loaded.sales.isEmpty;
         }
       });
     } catch (e) {
@@ -273,6 +294,7 @@ class _SalesScreenState extends State<SalesScreen> {
         includeItems: false,
         page: 1,
         perPage: perPage,
+        status: SaleStatus.paid,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
@@ -284,7 +306,7 @@ class _SalesScreenState extends State<SalesScreen> {
         _page = loaded.page;
         _hasMore = !hasActiveFilters && loaded.hasMore;
         if (!hasActiveFilters) {
-          _baseDataKnownEmpty = _receiptRows(loaded.sales).isEmpty;
+          _baseDataKnownEmpty = loaded.sales.isEmpty;
         }
         _error = null;
       });
@@ -304,6 +326,7 @@ class _SalesScreenState extends State<SalesScreen> {
         includeItems: false,
         page: nextPage,
         perPage: _perPage,
+        status: SaleStatus.paid,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
         startDate: _startDate,
         endDate: _endDate,
@@ -323,6 +346,7 @@ class _SalesScreenState extends State<SalesScreen> {
       if (activeQuery.isEmpty) {
         await CacheLoader.saveSalesPageCache(
           includeItems: false,
+          status: SaleStatus.paid,
           data: CachedSalesPage(sales: _sales, page: _page, hasMore: _hasMore),
         );
       }
@@ -340,14 +364,13 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   List<Sale> get _filteredSales {
-    final receipts = _receiptRows(_sales);
     final normalized = _query.trim().toLowerCase();
     final hasSearch = normalized.isNotEmpty;
     final hasDates = _startDate != null || _endDate != null;
 
-    if (!hasSearch && !hasDates) return receipts;
+    if (!hasSearch && !hasDates) return _sales;
 
-    return receipts.where((sale) {
+    return _sales.where((sale) {
       if (hasSearch) {
         final customer = (sale.customerName ?? '').toLowerCase();
         final idText = sale.id.toLowerCase();
@@ -371,7 +394,7 @@ class _SalesScreenState extends State<SalesScreen> {
     return query.isNotEmpty || _startDate != null || _endDate != null;
   }
 
-  bool get _isDataEmpty => !_loading && _receiptRows(_sales).isEmpty;
+  bool get _isDataEmpty => !_loading && _sales.isEmpty;
 
   bool get _shouldShowFullEmptyState =>
       _isDataEmpty && _query.trim().isEmpty && _startDate == null && _endDate == null && _baseDataKnownEmpty;
