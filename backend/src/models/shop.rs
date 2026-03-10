@@ -10,6 +10,7 @@ pub struct ShopProfile {
     pub id: i64,
     pub name: String,
     pub phone: String,
+    pub currency_code: String,
     pub email: String,
     pub address: Option<String>,
     pub logo_url: Option<String>,
@@ -91,7 +92,7 @@ impl ShopProfile {
     ) -> Result<Option<ShopProfile>, sqlx::Error> {
         let row = sqlx::query(
             "SELECT
-                s.id, s.name, s.phone, s.email, s.address, s.logo_url,
+                s.id, s.name, s.phone, s.currency_code, s.email, s.address, s.logo_url,
                 s.total_revenue, s.total_orders, s.total_customers, s.timezone,
                 s.created_at::text as created_at,
                 COALESCE((
@@ -122,18 +123,20 @@ impl ShopProfile {
             "UPDATE shops SET
                 name = COALESCE($1, name),
                 phone = COALESCE($2, phone),
-                email = COALESCE($3, email),
-                address = COALESCE($4, address),
-                logo_url = COALESCE($5, logo_url),
-                timezone = COALESCE($6, timezone),
+                currency_code = COALESCE($3, currency_code),
+                email = COALESCE($4, email),
+                address = COALESCE($5, address),
+                logo_url = COALESCE($6, logo_url),
+                timezone = COALESCE($7, timezone),
                 password_hash = CASE
-                  WHEN $7 IS NULL THEN password_hash
-                  ELSE crypt($7, gen_salt('bf', 12))
+                  WHEN $8 IS NULL THEN password_hash
+                  ELSE crypt($8, gen_salt('bf', 12))
                 END
-             WHERE id = $8",
+             WHERE id = $9",
         )
         .bind(&payload.input.name)
         .bind(&payload.input.phone)
+        .bind(payload.input.phone.as_deref().map(currency_code_from_phone))
         .bind(&payload.input.email)
         .bind(&payload.input.address)
         .bind(&payload.input.logo_url)
@@ -155,6 +158,7 @@ impl ShopProfile {
             WITH {}
             SELECT
               s.id, s.name, s.phone, s.email, s.address, s.logo_url,
+              s.currency_code,
               s.total_revenue, s.total_orders, s.total_customers, s.timezone,
               s.created_at::text AS created_at,
               COALESCE((
@@ -196,6 +200,7 @@ impl ShopProfile {
             shop_row AS (
               SELECT
                 s.id, s.name, s.phone, s.email, s.address, s.logo_url,
+                s.currency_code,
                 s.total_revenue, s.total_orders, s.total_customers, s.timezone,
                 s.created_at::text AS created_at,
                 COALESCE((
@@ -303,13 +308,14 @@ impl ShopProfile {
             SET
               name = COALESCE($3, s.name),
               phone = COALESCE($4, s.phone),
-              email = COALESCE($5, s.email),
-              address = COALESCE($6, s.address),
-              logo_url = COALESCE($7, s.logo_url),
-              timezone = COALESCE($8, s.timezone),
+              currency_code = COALESCE($5, s.currency_code),
+              email = COALESCE($6, s.email),
+              address = COALESCE($7, s.address),
+              logo_url = COALESCE($8, s.logo_url),
+              timezone = COALESCE($9, s.timezone),
               password_hash = CASE
-                WHEN $9 IS NULL THEN s.password_hash
-                ELSE crypt($9, gen_salt('bf', 12))
+                WHEN $10 IS NULL THEN s.password_hash
+                ELSE crypt($10, gen_salt('bf', 12))
               END
             WHERE s.id = $1
               AND EXISTS (SELECT 1 FROM auth_active)
@@ -323,6 +329,7 @@ impl ShopProfile {
             .bind(payload.device_id)
             .bind(payload.input.name.as_deref())
             .bind(payload.input.phone.as_deref())
+            .bind(payload.input.phone.as_deref().map(currency_code_from_phone))
             .bind(payload.input.email.as_deref())
             .bind(payload.input.address.as_deref())
             .bind(payload.input.logo_url.as_deref())
@@ -344,6 +351,18 @@ impl ShopProfile {
         tx.commit().await?;
         Ok(profile)
     }
+
+    pub async fn currency_code_by_id(pool: &PgPool, shop_id: i64) -> Result<String, sqlx::Error> {
+        let row = sqlx::query("SELECT currency_code FROM shops WHERE id = $1")
+            .bind(shop_id)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(row
+            .and_then(|row| row.try_get::<String, _>("currency_code").ok())
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| default_currency_code().to_string()))
+    }
 }
 
 fn shop_profile_from_row(row: sqlx::postgres::PgRow) -> Result<ShopProfile, sqlx::Error> {
@@ -355,6 +374,7 @@ fn shop_profile_from_row(row: sqlx::postgres::PgRow) -> Result<ShopProfile, sqlx
         id: row.get("id"),
         name: row.get("name"),
         phone: row.get("phone"),
+        currency_code: row.get("currency_code"),
         email: row.get("email"),
         address: row.get("address"),
         logo_url: row.get("logo_url"),
@@ -410,7 +430,7 @@ async fn load_shop_profile_tx(
 ) -> Result<Option<ShopProfile>, sqlx::Error> {
     let row = sqlx::query(
         "SELECT
-            s.id, s.name, s.phone, s.email, s.address, s.logo_url,
+            s.id, s.name, s.phone, s.currency_code, s.email, s.address, s.logo_url,
             s.total_revenue, s.total_orders, s.total_customers, s.timezone,
             s.created_at::text AS created_at,
             COALESCE((
@@ -436,3 +456,308 @@ async fn load_shop_profile_tx(
     row.map(shop_profile_from_row).transpose()
 }
 
+pub fn default_currency_code() -> &'static str {
+    "NGN"
+}
+
+pub fn currency_code_from_phone(phone: &str) -> &'static str {
+    let normalized = phone.trim();
+    let digits = normalized.trim_start_matches('+');
+    if digits.is_empty() {
+        return default_currency_code();
+    }
+
+    for (code, currency) in PHONE_CODE_TO_CURRENCY {
+        if digits.starts_with(code) {
+            return currency;
+        }
+    }
+
+    default_currency_code()
+}
+
+pub fn currency_symbol(code: &str) -> Option<&'static str> {
+    Some(match code {
+        "NGN" => "₦",
+        "GHS" => "GH₵",
+        "KES" => "KSh",
+        "UGX" => "USh",
+        "TZS" => "TSh",
+        "RWF" => "RF",
+        "ZAR" => "R",
+        "EGP" => "E£",
+        "MAD" => "MAD",
+        "EUR" => "€",
+        "GBP" => "£",
+        "AED" => "AED",
+        "SAR" => "SAR",
+        "QAR" => "QAR",
+        "BHD" => "BHD",
+        "KWD" => "KWD",
+        "OMR" => "OMR",
+        "JOD" => "JOD",
+        "INR" => "₹",
+        "PKR" => "₨",
+        "BDT" => "৳",
+        "LKR" => "Rs",
+        "CNY" => "¥",
+        "JPY" => "¥",
+        "KRW" => "₩",
+        "HKD" => "HK$",
+        "TWD" => "NT$",
+        "SGD" => "S$",
+        "MYR" => "RM",
+        "IDR" => "Rp",
+        "PHP" => "₱",
+        "THB" => "฿",
+        "VND" => "₫",
+        "AUD" => "A$",
+        "NZD" => "NZ$",
+        "CAD" => "C$",
+        "USD" => "$",
+        "BRL" => "R$",
+        "MXN" => "MX$",
+        "ARS" => "AR$",
+        "COP" => "COP",
+        "CLP" => "CLP",
+        "PEN" => "S/",
+        "UYU" => "$U",
+        "PYG" => "₲",
+        "BOB" => "Bs",
+        "CRC" => "₡",
+        "GTQ" => "Q",
+        "HNL" => "L",
+        "NIO" => "C$",
+        "DOP" => "RD$",
+        "JMD" => "J$",
+        "CHF" => "CHF",
+        "SEK" => "kr",
+        "NOK" => "kr",
+        "DKK" => "kr",
+        "PLN" => "zł",
+        "CZK" => "Kč",
+        "HUF" => "Ft",
+        "RON" => "lei",
+        "BGN" => "лв",
+        "UAH" => "₴",
+        "TRY" => "₺",
+        "RUB" => "₽",
+        _ => return None,
+    })
+}
+
+pub fn format_currency_amount(amount: f64, currency_code: &str) -> String {
+    let formatted_amount = format_decimal_amount(amount);
+    if let Some(symbol) = currency_symbol(currency_code) {
+        format!("{symbol}{formatted_amount}")
+    } else {
+        format!("{currency_code} {formatted_amount}")
+    }
+}
+
+fn format_decimal_amount(amount: f64) -> String {
+    let sign = if amount.is_sign_negative() { "-" } else { "" };
+    let rendered = format!("{:.2}", amount.abs());
+    let mut parts = rendered.split('.');
+    let integer = parts.next().unwrap_or("0");
+    let fraction = parts.next().unwrap_or("00");
+    let grouped_integer = group_thousands(integer);
+    format!("{sign}{grouped_integer}.{fraction}")
+}
+
+fn group_thousands(integer: &str) -> String {
+    let mut grouped = String::with_capacity(integer.len() + (integer.len() / 3));
+    for (index, ch) in integer.chars().rev().enumerate() {
+        if index > 0 && index % 3 == 0 {
+            grouped.push(',');
+        }
+        grouped.push(ch);
+    }
+    grouped.chars().rev().collect()
+}
+
+const PHONE_CODE_TO_CURRENCY: &[(&str, &str)] = &[
+    ("971", "AED"),
+    ("966", "SAR"),
+    ("974", "QAR"),
+    ("973", "BHD"),
+    ("965", "KWD"),
+    ("968", "OMR"),
+    ("962", "JOD"),
+    ("972", "ILS"),
+    ("880", "BDT"),
+    ("886", "TWD"),
+    ("856", "LAK"),
+    ("855", "KHR"),
+    ("853", "MOP"),
+    ("852", "HKD"),
+    ("850", "KPW"),
+    ("692", "USD"),
+    ("691", "USD"),
+    ("689", "XPF"),
+    ("688", "AUD"),
+    ("687", "XPF"),
+    ("686", "AUD"),
+    ("685", "WST"),
+    ("683", "NZD"),
+    ("682", "NZD"),
+    ("681", "XPF"),
+    ("680", "USD"),
+    ("679", "FJD"),
+    ("678", "VUV"),
+    ("677", "SBD"),
+    ("676", "TOP"),
+    ("675", "PGK"),
+    ("673", "BND"),
+    ("670", "USD"),
+    ("599", "USD"),
+    ("598", "UYU"),
+    ("597", "SRD"),
+    ("596", "EUR"),
+    ("595", "PYG"),
+    ("594", "EUR"),
+    ("593", "USD"),
+    ("592", "GYD"),
+    ("591", "BOB"),
+    ("590", "EUR"),
+    ("509", "HTG"),
+    ("508", "EUR"),
+    ("507", "USD"),
+    ("506", "CRC"),
+    ("505", "NIO"),
+    ("504", "HNL"),
+    ("503", "USD"),
+    ("502", "GTQ"),
+    ("501", "BZD"),
+    ("500", "FKP"),
+    ("421", "EUR"),
+    ("420", "CZK"),
+    ("389", "MKD"),
+    ("387", "BAM"),
+    ("386", "EUR"),
+    ("385", "EUR"),
+    ("382", "EUR"),
+    ("381", "RSD"),
+    ("380", "UAH"),
+    ("377", "EUR"),
+    ("376", "EUR"),
+    ("375", "BYN"),
+    ("374", "AMD"),
+    ("373", "MDL"),
+    ("372", "EUR"),
+    ("371", "EUR"),
+    ("370", "EUR"),
+    ("359", "BGN"),
+    ("358", "EUR"),
+    ("357", "EUR"),
+    ("356", "EUR"),
+    ("355", "ALL"),
+    ("354", "ISK"),
+    ("353", "EUR"),
+    ("352", "EUR"),
+    ("351", "EUR"),
+    ("299", "DKK"),
+    ("298", "DKK"),
+    ("297", "AWG"),
+    ("290", "SHP"),
+    ("269", "KMF"),
+    ("268", "SZL"),
+    ("267", "BWP"),
+    ("266", "LSL"),
+    ("265", "MWK"),
+    ("264", "NAD"),
+    ("263", "USD"),
+    ("262", "EUR"),
+    ("261", "MGA"),
+    ("260", "ZMW"),
+    ("258", "MZN"),
+    ("257", "BIF"),
+    ("256", "UGX"),
+    ("255", "TZS"),
+    ("254", "KES"),
+    ("253", "DJF"),
+    ("252", "SOS"),
+    ("251", "ETB"),
+    ("250", "RWF"),
+    ("249", "SDG"),
+    ("248", "SCR"),
+    ("247", "SHP"),
+    ("246", "USD"),
+    ("245", "XOF"),
+    ("244", "AOA"),
+    ("243", "CDF"),
+    ("242", "XAF"),
+    ("241", "XAF"),
+    ("240", "XAF"),
+    ("239", "STN"),
+    ("238", "CVE"),
+    ("237", "XAF"),
+    ("236", "XAF"),
+    ("235", "XAF"),
+    ("234", "NGN"),
+    ("233", "GHS"),
+    ("232", "SLL"),
+    ("231", "LRD"),
+    ("230", "MUR"),
+    ("229", "XOF"),
+    ("228", "XOF"),
+    ("227", "XOF"),
+    ("226", "XOF"),
+    ("225", "XOF"),
+    ("224", "GNF"),
+    ("223", "XOF"),
+    ("222", "MRU"),
+    ("221", "XOF"),
+    ("220", "GMD"),
+    ("218", "LYD"),
+    ("216", "TND"),
+    ("213", "DZD"),
+    ("212", "MAD"),
+    ("211", "SSP"),
+    ("98", "IRR"),
+    ("95", "MMK"),
+    ("94", "LKR"),
+    ("93", "AFN"),
+    ("92", "PKR"),
+    ("91", "INR"),
+    ("90", "TRY"),
+    ("86", "CNY"),
+    ("84", "VND"),
+    ("82", "KRW"),
+    ("81", "JPY"),
+    ("66", "THB"),
+    ("65", "SGD"),
+    ("64", "NZD"),
+    ("63", "PHP"),
+    ("62", "IDR"),
+    ("61", "AUD"),
+    ("60", "MYR"),
+    ("58", "VES"),
+    ("57", "COP"),
+    ("56", "CLP"),
+    ("55", "BRL"),
+    ("54", "ARS"),
+    ("53", "CUP"),
+    ("52", "MXN"),
+    ("51", "PEN"),
+    ("49", "EUR"),
+    ("48", "PLN"),
+    ("47", "NOK"),
+    ("46", "SEK"),
+    ("45", "DKK"),
+    ("44", "GBP"),
+    ("43", "EUR"),
+    ("41", "CHF"),
+    ("40", "RON"),
+    ("39", "EUR"),
+    ("36", "HUF"),
+    ("34", "EUR"),
+    ("33", "EUR"),
+    ("32", "EUR"),
+    ("31", "EUR"),
+    ("30", "EUR"),
+    ("27", "ZAR"),
+    ("20", "EGP"),
+    ("7", "RUB"),
+    ("1", "USD"),
+];

@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use sqlx::Row;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::models::ShopProfile;
+use crate::models::{currency_code_from_phone, ShopProfile};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AuthRegisterInput {
@@ -200,6 +200,7 @@ pub struct ShopAuthRecord {
     pub id: i64,
     pub name: String,
     pub phone: String,
+    pub currency_code: String,
     pub email: String,
     pub address: Option<String>,
     pub logo_url: Option<String>,
@@ -216,6 +217,7 @@ impl ShopAuthRecord {
             id: self.id.clone(),
             name: self.name.clone(),
             phone: self.phone.clone(),
+            currency_code: self.currency_code.clone(),
             email: self.email.clone(),
             address: self.address.clone(),
             logo_url: self.logo_url.clone(),
@@ -233,7 +235,7 @@ impl ShopAuthRecord {
         payload: &FindShopPayload,
     ) -> Result<Option<ShopAuthRecord>, sqlx::Error> {
         let row = sqlx::query(
-            "SELECT id, name, phone, email, password_hash, address, logo_url,
+            "SELECT id, name, phone, currency_code, email, password_hash, address, logo_url,
                     created_at::text as created_at,
                     failed_login_attempts,
                     locked_until::text as locked_until,
@@ -249,6 +251,7 @@ impl ShopAuthRecord {
             id: row.get("id"),
             name: row.get("name"),
             phone: row.get("phone"),
+            currency_code: row.get("currency_code"),
             email: row.get("email"),
             address: row.get("address"),
             logo_url: row.get("logo_url"),
@@ -265,7 +268,7 @@ impl ShopAuthRecord {
         payload: &FindShopByEmailPayload,
     ) -> Result<Option<ShopAuthRecord>, sqlx::Error> {
         let row = sqlx::query(
-            "SELECT id, name, phone, email, password_hash, address, logo_url,
+            "SELECT id, name, phone, currency_code, email, password_hash, address, logo_url,
                     created_at::text as created_at,
                     failed_login_attempts,
                     locked_until::text as locked_until,
@@ -280,6 +283,7 @@ impl ShopAuthRecord {
             id: row.get("id"),
             name: row.get("name"),
             phone: row.get("phone"),
+            currency_code: row.get("currency_code"),
             email: row.get("email"),
             address: row.get("address"),
             logo_url: row.get("logo_url"),
@@ -390,7 +394,7 @@ impl ShopAuthRecord {
                RETURNING id
              ),
              shop_row AS (
-               SELECT id, name, phone, email, address, logo_url,
+               SELECT id, name, phone, currency_code, email, address, logo_url,
                       total_revenue, total_orders, total_customers, timezone,
                       created_at::text AS created_at,
                       COALESCE((
@@ -536,7 +540,7 @@ impl ShopAuthRecord {
                RETURNING id
              ),
              shop_row AS (
-               SELECT id, name, phone, email, address, logo_url,
+               SELECT id, name, phone, currency_code, email, address, logo_url,
                       total_revenue, total_orders, total_customers, timezone,
                       created_at::text AS created_at,
                       COALESCE((
@@ -783,27 +787,27 @@ impl ShopAuthRecord {
 
         let row = sqlx::query(
             "WITH inserted_shop AS (
-               INSERT INTO shops (name, phone, email, password_hash, address, logo_url, timezone)
-               VALUES ($1, $2, $3, crypt($4, gen_salt('bf', 12)), $5, $6, $7)
-               RETURNING id, name, phone, email, address, logo_url,
+               INSERT INTO shops (name, phone, currency_code, email, password_hash, address, logo_url, timezone)
+               VALUES ($1, $2, $3, $4, crypt($5, gen_salt('bf', 12)), $6, $7, $8)
+               RETURNING id, name, phone, currency_code, email, address, logo_url,
                          total_revenue, total_orders, total_customers, timezone,
                          created_at::text AS created_at
              ),
              inserted_email AS (
                INSERT INTO email_outbox (to_email, template, payload)
-               SELECT email, 'welcome', json_build_object('shop_name', name, 'dashboard_url', $8)
+               SELECT email, 'welcome', json_build_object('shop_name', name, 'dashboard_url', $9)
                FROM inserted_shop
                RETURNING id
              ),
              inserted_device AS (
                INSERT INTO device_sessions (shop_id, device_name, device_platform, device_os, ip_address, location, user_agent)
-               SELECT id, $9, $10, $11, $12, $13, $14
+               SELECT id, $10, $11, $12, $13, $14, $15
                FROM inserted_shop
                RETURNING id
              ),
              inserted_refresh AS (
                INSERT INTO refresh_tokens (shop_id, device_session_id, token_hash, expires_at)
-               SELECT (SELECT id FROM inserted_shop), (SELECT id FROM inserted_device), $15, NOW() + ($16 || ' days')::interval
+               SELECT (SELECT id FROM inserted_shop), (SELECT id FROM inserted_device), $16, NOW() + ($17 || ' days')::interval
                RETURNING id
              )
              SELECT
@@ -812,6 +816,7 @@ impl ShopAuthRecord {
         )
         .bind(&input.shop_name)
         .bind(&input.phone)
+        .bind(currency_code_from_phone(&input.phone))
         .bind(&input.email)
         .bind(&input.password)
         .bind(&input.address)
@@ -981,7 +986,7 @@ impl ShopAuthRecord {
                RETURNING id
              ),
              shop_row AS (
-               SELECT id, name, phone, email, address, logo_url,
+               SELECT id, name, phone, currency_code, email, address, logo_url,
                       total_revenue, total_orders, total_customers, timezone,
                       created_at::text AS created_at,
                       COALESCE((
@@ -1262,12 +1267,13 @@ impl ShopProfile {
         payload: &CreateShopPayload,
     ) -> Result<ShopProfile, sqlx::Error> {
         let row = sqlx::query(
-            "INSERT INTO shops (name, phone, email, password_hash, address, logo_url, timezone)
-             VALUES ($1, $2, $3, crypt($4, gen_salt('bf', 12)), $5, $6, $7)
+            "INSERT INTO shops (name, phone, currency_code, email, password_hash, address, logo_url, timezone)
+             VALUES ($1, $2, $3, $4, crypt($5, gen_salt('bf', 12)), $6, $7, $8)
              RETURNING id, created_at::text as created_at",
         )
         .bind(&payload.input.shop_name)
         .bind(&payload.input.phone)
+        .bind(currency_code_from_phone(&payload.input.phone))
         .bind(&payload.input.email)
         .bind(&payload.password)
         .bind(&payload.input.address)
@@ -1283,6 +1289,7 @@ impl ShopProfile {
             id: shop_id,
             name: payload.input.shop_name.clone(),
             phone: payload.input.phone.clone(),
+            currency_code: currency_code_from_phone(&payload.input.phone).to_string(),
             email: payload.input.email.clone(),
             address: payload.input.address.clone(),
             logo_url: payload.input.logo_url.clone(),
@@ -1303,16 +1310,16 @@ impl ShopProfile {
     ) -> Result<ShopProfile, sqlx::Error> {
         let row = sqlx::query(
             "WITH inserted_shop AS (
-               INSERT INTO shops (name, phone, email, password_hash, address, logo_url, timezone)
-               VALUES ($1, $2, $3, crypt($4, gen_salt('bf', 12)), $5, $6, $7)
-               RETURNING id, name, phone, email, address, logo_url,
+               INSERT INTO shops (name, phone, currency_code, email, password_hash, address, logo_url, timezone)
+               VALUES ($1, $2, $3, $4, crypt($5, gen_salt('bf', 12)), $6, $7, $8)
+               RETURNING id, name, phone, currency_code, email, address, logo_url,
                          total_revenue, total_orders, total_customers, timezone,
                          created_at::text AS created_at,
                          '[]'::json AS bank_accounts
              ),
              inserted_email AS (
                INSERT INTO email_outbox (to_email, template, payload)
-               SELECT email, 'welcome', json_build_object('shop_name', name, 'dashboard_url', $8)
+               SELECT email, 'welcome', json_build_object('shop_name', name, 'dashboard_url', $9)
                FROM inserted_shop
                RETURNING id
              )
@@ -1320,6 +1327,7 @@ impl ShopProfile {
         )
         .bind(&input.shop_name)
         .bind(&input.phone)
+        .bind(currency_code_from_phone(&input.phone))
         .bind(&input.email)
         .bind(password)
         .bind(&input.address)
@@ -1372,4 +1380,3 @@ fn hash_refresh_token(raw: &str) -> String {
     hasher.update(raw.as_bytes());
     hex::encode(hasher.finalize())
 }
-

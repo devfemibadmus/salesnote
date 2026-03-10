@@ -7,10 +7,11 @@ use crate::api::middlewares::auth::AuthDeviceId;
 use crate::api::response::{json_created, json_empty, json_error, json_ok};
 use crate::api::state::AppState;
 use crate::models::{
-    AuthorizedSaleCreatePayload, AuthorizedSaleCreateResult, AuthorizedSaleDeletePayload,
-    AuthorizedSaleDeleteResult, AuthorizedSaleGetPayload, AuthorizedSaleGetResult,
-    AuthorizedSaleListPayload, AuthorizedSaleListResult, AuthorizedSaleUpdatePayload,
-    AuthorizedSaleUpdateResult, DeviceSession, Sale, SaleInput, SaleStatus, SaleUpdateInput,
+    format_currency_amount, AuthorizedSaleCreatePayload, AuthorizedSaleCreateResult,
+    AuthorizedSaleDeletePayload, AuthorizedSaleDeleteResult, AuthorizedSaleGetPayload,
+    AuthorizedSaleGetResult, AuthorizedSaleListPayload, AuthorizedSaleListResult,
+    AuthorizedSaleUpdatePayload, AuthorizedSaleUpdateResult, DeviceSession, Sale, SaleInput,
+    SaleStatus, SaleUpdateInput, ShopProfile,
 };
 use crate::{config::Settings, worker::notification::fcm::send_fcm_notification_with_data};
 
@@ -252,63 +253,88 @@ pub async fn create_sale(
             json_error(StatusCode::FORBIDDEN, "shop mismatch")
         }
         Ok(AuthorizedSaleCreateResult::Created(sale)) => {
-            if sale.status == SaleStatus::Paid {
-                let pool = state.pool.clone();
-                let shop_id_val = *shop_id;
-                let sale_id = sale.id;
-                let sale_total = sale.total;
-                let customer_name = sale
-                    .customer_name
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(str::to_owned);
-                let item_count = sale.items.len();
+            let pool = state.pool.clone();
+            let shop_id_val = *shop_id;
+            let sale_id = sale.id;
+            let sale_total = sale.total;
+            let sale_status = sale.status;
+            let customer_name = sale
+                .customer_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_owned);
+            let item_count = sale.items.len();
 
-                actix_web::rt::spawn(async move {
-                    let settings = Settings::load();
-                    if let Ok(tokens) =
-                        DeviceSession::get_fcm_tokens_for_shop(&pool, shop_id_val).await
-                    {
-                        if !tokens.is_empty() {
-                            let title = customer_name
-                                .as_deref()
-                                .map(|name| format!("New sale from {}", name))
-                                .unwrap_or_else(|| String::from("New sale recorded"));
-                            let body = format!(
-                                "#REC-{} · {} item{} · ₦{:.2}",
-                                sale_id,
-                                item_count,
-                                if item_count == 1 { "" } else { "s" },
-                                sale_total,
-                            );
-                            let extra_data = vec![
-                                (String::from("id"), format!("sale_{}", sale_id)),
-                                (String::from("sale_id"), sale_id.to_string()),
-                            ];
-                            for token in tokens {
-                                if let Err(err) = send_fcm_notification_with_data(
-                                    &token,
-                                    title.clone(),
-                                    body.clone(),
-                                    "new_sale",
-                                    extra_data.clone(),
-                                    &settings,
-                                )
-                                .await
-                                {
-                                    tracing::warn!(
-                                        sale_id,
-                                        shop_id = shop_id_val,
-                                        error = %err,
-                                        "sale notification send failed"
-                                    );
-                                }
+            actix_web::rt::spawn(async move {
+                let settings = Settings::load();
+                let currency_code = ShopProfile::currency_code_by_id(&pool, shop_id_val)
+                    .await
+                    .unwrap_or_else(|_| String::from("NGN"));
+                if let Ok(tokens) = DeviceSession::get_fcm_tokens_for_shop(&pool, shop_id_val).await
+                {
+                    if !tokens.is_empty() {
+                        let (title, body, kind, id_prefix, number_prefix) = match sale_status {
+                            SaleStatus::Invoice => (
+                                customer_name
+                                    .as_deref()
+                                    .map(|name| format!("New invoice for {}", name))
+                                    .unwrap_or_else(|| String::from("New invoice created")),
+                                format!(
+                                    "#INV-{} · {} item{} · {}",
+                                    sale_id,
+                                    item_count,
+                                    if item_count == 1 { "" } else { "s" },
+                                    format_currency_amount(sale_total, &currency_code),
+                                ),
+                                "new_invoice",
+                                "invoice",
+                                "INV",
+                            ),
+                            SaleStatus::Paid => (
+                                customer_name
+                                    .as_deref()
+                                    .map(|name| format!("New sale from {}", name))
+                                    .unwrap_or_else(|| String::from("New sale recorded")),
+                                format!(
+                                    "#REC-{} · {} item{} · {}",
+                                    sale_id,
+                                    item_count,
+                                    if item_count == 1 { "" } else { "s" },
+                                    format_currency_amount(sale_total, &currency_code),
+                                ),
+                                "new_sale",
+                                "sale",
+                                "REC",
+                            ),
+                        };
+                        let extra_data = vec![
+                            (String::from("id"), format!("{}_{}", id_prefix, sale_id)),
+                            (String::from("sale_id"), sale_id.to_string()),
+                        ];
+                        for token in tokens {
+                            if let Err(err) = send_fcm_notification_with_data(
+                                &token,
+                                title.clone(),
+                                body.clone(),
+                                kind,
+                                extra_data.clone(),
+                                &settings,
+                            )
+                            .await
+                            {
+                                tracing::warn!(
+                                    sale_id,
+                                    shop_id = shop_id_val,
+                                    status = %number_prefix,
+                                    error = %err,
+                                    "sale notification send failed"
+                                );
                             }
                         }
                     }
-                });
-            }
+                }
+            });
 
             json_created(sale)
         }
@@ -329,6 +355,32 @@ pub async fn update_sale(
     sale_id: web::Path<i64>,
     payload: web::Json<SaleUpdateInput>,
 ) -> impl Responder {
+    let existing_sale = match Sale::get_authorized(
+        &state.pool,
+        &AuthorizedSaleGetPayload {
+            shop_id: *shop_id,
+            device_id: (*device_id).0,
+            sale_id: *sale_id,
+        },
+    )
+    .await
+    {
+        Ok(AuthorizedSaleGetResult::Unauthorized) => {
+            return json_error(StatusCode::UNAUTHORIZED, "unauthorized")
+        }
+        Ok(AuthorizedSaleGetResult::NotFound) => {
+            return json_error(StatusCode::NOT_FOUND, "not found")
+        }
+        Ok(AuthorizedSaleGetResult::Sale(sale)) => sale,
+        Err(e) => {
+            tracing::error!("get sale before update error: {}", e);
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Server error. Please try again.",
+            );
+        }
+    };
+
     let input = payload.into_inner();
     if let Some(items) = &input.items {
         if items.is_empty() {
@@ -402,7 +454,70 @@ pub async fn update_sale(
         Ok(AuthorizedSaleUpdateResult::SignatureNotFound) => {
             json_error(StatusCode::NOT_FOUND, "signature not found")
         }
-        Ok(AuthorizedSaleUpdateResult::Updated(sale)) => json_ok(sale),
+        Ok(AuthorizedSaleUpdateResult::Updated(sale)) => {
+            if existing_sale.status == SaleStatus::Invoice && sale.status == SaleStatus::Paid {
+                let pool = state.pool.clone();
+                let shop_id_val = *shop_id;
+                let sale_id_val = sale.id;
+                let sale_total = sale.total;
+                let customer_name = sale
+                    .customer_name
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_owned);
+                let item_count = sale.items.len();
+
+                actix_web::rt::spawn(async move {
+                    let settings = Settings::load();
+                    let currency_code = ShopProfile::currency_code_by_id(&pool, shop_id_val)
+                        .await
+                        .unwrap_or_else(|_| String::from("NGN"));
+                    if let Ok(tokens) =
+                        DeviceSession::get_fcm_tokens_for_shop(&pool, shop_id_val).await
+                    {
+                        if !tokens.is_empty() {
+                            let title = customer_name
+                                .as_deref()
+                                .map(|name| format!("Invoice paid by {}", name))
+                                .unwrap_or_else(|| String::from("Invoice marked as paid"));
+                            let body = format!(
+                                "#REC-{} · {} item{} · {}",
+                                sale_id_val,
+                                item_count,
+                                if item_count == 1 { "" } else { "s" },
+                                format_currency_amount(sale_total, &currency_code),
+                            );
+                            let extra_data = vec![
+                                (String::from("id"), format!("sale_paid_{}", sale_id_val)),
+                                (String::from("sale_id"), sale_id_val.to_string()),
+                            ];
+                            for token in tokens {
+                                if let Err(err) = send_fcm_notification_with_data(
+                                    &token,
+                                    title.clone(),
+                                    body.clone(),
+                                    "invoice_paid",
+                                    extra_data.clone(),
+                                    &settings,
+                                )
+                                .await
+                                {
+                                    tracing::warn!(
+                                        sale_id = sale_id_val,
+                                        shop_id = shop_id_val,
+                                        error = %err,
+                                        "invoice paid notification send failed"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            json_ok(sale)
+        }
         Err(e) => {
             tracing::error!("update sale error: {}", e);
             json_error(

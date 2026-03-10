@@ -127,7 +127,7 @@ pub async fn send_fcm_notification_with_data(
                 priority: "high",
                 notification: FcmAndroidNotification {
                     sound: "salesnote_notification",
-                    channel_id: "salesnote_alerts_v1",
+                    channel_id: "salesnote_alerts_v2",
                 },
             },
             apns: FcmApnsConfig {

@@ -63,7 +63,7 @@ impl AnalyticsSummary {
             ),
             shop_row AS (
               SELECT
-                id, name, phone, email, address, logo_url,
+                id, name, phone, currency_code, email, address, logo_url,
                 total_revenue, total_orders, total_customers, timezone,
                 created_at::text AS created_at,
                 COALESCE((
@@ -691,4 +691,3 @@ impl AnalyticsSummary {
         Ok((fast, slow))
     }
 }
-
