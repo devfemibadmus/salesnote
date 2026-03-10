@@ -43,7 +43,7 @@ pub struct SaleItemInput {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct SaleInput {
-    pub signature_id: i64,
+    pub signature_id: Option<i64>,
     pub customer_name: String,
     pub customer_contact: String,
     #[serde(default)]
@@ -97,7 +97,7 @@ pub struct SaleItem {
 pub struct Sale {
     pub id: i64,
     pub shop_id: i64,
-    pub signature_id: i64,
+    pub signature_id: Option<i64>,
     #[serde(default)]
     pub status: SaleStatus,
     pub customer_name: Option<String>,
@@ -1197,7 +1197,10 @@ impl Sale {
                 COALESCE($7, NOW())
               FROM sale_totals st
               WHERE EXISTS (SELECT 1 FROM auth_active)
-                AND EXISTS (SELECT 1 FROM signature_ok)
+                AND (
+                  $4::text = 'invoice'
+                  OR EXISTS (SELECT 1 FROM signature_ok)
+                )
               RETURNING id, shop_id, signature_id, status, customer_name, customer_contact,
                         subtotal, discount_amount, vat_amount, service_fee_amount,
                         delivery_fee_amount, rounding_amount, other_amount, other_label,
@@ -1330,12 +1333,12 @@ impl Sale {
         }
 
         let signature_exists: bool = row.get("signature_exists");
-        if !signature_exists {
+        if payload.input.status.is_paid() && !signature_exists {
             return Ok(AuthorizedSaleCreateResult::SignatureNotFound);
         }
 
         let signature_for_shop: bool = row.get("signature_for_shop");
-        if !signature_for_shop {
+        if payload.input.status.is_paid() && !signature_for_shop {
             return Ok(AuthorizedSaleCreateResult::ShopMismatch);
         }
 
@@ -1595,7 +1598,7 @@ impl Sale {
             signature_id: payload
                 .input
                 .signature_id
-                .unwrap_or_else(|| sale_row.get::<i64, _>("signature_id")),
+                .or_else(|| sale_row.get::<Option<i64>, _>("signature_id")),
             status,
             customer_name: payload
                 .input

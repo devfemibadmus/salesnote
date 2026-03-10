@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::{PgPool, Row};
+use sqlx::{PgPool, Postgres, Row, Transaction};
 
 use crate::api::sql::common::AUTH_CTE;
 use crate::models::DeviceSession;
@@ -18,6 +18,24 @@ pub struct ShopProfile {
     pub total_customers: i64,
     pub timezone: String,
     pub created_at: String,
+    #[serde(default)]
+    pub bank_accounts: Vec<ShopBankAccount>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ShopBankAccount {
+    pub id: i16,
+    pub bank_name: String,
+    pub account_number: String,
+    pub account_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ShopBankAccountInput {
+    pub id: i16,
+    pub bank_name: String,
+    pub account_number: String,
+    pub account_name: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -29,6 +47,7 @@ pub struct ShopUpdateInput {
     pub logo_url: Option<String>,
     pub timezone: Option<String>,
     pub password: Option<String>,
+    pub bank_accounts: Option<Vec<ShopBankAccountInput>>,
 }
 
 #[derive(Debug, Clone)]
@@ -71,28 +90,31 @@ impl ShopProfile {
         payload: &IdPayload,
     ) -> Result<Option<ShopProfile>, sqlx::Error> {
         let row = sqlx::query(
-            "SELECT id, name, phone, email, address, logo_url,
-                    total_revenue, total_orders, total_customers, timezone,
-                    created_at::text as created_at
-             FROM shops WHERE id = $1",
+            "SELECT
+                s.id, s.name, s.phone, s.email, s.address, s.logo_url,
+                s.total_revenue, s.total_orders, s.total_customers, s.timezone,
+                s.created_at::text as created_at,
+                COALESCE((
+                  SELECT json_agg(
+                    json_build_object(
+                      'id', sba.id,
+                      'bank_name', sba.bank_name,
+                      'account_number', sba.account_number,
+                      'account_name', sba.account_name
+                    )
+                    ORDER BY sba.id ASC
+                  )
+                  FROM shop_bank_accounts sba
+                  WHERE sba.shop_id = s.id
+                ), '[]'::json) AS bank_accounts
+             FROM shops s
+             WHERE s.id = $1",
         )
         .bind(&payload.id)
         .fetch_optional(pool)
         .await?;
 
-        Ok(row.map(|row| ShopProfile {
-            id: row.get("id"),
-            name: row.get("name"),
-            phone: row.get("phone"),
-            email: row.get("email"),
-            address: row.get("address"),
-            logo_url: row.get("logo_url"),
-            total_revenue: row.get("total_revenue"),
-            total_orders: row.get("total_orders"),
-            total_customers: row.get("total_customers"),
-            timezone: row.get("timezone"),
-            created_at: row.get("created_at"),
-        }))
+        row.map(shop_profile_from_row).transpose()
     }
 
     pub async fn update(pool: &PgPool, payload: &ShopUpdatePayload) -> Result<(), sqlx::Error> {
@@ -134,7 +156,20 @@ impl ShopProfile {
             SELECT
               s.id, s.name, s.phone, s.email, s.address, s.logo_url,
               s.total_revenue, s.total_orders, s.total_customers, s.timezone,
-              s.created_at::text AS created_at
+              s.created_at::text AS created_at,
+              COALESCE((
+                SELECT json_agg(
+                  json_build_object(
+                    'id', sba.id,
+                    'bank_name', sba.bank_name,
+                    'account_number', sba.account_number,
+                    'account_name', sba.account_name
+                  )
+                  ORDER BY sba.id ASC
+                )
+                FROM shop_bank_accounts sba
+                WHERE sba.shop_id = s.id
+              ), '[]'::json) AS bank_accounts
             FROM shops s
             WHERE s.id = $1
               AND EXISTS (SELECT 1 FROM auth_active)
@@ -148,19 +183,7 @@ impl ShopProfile {
             .fetch_optional(pool)
             .await?;
 
-        Ok(row.map(|row| ShopProfile {
-            id: row.get("id"),
-            name: row.get("name"),
-            phone: row.get("phone"),
-            email: row.get("email"),
-            address: row.get("address"),
-            logo_url: row.get("logo_url"),
-            total_revenue: row.get("total_revenue"),
-            total_orders: row.get("total_orders"),
-            total_customers: row.get("total_customers"),
-            timezone: row.get("timezone"),
-            created_at: row.get("created_at"),
-        }))
+        row.map(shop_profile_from_row).transpose()
     }
 
     pub async fn settings_summary_authorized(
@@ -174,7 +197,20 @@ impl ShopProfile {
               SELECT
                 s.id, s.name, s.phone, s.email, s.address, s.logo_url,
                 s.total_revenue, s.total_orders, s.total_customers, s.timezone,
-                s.created_at::text AS created_at
+                s.created_at::text AS created_at,
+                COALESCE((
+                  SELECT json_agg(
+                    json_build_object(
+                      'id', sba.id,
+                      'bank_name', sba.bank_name,
+                      'account_number', sba.account_number,
+                      'account_name', sba.account_name
+                    )
+                    ORDER BY sba.id ASC
+                  )
+                  FROM shop_bank_accounts sba
+                  WHERE sba.shop_id = s.id
+                ), '[]'::json) AS bank_accounts
               FROM shops s
               WHERE s.id = $1
                 AND EXISTS (SELECT 1 FROM auth_active)
@@ -259,6 +295,7 @@ impl ShopProfile {
         pool: &PgPool,
         payload: &AuthorizedShopUpdatePayload,
     ) -> Result<Option<ShopProfile>, sqlx::Error> {
+        let mut tx: Transaction<'_, Postgres> = pool.begin().await?;
         let sql = format!(
             r#"
             WITH {}
@@ -276,10 +313,7 @@ impl ShopProfile {
               END
             WHERE s.id = $1
               AND EXISTS (SELECT 1 FROM auth_active)
-            RETURNING
-              s.id, s.name, s.phone, s.email, s.address, s.logo_url,
-              s.total_revenue, s.total_orders, s.total_customers, s.timezone,
-              s.created_at::text AS created_at
+            RETURNING s.id
             "#,
             AUTH_CTE
         );
@@ -294,21 +328,111 @@ impl ShopProfile {
             .bind(payload.input.logo_url.as_deref())
             .bind(payload.input.timezone.as_deref())
             .bind(payload.password.as_deref())
-            .fetch_optional(pool)
+            .fetch_optional(&mut *tx)
             .await?;
 
-        Ok(row.map(|row| ShopProfile {
-            id: row.get("id"),
-            name: row.get("name"),
-            phone: row.get("phone"),
-            email: row.get("email"),
-            address: row.get("address"),
-            logo_url: row.get("logo_url"),
-            total_revenue: row.get("total_revenue"),
-            total_orders: row.get("total_orders"),
-            total_customers: row.get("total_customers"),
-            timezone: row.get("timezone"),
-            created_at: row.get("created_at"),
-        }))
+        let Some(_) = row else {
+            tx.rollback().await?;
+            return Ok(None);
+        };
+
+        if let Some(bank_accounts) = payload.input.bank_accounts.as_ref() {
+            replace_bank_accounts(&mut tx, payload.shop_id, bank_accounts).await?;
+        }
+
+        let profile = load_shop_profile_tx(&mut tx, payload.shop_id).await?;
+        tx.commit().await?;
+        Ok(profile)
     }
 }
+
+fn shop_profile_from_row(row: sqlx::postgres::PgRow) -> Result<ShopProfile, sqlx::Error> {
+    let bank_accounts = row.get::<serde_json::Value, _>("bank_accounts");
+    let bank_accounts: Vec<ShopBankAccount> = serde_json::from_value(bank_accounts)
+        .map_err(|e| sqlx::Error::Protocol(format!("invalid bank accounts json: {}", e).into()))?;
+
+    Ok(ShopProfile {
+        id: row.get("id"),
+        name: row.get("name"),
+        phone: row.get("phone"),
+        email: row.get("email"),
+        address: row.get("address"),
+        logo_url: row.get("logo_url"),
+        total_revenue: row.get("total_revenue"),
+        total_orders: row.get("total_orders"),
+        total_customers: row.get("total_customers"),
+        timezone: row.get("timezone"),
+        created_at: row.get("created_at"),
+        bank_accounts,
+    })
+}
+
+async fn replace_bank_accounts(
+    tx: &mut Transaction<'_, Postgres>,
+    shop_id: i64,
+    bank_accounts: &[ShopBankAccountInput],
+) -> Result<(), sqlx::Error> {
+    let ids: Vec<i16> = bank_accounts.iter().map(|entry| entry.id).collect();
+    sqlx::query("DELETE FROM shop_bank_accounts WHERE shop_id = $1 AND NOT (id = ANY($2))")
+        .bind(shop_id)
+        .bind(&ids)
+        .execute(&mut **tx)
+        .await?;
+
+    for bank_account in bank_accounts {
+        sqlx::query(
+            "INSERT INTO shop_bank_accounts (
+                shop_id, id, bank_name, account_number, account_name, updated_at
+             )
+             VALUES ($1, $2, $3, $4, $5, NOW())
+             ON CONFLICT (shop_id, id)
+             DO UPDATE SET
+               bank_name = EXCLUDED.bank_name,
+               account_number = EXCLUDED.account_number,
+               account_name = EXCLUDED.account_name,
+                updated_at = NOW()",
+        )
+        .bind(shop_id)
+        .bind(bank_account.id)
+        .bind(&bank_account.bank_name)
+        .bind(&bank_account.account_number)
+        .bind(&bank_account.account_name)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    Ok(())
+}
+
+async fn load_shop_profile_tx(
+    tx: &mut Transaction<'_, Postgres>,
+    shop_id: i64,
+) -> Result<Option<ShopProfile>, sqlx::Error> {
+    let row = sqlx::query(
+        "SELECT
+            s.id, s.name, s.phone, s.email, s.address, s.logo_url,
+            s.total_revenue, s.total_orders, s.total_customers, s.timezone,
+            s.created_at::text AS created_at,
+            COALESCE((
+              SELECT json_agg(
+                json_build_object(
+                  'id', sba.id,
+                  'bank_name', sba.bank_name,
+                  'account_number', sba.account_number,
+                  'account_name', sba.account_name
+                )
+                ORDER BY sba.id ASC
+              )
+              FROM shop_bank_accounts sba
+              WHERE sba.shop_id = s.id
+            ), '[]'::json) AS bank_accounts
+         FROM shops s
+         WHERE s.id = $1",
+    )
+    .bind(shop_id)
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    row.map(shop_profile_from_row).transpose()
+}
+

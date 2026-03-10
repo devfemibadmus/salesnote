@@ -1,3 +1,5 @@
+use chrono::{DateTime, Datelike, Duration, TimeZone};
+
 pub struct NotificationMessage {
     pub title: String,
     pub body: String,
@@ -10,6 +12,7 @@ pub struct TopItem {
 
 pub struct ProgressInput {
     pub period_label: &'static str,
+    pub comparison_reference: String,
     pub current_sales: i64,
     pub previous_sales: i64,
     pub top_item: Option<TopItem>,
@@ -27,8 +30,8 @@ pub fn build_progress_message(input: ProgressInput) -> Option<NotificationMessag
 
     if input.current_sales == 0 {
         let mut body = format!(
-            "Last {} at this time you had {} sales.",
-            input.period_label, input.previous_sales
+            "{} you had {} sales.",
+            input.comparison_reference, input.previous_sales
         );
         if let Some(line) = top_line {
             body.push_str(&format!("\n{}", line));
@@ -41,8 +44,8 @@ pub fn build_progress_message(input: ProgressInput) -> Option<NotificationMessag
 
     if input.previous_sales == 0 {
         let mut body = format!(
-            "Last {} at this time you had 0 sales. This {} you have {}.",
-            input.period_label, input.period_label, input.current_sales
+            "{} you had 0 sales. This {} you have {}.",
+            input.comparison_reference, input.period_label, input.current_sales
         );
         if let Some(line) = top_line {
             body.push_str(&format!("\n{}", line));
@@ -53,17 +56,22 @@ pub fn build_progress_message(input: ProgressInput) -> Option<NotificationMessag
         });
     }
 
-    let percent =
-        ((input.previous_sales as f64) / (input.current_sales as f64) * 100.0).round() as i64;
+    let change_pct = (((input.current_sales - input.previous_sales) as f64)
+        / (input.previous_sales as f64)
+        * 100.0)
+        .round() as i64;
+    let comparison = if change_pct >= 0 {
+        format!("That is {}% more.", change_pct)
+    } else {
+        format!("That is {}% less.", change_pct.abs())
+    };
     let mut body = format!(
-        "This time last {} you were making {}% of what you're making this {}. Last {}: {} sales. This {}: {} sales.",
-        input.period_label,
-        percent,
-        input.period_label,
-        input.period_label,
+        "{} you had {} sales. This {} you have {}. {}",
+        input.comparison_reference,
         input.previous_sales,
         input.period_label,
-        input.current_sales
+        input.current_sales,
+        comparison,
     );
     if let Some(line) = top_line {
         body.push_str(&format!("\n{}", line));
@@ -89,4 +97,36 @@ fn capitalize(input: &str) -> String {
         Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
         None => String::new(),
     }
+}
+
+pub fn format_comparison_reference<Tz: TimeZone>(
+    now_local: DateTime<Tz>,
+    comparison_local: DateTime<Tz>,
+) -> String
+where
+    Tz::Offset: std::fmt::Display,
+{
+    if comparison_local.date_naive() == now_local.date_naive() - Duration::days(1) {
+        return String::from("Yesterday at this time");
+    }
+
+    format!(
+        "On {} {} of {} at this time",
+        comparison_local.format("%A"),
+        ordinal(comparison_local.day()),
+        comparison_local.format("%B"),
+    )
+}
+
+fn ordinal(day: u32) -> String {
+    let suffix = match day % 100 {
+        11 | 12 | 13 => "th",
+        _ => match day % 10 {
+            1 => "st",
+            2 => "nd",
+            3 => "rd",
+            _ => "th",
+        },
+    };
+    format!("{}{}", day, suffix)
 }

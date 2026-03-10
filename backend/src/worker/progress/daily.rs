@@ -5,7 +5,9 @@ use std::str::FromStr;
 
 use crate::config::Settings;
 use crate::worker::notification::fcm::send_fcm_notification;
-use crate::worker::progress::message::{build_progress_message, ProgressInput};
+use crate::worker::progress::message::{
+    build_progress_message, format_comparison_reference, ProgressInput,
+};
 use crate::worker::progress::repo::{
     already_sent_today, count_sales_between, fetch_shops_with_tokens, mark_sent, top_item_between,
 };
@@ -49,6 +51,7 @@ pub async fn process_daily_receipt(settings: &Settings, pool: &PgPool) -> Result
 
         let message = build_progress_message(ProgressInput {
             period_label: "day",
+            comparison_reference: format_comparison_reference(now_local, yesterday_end_local),
             current_sales: today_count,
             previous_sales: yesterday_count,
             top_item,

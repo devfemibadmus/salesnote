@@ -224,6 +224,7 @@ impl ShopAuthRecord {
             total_customers: 0,
             timezone: self.timezone.clone(),
             created_at: self.created_at.clone(),
+            bank_accounts: vec![],
         }
     }
 
@@ -391,7 +392,19 @@ impl ShopAuthRecord {
              shop_row AS (
                SELECT id, name, phone, email, address, logo_url,
                       total_revenue, total_orders, total_customers, timezone,
-                      created_at::text AS created_at
+                      created_at::text AS created_at,
+                      COALESCE((
+                        SELECT json_agg(
+                          json_build_object(
+                            'id', sba.id,                            'bank_name', sba.bank_name,
+                            'account_number', sba.account_number,
+                            'account_name', sba.account_name
+                          )
+                          ORDER BY sba.id ASC
+                        )
+                        FROM shop_bank_accounts sba
+                        WHERE sba.shop_id = shops.id
+                      ), '[]'::json) AS bank_accounts
                FROM shops
                WHERE id = $1
              )
@@ -525,7 +538,19 @@ impl ShopAuthRecord {
              shop_row AS (
                SELECT id, name, phone, email, address, logo_url,
                       total_revenue, total_orders, total_customers, timezone,
-                      created_at::text AS created_at
+                      created_at::text AS created_at,
+                      COALESCE((
+                        SELECT json_agg(
+                          json_build_object(
+                            'id', sba.id,                            'bank_name', sba.bank_name,
+                            'account_number', sba.account_number,
+                            'account_name', sba.account_name
+                          )
+                          ORDER BY sba.id ASC
+                        )
+                        FROM shop_bank_accounts sba
+                        WHERE sba.shop_id = shops.id
+                      ), '[]'::json) AS bank_accounts
                FROM shops
                WHERE id = (SELECT shop_id FROM login_state WHERE status = 'success')
              )
@@ -958,7 +983,19 @@ impl ShopAuthRecord {
              shop_row AS (
                SELECT id, name, phone, email, address, logo_url,
                       total_revenue, total_orders, total_customers, timezone,
-                      created_at::text AS created_at
+                      created_at::text AS created_at,
+                      COALESCE((
+                        SELECT json_agg(
+                          json_build_object(
+                            'id', sba.id,                            'bank_name', sba.bank_name,
+                            'account_number', sba.account_number,
+                            'account_name', sba.account_name
+                          )
+                          ORDER BY sba.id ASC
+                        )
+                        FROM shop_bank_accounts sba
+                        WHERE sba.shop_id = shops.id
+                      ), '[]'::json) AS bank_accounts
                FROM shops
                WHERE id = (SELECT shop_id FROM inserted LIMIT 1)
              )
@@ -1254,6 +1291,7 @@ impl ShopProfile {
             total_customers: 0,
             timezone: payload.input.timezone.clone(),
             created_at,
+            bank_accounts: vec![],
         })
     }
 
@@ -1269,7 +1307,8 @@ impl ShopProfile {
                VALUES ($1, $2, $3, crypt($4, gen_salt('bf', 12)), $5, $6, $7)
                RETURNING id, name, phone, email, address, logo_url,
                          total_revenue, total_orders, total_customers, timezone,
-                         created_at::text AS created_at
+                         created_at::text AS created_at,
+                         '[]'::json AS bank_accounts
              ),
              inserted_email AS (
                INSERT INTO email_outbox (to_email, template, payload)
@@ -1333,3 +1372,4 @@ fn hash_refresh_token(raw: &str) -> String {
     hasher.update(raw.as_bytes());
     hex::encode(hasher.finalize())
 }
+

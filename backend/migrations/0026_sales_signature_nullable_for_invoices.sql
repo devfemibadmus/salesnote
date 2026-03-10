@@ -1,0 +1,2 @@
+ALTER TABLE sales
+  ALTER COLUMN signature_id DROP NOT NULL;

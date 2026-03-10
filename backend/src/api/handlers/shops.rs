@@ -6,6 +6,7 @@ use futures_util::StreamExt;
 use image::codecs::jpeg::JpegEncoder;
 use image::ImageReader;
 use serde::Serialize;
+use std::collections::BTreeSet;
 use std::io::Cursor;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -89,6 +90,35 @@ fn validate_shop_patch(input: &ShopUpdateInput, state: &AppState) -> Result<(), 
                 "password must be {} characters or less",
                 state.password_max_chars
             ));
+        }
+    }
+
+    if let Some(bank_accounts) = input.bank_accounts.as_ref() {
+        if bank_accounts.is_empty() {
+            return Err("at least one bank account is required".to_string());
+        }
+        if bank_accounts.len() > 2 {
+            return Err("you can save at most two bank accounts".to_string());
+        }
+
+        let mut seen_ids = BTreeSet::new();
+        for bank_account in bank_accounts {
+            if bank_account.id != 1 && bank_account.id != 2 {
+                return Err("bank account id must be 1 or 2".to_string());
+            }
+            if !seen_ids.insert(bank_account.id) {
+                return Err("bank account ids must be unique".to_string());
+            }
+
+            if bank_account.bank_name.trim().is_empty() {
+                return Err("bank name is required".to_string());
+            }
+            if bank_account.account_name.trim().is_empty() {
+                return Err("bank account name is required".to_string());
+            }
+            if bank_account.account_number.trim().is_empty() {
+                return Err("bank account number is required".to_string());
+            }
         }
     }
 
@@ -371,6 +401,7 @@ pub async fn update_my_shop(
                 logo_url: None,
                 timezone: None,
                 password: None,
+                bank_accounts: None,
             };
 
             while let Some(item) = multipart.next().await {
@@ -486,6 +517,13 @@ pub async fn update_my_shop(
     if let Some(v) = input.password.as_ref() {
         if v.trim().is_empty() {
             input.password = None;
+        }
+    }
+    if let Some(bank_accounts) = input.bank_accounts.as_mut() {
+        for bank_account in bank_accounts {
+            bank_account.bank_name = bank_account.bank_name.trim().to_string();
+            bank_account.account_number = bank_account.account_number.trim().to_string();
+            bank_account.account_name = bank_account.account_name.trim().to_string();
         }
     }
 

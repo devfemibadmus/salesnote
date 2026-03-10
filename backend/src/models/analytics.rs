@@ -65,7 +65,19 @@ impl AnalyticsSummary {
               SELECT
                 id, name, phone, email, address, logo_url,
                 total_revenue, total_orders, total_customers, timezone,
-                created_at::text AS created_at
+                created_at::text AS created_at,
+                COALESCE((
+                  SELECT json_agg(
+                    json_build_object(
+                      'id', sba.id,                      'bank_name', sba.bank_name,
+                      'account_number', sba.account_number,
+                      'account_name', sba.account_name
+                    )
+                    ORDER BY sba.id ASC
+                  )
+                  FROM shop_bank_accounts sba
+                  WHERE sba.shop_id = shops.id
+                ), '[]'::json) AS bank_accounts
               FROM shops
               WHERE id = $1
                 AND EXISTS (SELECT 1 FROM auth_active)
@@ -679,3 +691,4 @@ impl AnalyticsSummary {
         Ok((fast, slow))
     }
 }
+
