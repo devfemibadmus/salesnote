@@ -9,6 +9,7 @@ import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../preview/preview.dart';
 import '../../services/api_client.dart';
+import '../../services/bank_account.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
 import '../../services/cache/local.dart';
@@ -90,6 +91,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   int _step = 0;
   bool _stepSwipeUnlocked = false;
   String? _selectedSignatureId;
+  String? _selectedBankAccountId;
   String _activeDraftId = _defaultDraftId;
   SaleStatus _saleStatus = SaleStatus.paid;
 
@@ -189,9 +191,19 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
   void _initCountry() {
     _country = RegionService.resolveAccountCountry();
+    _selectedBankAccountId = _resolveBankAccountId(_selectedBankAccountId);
   }
 
   bool get _creatingInvoice => _saleStatus == SaleStatus.invoice;
+
+  String? _resolveBankAccountId(String? candidate) {
+    final bankAccounts = _previewShop()?.bankAccounts ?? const <ShopBankAccount>[];
+    if (candidate != null &&
+        bankAccounts.any((bankAccount) => bankAccount.id == candidate)) {
+      return candidate;
+    }
+    return bankAccounts.isNotEmpty ? bankAccounts.first.id : null;
+  }
 
   String get _documentTitle => _creatingInvoice ? 'New Invoice' : 'New Sale';
 
@@ -385,6 +397,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _selectedSignatureId = _signatures.isNotEmpty
             ? _signatures.first.id
             : null;
+        _selectedBankAccountId = _resolveBankAccountId(null);
         _saleStatus = widget.routeArgs?.startAsInvoice == true
             ? SaleStatus.invoice
             : SaleStatus.paid;
@@ -441,6 +454,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       final otherLabel = (draft['other_label'] ?? '').toString().trim();
       _otherLabel = otherLabel.isEmpty ? _defaultOtherLabel : otherLabel;
       _selectedSignatureId = draft['signature_id']?.toString();
+      _selectedBankAccountId = _resolveBankAccountId(
+        draft['bank_account_id']?.toString(),
+      );
       final rawStatus = (draft['status'] ?? '').toString().trim().toLowerCase();
       _saleStatus = rawStatus == 'invoice'
           ? SaleStatus.invoice
@@ -482,7 +498,12 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
   void _setSaleStatus(SaleStatus status) {
     if (_saleStatus == status) return;
-    setState(() => _saleStatus = status);
+    setState(() {
+      _saleStatus = status;
+      if (status == SaleStatus.invoice && _selectedBankAccountId == null) {
+        _selectedBankAccountId = _resolveBankAccountId(null);
+      }
+    });
     unawaited(_saveDraft());
   }
 
@@ -508,6 +529,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       'other_amount': _otherAmount,
       'other_label': _otherLabel,
       'signature_id': _selectedSignatureId,
+      'bank_account_id': _selectedBankAccountId,
       'status': _saleStatus.name,
       'step': _step,
       'items': _items
@@ -554,6 +576,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _selectedSignatureId = _signatures.isNotEmpty
           ? _signatures.first.id
           : null;
+      _selectedBankAccountId = _resolveBankAccountId(null);
       _step = 0;
       _stepSwipeUnlocked = false;
       _customerNameTouched = false;
@@ -602,6 +625,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _selectedSignatureId = _signatures.isNotEmpty
             ? _signatures.first.id
             : null;
+        _selectedBankAccountId = _resolveBankAccountId(null);
         _step = 0;
         _stepSwipeUnlocked = false;
         _customerNameTouched = false;
@@ -712,7 +736,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   bool get _canContinueFromDetails {
     return _isCustomerNameValid(_customerNameController.text) &&
         _isCustomerContactValid(_customerContactController.text) &&
-        (_selectedSignatureId?.isNotEmpty == true);
+        (_creatingInvoice
+            ? (_selectedBankAccountId?.isNotEmpty == true)
+            : (_selectedSignatureId?.isNotEmpty == true));
   }
 
   bool get _canCreateSale => _canContinueFromDetails && _items.isNotEmpty;
@@ -757,7 +783,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       );
       return;
     }
-    if (_selectedSignatureId == null || _selectedSignatureId!.isEmpty) {
+    if (_creatingInvoice &&
+        (_selectedBankAccountId == null || _selectedBankAccountId!.isEmpty)) {
+      _showSnackBar('Select a bank account.');
+      return;
+    }
+    if (!_creatingInvoice &&
+        (_selectedSignatureId == null || _selectedSignatureId!.isEmpty)) {
       _showSnackBar('Select a signature.');
       return;
     }
@@ -782,8 +814,11 @@ class _NewSaleScreenState extends State<NewSaleScreen>
               ? 'Enter a valid email.'
               : _invalidPhoneMessage(),
         );
-      } else if (_selectedSignatureId == null ||
-          _selectedSignatureId!.isEmpty) {
+      } else if (_creatingInvoice &&
+          (_selectedBankAccountId == null || _selectedBankAccountId!.isEmpty)) {
+        _showSnackBar('Select a bank account.');
+      } else if (!_creatingInvoice &&
+          (_selectedSignatureId == null || _selectedSignatureId!.isEmpty)) {
         _showSnackBar('Select a signature.');
       } else if (_items.isEmpty) {
         _showSnackBar('Add at least one item.');
@@ -813,7 +848,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         return null;
       }
       final input = SaleInput(
-        signatureId: _selectedSignatureId!,
+        signatureId: _creatingInvoice ? null : _selectedSignatureId,
         customerName: _customerNameController.text.trim(),
         customerContact: contact,
         status: _saleStatus,
@@ -961,8 +996,11 @@ class _NewSaleScreenState extends State<NewSaleScreen>
               ? 'Enter a valid email.'
               : _invalidPhoneMessage(),
         );
-      } else if (_selectedSignatureId == null ||
-          _selectedSignatureId!.isEmpty) {
+      } else if (_creatingInvoice &&
+          (_selectedBankAccountId == null || _selectedBankAccountId!.isEmpty)) {
+        _showSnackBar('Select a bank account.');
+      } else if (!_creatingInvoice &&
+          (_selectedSignatureId == null || _selectedSignatureId!.isEmpty)) {
         _showSnackBar('Select a signature.');
       } else if (_items.isEmpty) {
         _showSnackBar('Add at least one item.');
@@ -975,10 +1013,12 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     }
 
     SignatureItem? signature;
-    for (final item in _signatures) {
-      if (item.id == _selectedSignatureId) {
-        signature = item;
-        break;
+    if (!_creatingInvoice) {
+      for (final item in _signatures) {
+        if (item.id == _selectedSignatureId) {
+          signature = item;
+          break;
+        }
       }
     }
     final shop = _previewShop();
@@ -988,6 +1028,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
           isCreatedSale: false,
           status: _saleStatus,
           shop: shop,
+          selectedBankAccountId: _selectedBankAccountId,
           signature: signature,
           customerName: _customerNameController.text.trim(),
           customerContact: _customerContactController.text.trim(),
@@ -1138,6 +1179,76 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     });
     await CacheLoader.saveSignaturesCache(_signatures);
     await _saveDraft();
+  }
+
+  Future<void> _openAddBankAccountDialog() async {
+    final shop = _previewShop();
+    if (shop == null) {
+      _showSnackBar('Unable to load shop profile.');
+      return;
+    }
+    if (shop.bankAccounts.length >= 2) {
+      _showSnackBar('You can save at most two bank accounts.');
+      return;
+    }
+    final usedIds = shop.bankAccounts.map((e) => e.id).toSet();
+    final nextId = !usedIds.contains('1') ? '1' : '2';
+    final created = await showBankAccountDialog(
+      context: context,
+      initial: ShopBankAccount(
+        id: nextId,
+        bankName: '',
+        accountNumber: '',
+        accountName: '',
+      ),
+      isNew: true,
+    );
+    if (created == null) return;
+
+    final nextBankAccounts = [...shop.bankAccounts, created]
+      ..sort((a, b) => int.parse(a.id).compareTo(int.parse(b.id)));
+
+    try {
+      final updatedShop = await _api.updateShop(
+        ShopUpdateInput(bankAccounts: nextBankAccounts),
+      );
+      await _updateShopCaches(updatedShop);
+      if (!mounted) return;
+      setState(() {
+        _selectedBankAccountId = updatedShop.bankAccounts
+            .firstWhere((e) => e.id == created.id, orElse: () => updatedShop.bankAccounts.first)
+            .id;
+      });
+      await _saveDraft();
+      _showSnackBar('Bank account added.');
+    } catch (e) {
+      if (!mounted) return;
+      _showSnackBar(e is ApiException ? e.message : 'Unable to add bank account.');
+    }
+  }
+
+  Future<void> _updateShopCaches(ShopProfile updatedShop) async {
+    final settings = CacheLoader.loadSettingsSummaryCache();
+    if (settings != null) {
+      await CacheLoader.saveSettingsSummaryCache(
+        SettingsSummary(
+          shop: updatedShop,
+          devices: settings.devices,
+          currentDevicePushEnabled: settings.currentDevicePushEnabled,
+        ),
+      );
+    }
+
+    final home = CacheLoader.loadHomeSummaryCache();
+    if (home != null) {
+      await CacheLoader.saveHomeSummaryCache(
+        HomeSummary(
+          shop: updatedShop,
+          analytics: home.analytics,
+          recentSales: home.recentSales,
+        ),
+      );
+    }
   }
 
   void _changeQuantity(int index, double delta) {
@@ -1621,11 +1732,18 @@ class _NewSaleScreenState extends State<NewSaleScreen>
           loadingSignatures: _loadingSignatures,
           uploadingSignature: _uploadingSignature,
           selectedSignatureId: _selectedSignatureId,
+          bankAccounts: _previewShop()?.bankAccounts ?? const <ShopBankAccount>[],
+          selectedBankAccountId: _selectedBankAccountId,
           onSelectSignature: (id) {
             setState(() => _selectedSignatureId = id);
             unawaited(_saveDraft());
           },
+          onSelectBankAccount: (id) {
+            setState(() => _selectedBankAccountId = id);
+            unawaited(_saveDraft());
+          },
           onAddSignature: _openAddSignatureSheet,
+          onAddBankAccount: _openAddBankAccountDialog,
           onStatusChanged: _setSaleStatus,
           total: _saleTotal,
           hasItems: _items.isNotEmpty,

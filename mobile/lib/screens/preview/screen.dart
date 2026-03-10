@@ -7,6 +7,7 @@ class SalePreviewScreen extends StatefulWidget {
     required this.status,
     required this.shop,
     required this.signature,
+    this.selectedBankAccountId,
     required this.customerName,
     required this.customerContact,
     required this.items,
@@ -31,6 +32,7 @@ class SalePreviewScreen extends StatefulWidget {
   final SaleStatus status;
   final ShopProfile? shop;
   final SignatureItem? signature;
+  final String? selectedBankAccountId;
   final String customerName;
   final String customerContact;
   final List<PreviewSaleItem> items;
@@ -55,11 +57,11 @@ class SalePreviewScreen extends StatefulWidget {
 }
 
 class _SalePreviewScreenState extends State<SalePreviewScreen> {
-  static const double _singlePageOverflowTolerancePx = 28;
   bool _documentBusy = false;
   bool _statusBusy = false;
   bool _deleteBusy = false;
   bool _fitsSinglePage = false;
+  String? _selectedBankAccountId;
   late final String _currencySymbol;
   late final String _currencyLocale;
   final ScrollController _receiptScrollController = ScrollController();
@@ -71,7 +73,23 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     final ctx = CurrencyService.resolveContext();
     _currencyLocale = ctx.locale;
     _currencySymbol = ctx.symbol;
+    _selectedBankAccountId =
+        widget.selectedBankAccountId ??
+        (widget.shop?.bankAccounts.isNotEmpty == true
+            ? widget.shop!.bankAccounts.first.id
+            : null);
     _syncSinglePageFlagWithRetry();
+  }
+
+  ShopBankAccount? get _selectedBankAccount {
+    final bankAccounts = widget.shop?.bankAccounts ?? const <ShopBankAccount>[];
+    if (bankAccounts.isEmpty) return null;
+    for (final bankAccount in bankAccounts) {
+      if (bankAccount.id == _selectedBankAccountId) {
+        return bankAccount;
+      }
+    }
+    return bankAccounts.first;
   }
 
   @override
@@ -347,7 +365,14 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
   }
 
   bool _isSinglePageFromMetrics(ScrollMetrics metrics) {
-    return metrics.maxScrollExtent <= _singlePageOverflowTolerancePx;
+    final renderObject =
+        _receiptBoundaryKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderObject == null || !renderObject.hasSize) {
+      return metrics.maxScrollExtent <= 0;
+    }
+    final receiptHeight = renderObject.size.height;
+    final deviceHeight = MediaQuery.of(context).size.height;
+    return receiptHeight <= deviceHeight;
   }
 
   void _syncSinglePageFlagWithRetry([int retry = 0]) {
@@ -380,6 +405,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
         ? customerContact
         : customerName;
     final customerBottomValue = customerContact.isNotEmpty ? customerName : '';
+    final bankAccounts = widget.shop?.bankAccounts ?? const <ShopBankAccount>[];
 
     return PopScope(
       canPop: !_isAnyBusy,
@@ -626,8 +652,16 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                                     value: _formatAmount(widget.total),
                                     strong: true,
                                   ),
+                                  if (widget.status == SaleStatus.invoice &&
+                                      bankAccounts.isNotEmpty) ...[
+                                    const SizedBox(height: 22),
+                                    _PreviewBankDetails(
+                                      bankAccount: _selectedBankAccount,
+                                    ),
+                                  ],
                                   const SizedBox(height: 24),
-                                  if (hasCustomerDetails)
+                                  if (widget.status != SaleStatus.invoice &&
+                                      hasCustomerDetails)
                                     Row(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
@@ -718,7 +752,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                                         ),
                                       ],
                                     )
-                                  else
+                                  else if (widget.status != SaleStatus.invoice)
                                     Column(
                                       children: [
                                         SizedBox(

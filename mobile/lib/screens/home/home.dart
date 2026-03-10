@@ -335,6 +335,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           : settingsShop.logoUrl,
       timezone: homeShop.timezone,
       createdAt: homeShop.createdAt,
+      bankAccounts: settingsShop.bankAccounts.isEmpty
+          ? homeShop.bankAccounts
+          : settingsShop.bankAccounts,
     );
   }
 

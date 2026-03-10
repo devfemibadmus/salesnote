@@ -219,3 +219,94 @@ class _PreviewSignature extends StatelessWidget {
     return const SizedBox.shrink();
   }
 }
+
+class _PreviewBankDetails extends StatelessWidget {
+  const _PreviewBankDetails({required this.bankAccount});
+
+  final ShopBankAccount? bankAccount;
+
+  @override
+  Widget build(BuildContext context) {
+    if (bankAccount == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: const Text(
+          'No bank account added yet. Add one in Settings before sharing this invoice.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Color(0xFF64748B),
+            fontSize: 14,
+            height: 1.4,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
+    Widget line(String label, String value) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 108,
+              child: Text(
+                label.toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xFF8A9AB3),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: Color(0xFF0E1930),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'PAY TO',
+            style: TextStyle(
+              color: Color(0xFF667085),
+              letterSpacing: 2.0,
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
+          ),
+          line('Bank', bankAccount!.bankName),
+          line('Account No.', bankAccount!.accountNumber),
+          line('Account Name', bankAccount!.accountName),
+        ],
+      ),
+    );
+  }
+}

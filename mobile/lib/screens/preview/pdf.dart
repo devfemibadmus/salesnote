@@ -23,6 +23,7 @@ extension _PreviewPdf on _SalePreviewScreenState {
     final signatureBytes = await _loadNetworkImageBytes(
       widget.signature?.imageUrl,
     );
+    final selectedBankAccount = _selectedBankAccount;
 
     final customerName = widget.customerName.trim();
     final customerContact = widget.customerContact.trim();
@@ -260,7 +261,12 @@ extension _PreviewPdf on _SalePreviewScreenState {
                         true,
                       ),
                       pw.SizedBox(height: 18),
-                      if (hasCustomerDetails)
+                      if (widget.status == SaleStatus.invoice) ...[
+                        _pdfBankDetails(selectedBankAccount),
+                        pw.SizedBox(height: 18),
+                      ],
+                      if (widget.status != SaleStatus.invoice &&
+                          hasCustomerDetails)
                         pw.Row(
                           crossAxisAlignment: pw.CrossAxisAlignment.start,
                           children: [
@@ -395,7 +401,7 @@ extension _PreviewPdf on _SalePreviewScreenState {
                             ),
                           ],
                         )
-                      else ...[
+                      else if (widget.status != SaleStatus.invoice) ...[
                         pw.Center(
                           child: pw.Container(
                             height: 52,
@@ -701,6 +707,87 @@ extension _PreviewPdf on _SalePreviewScreenState {
     } catch (_) {
       return null;
     }
+  }
+
+  pw.Widget _pdfBankDetails(ShopBankAccount? bankAccount) {
+    if (bankAccount == null) {
+      return pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.all(14),
+        decoration: pw.BoxDecoration(
+          color: PdfColor.fromInt(0xFFF8FAFC),
+          border: pw.Border.all(color: PdfColor.fromInt(0xFFE2E8F0)),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(14)),
+        ),
+        child: pw.Text(
+          'No bank account added yet. Add one in Settings before sharing this invoice.',
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(
+            color: PdfColor.fromInt(0xFF64748B),
+            fontSize: 11,
+            fontWeight: pw.FontWeight.bold,
+          ),
+        ),
+      );
+    }
+
+    pw.Widget line(String label, String value) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 8),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.SizedBox(
+              width: 84,
+              child: pw.Text(
+                label.toUpperCase(),
+                style: pw.TextStyle(
+                  color: PdfColor.fromInt(0xFF8A9AB3),
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+            pw.Expanded(
+              child: pw.Text(
+                value,
+                style: pw.TextStyle(
+                  color: PdfColor.fromInt(0xFF0E1930),
+                  fontSize: 12,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.all(14),
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromInt(0xFFF8FAFC),
+        border: pw.Border.all(color: PdfColor.fromInt(0xFFE2E8F0)),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(14)),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'PAY TO',
+            style: pw.TextStyle(
+              color: PdfColor.fromInt(0xFF667085),
+              fontSize: 12,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+          line('Bank', bankAccount.bankName),
+          line('Account No.', bankAccount.accountNumber),
+          line('Account Name', bankAccount.accountName),
+        ],
+      ),
+    );
   }
 }
 

@@ -200,6 +200,7 @@ class ApiClient {
         logoUrl: input.logoUrl,
         timezone: input.timezone,
         createdAt: '',
+        bankAccounts: const [],
       ),
     );
   }

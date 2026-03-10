@@ -11,6 +11,7 @@ import '../../app/config.dart';
 import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../../services/api_client.dart';
+import '../../services/bank_account.dart';
 import '../../services/cache/loader.dart';
 import '../../services/cache/local.dart';
 import '../../services/notice.dart';
@@ -401,6 +402,96 @@ class _ShopScreenState extends State<ShopScreen> {
     await _updateShopField(
       input: ShopUpdateInput(address: value),
       successMessage: 'Address updated.',
+    );
+  }
+
+  Future<void> _addBankAccount() async {
+    final shop = _shop;
+    if (shop == null) return;
+    if (shop.bankAccounts.length >= 2) {
+      _showNotice('You can save at most two bank accounts.');
+      return;
+    }
+    final usedIds = shop.bankAccounts.map((e) => e.id).toSet();
+    final nextId = !usedIds.contains('1') ? '1' : '2';
+    final created = await showBankAccountDialog(
+      context: context,
+      initial: ShopBankAccount(
+        id: nextId,
+        bankName: '',
+        accountNumber: '',
+        accountName: '',
+      ),
+      isNew: true,
+    );
+    if (created == null) return;
+    final next = [...shop.bankAccounts, created]..sort(
+      (a, b) => int.parse(a.id).compareTo(int.parse(b.id)),
+    );
+    await _updateShopField(
+      input: ShopUpdateInput(bankAccounts: next),
+      successMessage: 'Bank account added.',
+    );
+  }
+
+  Future<void> _editBankAccount(ShopBankAccount bankAccount) async {
+    final shop = _shop;
+    if (shop == null) return;
+    final updated = await showBankAccountDialog(
+      context: context,
+      initial: bankAccount,
+      isNew: false,
+    );
+    if (updated == null) return;
+    final changed = updated.bankName != bankAccount.bankName ||
+        updated.accountNumber != bankAccount.accountNumber ||
+        updated.accountName != bankAccount.accountName;
+    if (!changed) return;
+    final next = shop.bankAccounts
+        .map((item) => item.id == bankAccount.id ? updated : item)
+        .toList()
+      ..sort((a, b) => int.parse(a.id).compareTo(int.parse(b.id)));
+    await _updateShopField(
+      input: ShopUpdateInput(bankAccounts: next),
+      successMessage: 'Bank account updated.',
+    );
+  }
+
+  Future<void> _deleteBankAccount(ShopBankAccount bankAccount) async {
+    final shop = _shop;
+    if (shop == null) return;
+    if (shop.bankAccounts.length <= 1) {
+      _showNotice('At least one bank account must remain.');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Bank Account?'),
+        content: Text('Delete "${bankAccount.bankName}" from invoice payment options?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Color(0xFFEF4444)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final next = shop.bankAccounts
+        .where((item) => item.id != bankAccount.id)
+        .toList()
+      ..sort((a, b) => int.parse(a.id).compareTo(int.parse(b.id)));
+    await _updateShopField(
+      input: ShopUpdateInput(bankAccounts: next),
+      successMessage: 'Bank account deleted.',
     );
   }
 
@@ -850,6 +941,9 @@ class _ShopScreenState extends State<ShopScreen> {
                   onEditPhone: _editPhone,
                   onEditEmail: _editEmail,
                   onEditAddress: _editAddress,
+                  onAddBankAccount: _addBankAccount,
+                  onEditBankAccount: _editBankAccount,
+                  onDeleteBankAccount: _deleteBankAccount,
                   onAddSignature: _addSignature,
                   onDeleteSignature: _deleteSignature,
                   onWebApp: () =>

@@ -23,8 +23,12 @@ class _NewSaleDetailsStep extends StatelessWidget {
     required this.loadingSignatures,
     required this.uploadingSignature,
     required this.selectedSignatureId,
+    required this.bankAccounts,
+    required this.selectedBankAccountId,
     required this.onSelectSignature,
+    required this.onSelectBankAccount,
     required this.onAddSignature,
+    required this.onAddBankAccount,
     required this.onStatusChanged,
     required this.total,
     required this.hasItems,
@@ -54,8 +58,12 @@ class _NewSaleDetailsStep extends StatelessWidget {
   final bool loadingSignatures;
   final bool uploadingSignature;
   final String? selectedSignatureId;
+  final List<ShopBankAccount> bankAccounts;
+  final String? selectedBankAccountId;
   final ValueChanged<String> onSelectSignature;
+  final ValueChanged<String> onSelectBankAccount;
   final Future<void> Function() onAddSignature;
+  final Future<void> Function() onAddBankAccount;
   final ValueChanged<SaleStatus> onStatusChanged;
   final double total;
   final bool hasItems;
@@ -193,66 +201,117 @@ class _NewSaleDetailsStep extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 24),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'SELECT SIGNATURE',
-                        style: TextStyle(
-                          color: Color(0xFF667085),
-                          letterSpacing: 2.0,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
+                if (saleStatus == SaleStatus.paid) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'SELECT SIGNATURE',
+                          style: TextStyle(
+                            color: Color(0xFF667085),
+                            letterSpacing: 2.0,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: uploadingSignature ? null : onAddSignature,
-                        child: uploadingSignature
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                        const Spacer(),
+                        TextButton(
+                          onPressed: uploadingSignature ? null : onAddSignature,
+                          child: uploadingSignature
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  '+ NEW',
+                                  style: TextStyle(
+                                    color: Color(0xFF1677E6),
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
-                              )
-                            : const Text(
-                                '+ NEW',
-                                style: TextStyle(
-                                  color: Color(0xFF1677E6),
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 122,
-                  child: loadingSignatures
-                      ? const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          scrollDirection: Axis.horizontal,
-                          itemCount: signatures.length,
-                          separatorBuilder: (_, _) => const SizedBox(width: 12),
-                          itemBuilder: (context, index) {
-                            final signature = signatures[index];
-                            final selected =
-                                signature.id == selectedSignatureId;
-                            return _SignatureCard(
-                              signature: signature,
-                              selected: selected,
-                              onTap: () => onSelectSignature(signature.id),
-                            );
-                          },
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 122,
+                    child: loadingSignatures
+                        ? const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            scrollDirection: Axis.horizontal,
+                            itemCount: signatures.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 12),
+                            itemBuilder: (context, index) {
+                              final signature = signatures[index];
+                              final selected =
+                                  signature.id == selectedSignatureId;
+                              return _SignatureCard(
+                                signature: signature,
+                                selected: selected,
+                                onTap: () => onSelectSignature(signature.id),
+                              );
+                            },
+                          ),
+                  ),
+                ] else ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Row(
+                      children: [
+                        const Text(
+                          'SELECT BANK',
+                          style: TextStyle(
+                            color: Color(0xFF667085),
+                            letterSpacing: 2.0,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
                         ),
-                ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: onAddBankAccount,
+                          child: const Text(
+                            '+ NEW',
+                            style: TextStyle(
+                              color: Color(0xFF1677E6),
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (bankAccounts.isNotEmpty)
+                    SizedBox(
+                      height: 126,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: bankAccounts.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 12),
+                        itemBuilder: (context, index) {
+                          final bankAccount = bankAccounts[index];
+                          return _BankAccountCard(
+                            bankAccount: bankAccount,
+                            selected: bankAccount.id == selectedBankAccountId,
+                            onTap: () => onSelectBankAccount(bankAccount.id),
+                          );
+                        },
+                      ),
+                    ),
+                ],
               ],
             ),
           ),

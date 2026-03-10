@@ -82,6 +82,107 @@ class _SignatureCard extends StatelessWidget {
   }
 }
 
+class _BankAccountCard extends StatelessWidget {
+  const _BankAccountCard({
+    required this.bankAccount,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ShopBankAccount bankAccount;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: 176,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? const Color(0xFF1677E6) : const Color(0xFFD4DEE9),
+            width: selected ? 2.3 : 1.3,
+          ),
+          color: selected ? const Color(0xFFEFF5FD) : Colors.white,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? const Color(0xFFDCEBFF)
+                          : const Color(0xFFF2F6FB),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.account_balance_rounded,
+                      size: 18,
+                      color: selected
+                          ? const Color(0xFF1677E6)
+                          : const Color(0xFF6B7B93),
+                    ),
+                  ),
+                  const Spacer(),
+                  if (selected)
+                    const CircleAvatar(
+                      radius: 10,
+                      backgroundColor: Color(0xFF1677E6),
+                      child: Icon(Icons.check, size: 12, color: Colors.white),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                bankAccount.bankName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF0E1930),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                bankAccount.accountNumber,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF1677E6),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                bankAccount.accountName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF60708A),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ItemCard extends StatelessWidget {
   const _ItemCard({
     required this.item,

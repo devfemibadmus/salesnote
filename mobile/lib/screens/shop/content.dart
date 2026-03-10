@@ -18,6 +18,9 @@ class SettingsMainView extends StatelessWidget {
     required this.onEditPhone,
     required this.onEditEmail,
     required this.onEditAddress,
+    required this.onAddBankAccount,
+    required this.onEditBankAccount,
+    required this.onDeleteBankAccount,
     required this.onAddSignature,
     required this.onDeleteSignature,
     required this.onPrivacy,
@@ -40,6 +43,9 @@ class SettingsMainView extends StatelessWidget {
   final VoidCallback onEditPhone;
   final VoidCallback onEditEmail;
   final VoidCallback onEditAddress;
+  final VoidCallback onAddBankAccount;
+  final ValueChanged<ShopBankAccount> onEditBankAccount;
+  final ValueChanged<ShopBankAccount> onDeleteBankAccount;
   final VoidCallback onAddSignature;
   final ValueChanged<SignatureItem> onDeleteSignature;
   final VoidCallback onPrivacy;
@@ -90,6 +96,35 @@ class SettingsMainView extends StatelessWidget {
             SettingsInfoRow(
               label: 'Timezone',
               value: shop.timezone,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        const SettingsSectionTitle('BANK ACCOUNTS'),
+        const SizedBox(height: 8),
+        SettingsWhiteCard(
+          children: [
+            if (shop.bankAccounts.length < 2)
+              SettingsActionRow(
+                title: 'Add Bank Account',
+                onTap: onAddBankAccount,
+              ),
+            if (shop.bankAccounts.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                child: Text(
+                  'Add at least one bank account for invoices.',
+                  style: TextStyle(color: Color(0xFF64748B)),
+                ),
+              ),
+            ...shop.bankAccounts.map(
+              (bankAccount) => SettingsBankAccountRow(
+                bankAccount: bankAccount,
+                busy: busy,
+                canDelete: shop.bankAccounts.length > 1,
+                onEdit: () => onEditBankAccount(bankAccount),
+                onDelete: () => onDeleteBankAccount(bankAccount),
+              ),
             ),
           ],
         ),
@@ -591,6 +626,100 @@ class SettingsSignatureRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class SettingsBankAccountRow extends StatelessWidget {
+  const SettingsBankAccountRow({
+    super.key,
+    required this.bankAccount,
+    required this.busy,
+    required this.canDelete,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final ShopBankAccount bankAccount;
+  final bool busy;
+  final bool canDelete;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onEdit,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.account_balance_rounded,
+                color: Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    bankAccount.bankName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    bankAccount.accountNumber,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    bankAccount.accountName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: busy || !canDelete ? null : onDelete,
+              icon: Icon(
+                Icons.delete_outline_rounded,
+                color: canDelete
+                    ? const Color(0xFFEF4444)
+                    : const Color(0xFFCBD5E1),
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+          ],
+        ),
       ),
     );
   }

@@ -36,6 +36,7 @@ class ShopUpdateInput {
     this.address,
     this.logoUrl,
     this.password,
+    this.bankAccounts,
   });
 
   final String? name;
@@ -44,6 +45,7 @@ class ShopUpdateInput {
   final String? address;
   final String? logoUrl;
   final String? password;
+  final List<ShopBankAccount>? bankAccounts;
 
   Map<String, dynamic> toJson() => {
     'name': name,
@@ -52,6 +54,37 @@ class ShopUpdateInput {
     'address': address,
     'logo_url': logoUrl,
     'password': password,
+    'bank_accounts': bankAccounts?.map((e) => e.toJson()).toList(),
+  };
+}
+
+class ShopBankAccount {
+  ShopBankAccount({
+    required this.id,
+    required this.bankName,
+    required this.accountNumber,
+    required this.accountName,
+  });
+
+  final String id;
+  final String bankName;
+  final String accountNumber;
+  final String accountName;
+
+  factory ShopBankAccount.fromJson(dynamic json) {
+    return ShopBankAccount(
+      id: json['id'].toString(),
+      bankName: (json['bank_name'] as String? ?? '').trim(),
+      accountNumber: (json['account_number'] as String? ?? '').trim(),
+      accountName: (json['account_name'] as String? ?? '').trim(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': int.tryParse(id),
+    'bank_name': bankName,
+    'account_number': accountNumber,
+    'account_name': accountName,
   };
 }
 
@@ -65,6 +98,7 @@ class ShopProfile {
     this.logoUrl,
     required this.timezone,
     required this.createdAt,
+    this.bankAccounts = const <ShopBankAccount>[],
   });
 
   final String id;
@@ -75,6 +109,7 @@ class ShopProfile {
   final String? logoUrl;
   final String timezone;
   final String createdAt;
+  final List<ShopBankAccount> bankAccounts;
 
   factory ShopProfile.fromJson(dynamic json) {
     return ShopProfile(
@@ -86,6 +121,9 @@ class ShopProfile {
       logoUrl: json['logo_url'] as String?,
       timezone: json['timezone'] as String? ?? 'UTC',
       createdAt: json['created_at'] as String,
+      bankAccounts: (json['bank_accounts'] as List<dynamic>? ?? const [])
+          .map(ShopBankAccount.fromJson)
+          .toList(),
     );
   }
 
@@ -98,6 +136,7 @@ class ShopProfile {
     'logo_url': logoUrl,
     'timezone': timezone,
     'created_at': createdAt,
+    'bank_accounts': bankAccounts.map((e) => e.toJson()).toList(),
   };
 }
 
@@ -252,7 +291,7 @@ SaleStatus _saleStatusFromJson(dynamic json) {
 
 class SaleInput {
   SaleInput({
-    required this.signatureId,
+    this.signatureId,
     required this.customerName,
     required this.customerContact,
     required this.items,
@@ -267,7 +306,7 @@ class SaleInput {
     this.otherLabel = 'Others',
   });
 
-  final String signatureId;
+  final String? signatureId;
   final String customerName;
   final String customerContact;
   final List<SaleItemInput> items;
@@ -282,7 +321,7 @@ class SaleInput {
   final String otherLabel;
 
   Map<String, dynamic> toJson() => {
-    'signature_id': int.tryParse(signatureId),
+    'signature_id': signatureId == null ? null : int.tryParse(signatureId!),
     'customer_name': customerName,
     'customer_contact': customerContact,
     'items': items.map((e) => e.toJson()).toList(),
@@ -385,7 +424,7 @@ class Sale {
   Sale({
     required this.id,
     required this.shopId,
-    required this.signatureId,
+    this.signatureId,
     required this.status,
     this.customerName,
     this.customerContact,
@@ -404,7 +443,7 @@ class Sale {
 
   final String id;
   final String shopId;
-  final String signatureId;
+  final String? signatureId;
   final SaleStatus status;
   final String? customerName;
   final String? customerContact;
@@ -431,7 +470,7 @@ class Sale {
     return Sale(
       id: json['id'].toString(),
       shopId: json['shop_id'].toString(),
-      signatureId: json['signature_id'].toString(),
+      signatureId: json['signature_id']?.toString(),
       status: _saleStatusFromJson(json),
       customerName: json['customer_name'] as String?,
       customerContact: json['customer_contact'] as String?,
