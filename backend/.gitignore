@@ -14,7 +14,7 @@ k6/local.config.js
 **/dist/
 
 # Logs
-*.log
+logs
 uploads
 
 # OS/Editor

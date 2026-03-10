@@ -28,14 +28,6 @@ set SALESNOTE__SEED_SHOP_ADDRESS=12 Lagos Island Market
 cargo run --bin seed
 ```
 
-## Backup (Postgres)
-
-```bash
-cd backend
-set SALESNOTE__BACKUP_PATH=backups/salesnote_backup.dump
-cargo run --bin backup
-```
-
 ## Auth + Shop
 - `POST /auth/register` (phone/email/password + shop profile with address + timezone)
 - `POST /auth/login` (phone or email + password)
