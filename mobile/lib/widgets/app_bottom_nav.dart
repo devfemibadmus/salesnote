@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum AppBottomTab { home, sales, items, settings }
+enum AppBottomTab { none, home, sales, items, settings }
 
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({
@@ -70,8 +70,8 @@ class AppBottomNav extends StatelessWidget {
               ),
             ),
             _NavItem(
-              icon: Icons.inventory_2,
-              label: 'Items',
+              icon: Icons.receipt_long,
+              label: 'Invoices',
               active: activeTab == AppBottomTab.items,
               onTap: onItems,
             ),
@@ -108,7 +108,7 @@ class _NavItem extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: SizedBox(
-        width: 56,
+        width: 64,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

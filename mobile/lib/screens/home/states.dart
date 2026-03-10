@@ -861,6 +861,7 @@ class _MainState extends StatelessWidget {
     required this.onSettings,
     required this.onNotification,
     required this.onOpenSale,
+    required this.onOpenItem,
   });
 
   final ShopProfile shop;
@@ -871,6 +872,7 @@ class _MainState extends StatelessWidget {
   final VoidCallback onSettings;
   final VoidCallback onNotification;
   final void Function(Sale) onOpenSale;
+  final VoidCallback onOpenItem;
 
   @override
   Widget build(BuildContext context) {
@@ -1024,6 +1026,7 @@ class _MainState extends StatelessWidget {
         LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 380;
+            final hideTitle = constraints.maxWidth < 460;
             final selector = Container(
               decoration: BoxDecoration(
                 color: const Color(0xFFE2E8F0),
@@ -1054,23 +1057,28 @@ class _MainState extends StatelessWidget {
             );
             if (compact) {
               return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: hideTitle
+                    ? CrossAxisAlignment.end
+                    : CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Sales Trend',
-                    style: TextStyle(fontSize: 34 / 2, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
+                  if (!hideTitle) ...[
+                    const Text(
+                      'Sales Trend',
+                      style: TextStyle(fontSize: 34 / 2, fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   selector,
                 ],
               );
             }
             return Row(
               children: [
-                const Text(
-                  'Sales Trend',
-                  style: TextStyle(fontSize: 34 / 2, fontWeight: FontWeight.w700),
-                ),
+                if (!hideTitle)
+                  const Text(
+                    'Sales Trend',
+                    style: TextStyle(fontSize: 34 / 2, fontWeight: FontWeight.w700),
+                  ),
                 const Spacer(),
                 selector,
               ],
@@ -1083,26 +1091,34 @@ class _MainState extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _InfoCard(
-                title: 'FAST MOVING',
-                text: analytics.fastMoving.isEmpty
-                    ? 'No data'
-                    : analytics.fastMoving.first.productName,
-                subtext: analytics.fastMoving.isEmpty
-                    ? '0 sold in 30 days'
-                    : '${analytics.fastMoving.first.sold30Days.toStringAsFixed(0)} sold in 30 days',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: analytics.fastMoving.isEmpty ? null : onOpenItem,
+                child: _InfoCard(
+                  title: 'FAST MOVING',
+                  text: analytics.fastMoving.isEmpty
+                      ? 'No data'
+                      : analytics.fastMoving.first.productName,
+                  subtext: analytics.fastMoving.isEmpty
+                      ? '0 sold in 30 days'
+                      : '${analytics.fastMoving.first.sold30Days.toStringAsFixed(0)} sold in 30 days',
+                ),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: _InfoCard(
-                title: 'SLOW MOVING',
-                text: analytics.slowMoving.isEmpty
-                    ? 'No data'
-                    : analytics.slowMoving.first.productName,
-                subtext: analytics.slowMoving.isEmpty
-                    ? '0 sold in 30 days'
-                    : '${analytics.slowMoving.first.sold30Days.toStringAsFixed(0)} sold in 30 days',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: analytics.slowMoving.isEmpty ? null : onOpenItem,
+                child: _InfoCard(
+                  title: 'SLOW MOVING',
+                  text: analytics.slowMoving.isEmpty
+                      ? 'No data'
+                      : analytics.slowMoving.first.productName,
+                  subtext: analytics.slowMoving.isEmpty
+                      ? '0 sold in 30 days'
+                      : '${analytics.slowMoving.first.sold30Days.toStringAsFixed(0)} sold in 30 days',
+                ),
               ),
             ),
           ],

@@ -4,6 +4,7 @@ class SalePreviewScreen extends StatefulWidget {
   const SalePreviewScreen({
     super.key,
     required this.isCreatedSale,
+    required this.status,
     required this.shop,
     required this.signature,
     required this.customerName,
@@ -21,10 +22,12 @@ class SalePreviewScreen extends StatefulWidget {
     this.receiptNumber,
     this.createdAt,
     this.onCreate,
+    this.onMarkAsPaid,
     this.onDownloadPdf,
   });
 
   final bool isCreatedSale;
+  final SaleStatus status;
   final ShopProfile? shop;
   final SignatureItem? signature;
   final String customerName;
@@ -42,6 +45,7 @@ class SalePreviewScreen extends StatefulWidget {
   final String? receiptNumber;
   final DateTime? createdAt;
   final Future<String?> Function()? onCreate;
+  final Future<void> Function()? onMarkAsPaid;
   final Future<void> Function()? onDownloadPdf;
 
   @override
@@ -98,6 +102,18 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     }
   }
 
+  Future<void> _handleMarkAsPaid() async {
+    if (_busy || widget.onMarkAsPaid == null) return;
+    setState(() => _busy = true);
+    try {
+      await widget.onMarkAsPaid!.call();
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
   Future<void> _handleDownloadPdf() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -121,7 +137,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     if (!_fitsSinglePage) {
       AppNotice.show(
         context,
-        'Image download is only available for single-page receipts.',
+        'Image download is only available for single-page documents.',
       );
       return;
     }
@@ -149,7 +165,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
       final fileName = _receiptFileName('pdf');
       await Share.shareXFiles([
         XFile.fromData(bytes, mimeType: 'application/pdf', name: fileName),
-      ], text: 'Salesnote receipt');
+      ], text: widget.status == SaleStatus.invoice ? 'Salesnote invoice' : 'Salesnote receipt');
     } catch (e) {
       if (!mounted) return;
       AppNotice.show(context, 'Failed to share receipt: $e');
@@ -187,6 +203,8 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
   }
 
   Widget _buildCreatedSaleActions() {
+    final showMarkAsPaid =
+        widget.status == SaleStatus.invoice && widget.onMarkAsPaid != null;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -222,13 +240,47 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
         if (!_fitsSinglePage) ...[
           const SizedBox(height: 8),
           const Text(
-            'Image download is available only for single-page receipts.',
+            'Image download is available only for single-page documents.',
             style: TextStyle(
               color: Color(0xFF8A9AB3),
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
+          ),
+        ],
+        if (showMarkAsPaid) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: _busy ? null : _handleMarkAsPaid,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1677E6),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              icon: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.check_circle_outline_rounded),
+              label: Text(
+                _busy ? 'Updating...' : 'Mark as paid',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ),
         ],
       ],
@@ -265,7 +317,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     final dateText = DateFormat('MMM d, yyyy | HH:mm').format(timestamp);
     final receiptNo =
         widget.receiptNumber ??
-        '#REC-${timestamp.millisecondsSinceEpoch % 1000000}';
+        '#${widget.status == SaleStatus.invoice ? 'INV' : 'REC'}-${timestamp.millisecondsSinceEpoch % 1000000}';
     final customerName = widget.customerName.trim();
     final customerContact = widget.customerContact.trim();
     final hasCustomerDetails =
@@ -295,11 +347,13 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                         color: Color(0xFF46566E),
                       ),
                     ),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'E-Receipt',
+                        widget.status == SaleStatus.invoice
+                            ? 'Invoice'
+                            : 'E-Receipt',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 34,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF0E1930),
@@ -699,7 +753,11 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                                 )
                               : const Icon(Icons.check_rounded),
                           label: Text(
-                            _busy ? 'Creating...' : 'Create Sale & Receipt',
+                            _busy
+                                ? 'Creating...'
+                                : (widget.status == SaleStatus.invoice
+                                      ? 'Create Invoice'
+                                      : 'Create Sale & Receipt'),
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,

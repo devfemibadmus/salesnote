@@ -63,6 +63,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Navigator.pushNamed(context, route);
   }
 
+  void _openItemsPage() {
+    _api.cancelInFlight();
+    if (!mounted) return;
+    Navigator.pushNamed(context, AppRoutes.items);
+  }
+
   bool _openingPreview = false;
 
   Future<void> _openSalePreviewById(String saleId) async {
@@ -347,6 +353,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onSettings: () => _goTo(AppRoutes.shop, reset: true),
         onNotification: () => _goTo(AppRoutes.notification),
         onOpenSale: (sale) => _openSalePreviewById(sale.id.toString()),
+        onOpenItem: _openItemsPage,
       );
     }
 
@@ -363,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onHome: () {},
         onSales: () => _goTo(AppRoutes.sales, reset: true),
         onAdd: () => _goTo(AppRoutes.newSale),
-        onItems: () => _goTo(AppRoutes.items, reset: true),
+        onItems: () => _goTo(AppRoutes.invoices, reset: true),
         onSettings: () => _goTo(AppRoutes.shop, reset: true),
       ),
     );

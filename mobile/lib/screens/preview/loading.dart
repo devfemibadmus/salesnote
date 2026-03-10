@@ -23,7 +23,7 @@ class SalePreviewLoadingScreen extends StatelessWidget {
                   ),
                   const Expanded(
                     child: Text(
-                      'E-Receipt',
+                      'Preview',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 34,

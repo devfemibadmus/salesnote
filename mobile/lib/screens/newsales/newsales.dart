@@ -36,7 +36,9 @@ class _AdjustmentDraft {
 }
 
 class NewSaleScreen extends StatefulWidget {
-  const NewSaleScreen({super.key});
+  const NewSaleScreen({super.key, this.routeArgs});
+
+  final NewSaleRouteArgs? routeArgs;
 
   @override
   State<NewSaleScreen> createState() => _NewSaleScreenState();
@@ -89,6 +91,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   bool _stepSwipeUnlocked = false;
   String? _selectedSignatureId;
   String _activeDraftId = _defaultDraftId;
+  SaleStatus _saleStatus = SaleStatus.paid;
 
   @override
   void initState() {
@@ -187,6 +190,15 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   void _initCountry() {
     _country = RegionService.resolveAccountCountry();
   }
+
+  bool get _creatingInvoice => _saleStatus == SaleStatus.invoice;
+
+  String get _documentTitle => _creatingInvoice ? 'New Invoice' : 'New Sale';
+
+  String get _successMessage =>
+      _creatingInvoice
+          ? 'Invoice created successfully.'
+          : 'Sale created successfully.';
 
   Future<void> _loadSignatures() async {
     final inFlight = _signaturesRequest;
@@ -373,6 +385,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _selectedSignatureId = _signatures.isNotEmpty
             ? _signatures.first.id
             : null;
+        _saleStatus = widget.routeArgs?.startAsInvoice == true
+            ? SaleStatus.invoice
+            : SaleStatus.paid;
         _step = 0;
         _stepSwipeUnlocked = false;
         _customerNameTouched = false;
@@ -426,6 +441,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       final otherLabel = (draft['other_label'] ?? '').toString().trim();
       _otherLabel = otherLabel.isEmpty ? _defaultOtherLabel : otherLabel;
       _selectedSignatureId = draft['signature_id']?.toString();
+      final rawStatus = (draft['status'] ?? '').toString().trim().toLowerCase();
+      _saleStatus = rawStatus == 'invoice'
+          ? SaleStatus.invoice
+          : SaleStatus.paid;
       _step = (draft['step'] as num?)?.toInt().clamp(0, 1) ?? 0;
       _stepSwipeUnlocked = _step == 1 || parsedItems.isNotEmpty;
       _customerNameTouched = false;
@@ -461,6 +480,12 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     _saveDraftDebounced();
   }
 
+  void _setSaleStatus(SaleStatus status) {
+    if (_saleStatus == status) return;
+    setState(() => _saleStatus = status);
+    unawaited(_saveDraft());
+  }
+
   Future<void> _saveDraft() async {
     if (_switchingDraft || _hydratingDraft) return;
     final trimmedName = _customerNameController.text.trim();
@@ -483,6 +508,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       'other_amount': _otherAmount,
       'other_label': _otherLabel,
       'signature_id': _selectedSignatureId,
+      'status': _saleStatus.name,
       'step': _step,
       'items': _items
           .map(
@@ -790,6 +816,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         signatureId: _selectedSignatureId!,
         customerName: _customerNameController.text.trim(),
         customerContact: contact,
+        status: _saleStatus,
         discountAmount: _discountAmount,
         vatAmount: _vatAmount,
         serviceFeeAmount: _serviceFeeAmount,
@@ -813,7 +840,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       unawaited(_refreshPostCreateCachesAfterSaleCreate());
       await _clearActiveDraftAfterSubmit();
       if (!mounted) return null;
-      _showSnackBar('Sale created successfully.');
+      _showSnackBar(_successMessage);
       return createdSale.id;
     } catch (e) {
       if (!mounted) return null;
@@ -938,6 +965,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       MaterialPageRoute<String?>(
         builder: (_) => SalePreviewScreen(
           isCreatedSale: false,
+          status: _saleStatus,
           shop: shop,
           signature: signature,
           customerName: _customerNameController.text.trim(),
@@ -969,12 +997,17 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     }
     Navigator.pushNamedAndRemoveUntil(
       context,
-      AppRoutes.sales,
+      _creatingInvoice ? AppRoutes.invoices : AppRoutes.sales,
       (_) => false,
-      arguments: SalesRouteArgs(
-        openSaleId: createdSaleId.trim(),
-        refreshFirst: false,
-      ),
+      arguments: _creatingInvoice
+          ? InvoicesRouteArgs(
+              openSaleId: createdSaleId.trim(),
+              refreshFirst: false,
+            )
+          : SalesRouteArgs(
+              openSaleId: createdSaleId.trim(),
+              refreshFirst: false,
+            ),
     );
   }
 
@@ -1521,6 +1554,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       },
       children: [
         _NewSaleDetailsStep(
+          title: _documentTitle,
+          saleStatus: _saleStatus,
           customerNameController: _customerNameController,
           customerContactController: _customerContactController,
           customerNameInvalid: _customerNameInvalid,
@@ -1570,6 +1605,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
             unawaited(_saveDraft());
           },
           onAddSignature: _openAddSignatureSheet,
+          onStatusChanged: _setSaleStatus,
           total: _saleTotal,
           hasItems: _items.isNotEmpty,
           formatAmount: _formatAmount,
@@ -1581,6 +1617,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
           },
         ),
         _NewSaleItemsStep(
+          previewLabel: _creatingInvoice ? 'Preview Invoice  →' : 'Preview Receipt  →',
           items: _items,
           drafts: _drafts,
           activeDraftId: _activeDraftId,

@@ -890,7 +890,7 @@ class _ShopScreenState extends State<ShopScreen> {
         onHome: () => _goTo(AppRoutes.home, reset: true),
         onSales: () => _goTo(AppRoutes.sales, reset: true),
         onAdd: () => _goTo(AppRoutes.newSale),
-        onItems: () => _goTo(AppRoutes.items, reset: true),
+        onItems: () => _goTo(AppRoutes.invoices, reset: true),
         onSettings: () {},
       ),
     );

@@ -1,15 +1,31 @@
 part of 'items.dart';
 
 class _ItemsHeader extends StatelessWidget {
-  const _ItemsHeader();
+  const _ItemsHeader({required this.showBackButton});
+
+  final bool showBackButton;
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
-        SizedBox(width: 4),
-        SizedBox(width: 10),
-        Text(
+        if (showBackButton)
+          InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => Navigator.of(context).maybePop(),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 20,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          )
+        else
+          const SizedBox(width: 4),
+        const SizedBox(width: 10),
+        const Text(
           'Items',
           style: TextStyle(
             fontSize: 17,
@@ -17,7 +33,7 @@ class _ItemsHeader extends StatelessWidget {
             color: Color(0xFF0F172A),
           ),
         ),
-        Spacer(),
+        const Spacer(),
       ],
     );
   }

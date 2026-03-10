@@ -4,6 +4,7 @@ class AppRoutes {
   static const home = '/home';
   static const sales = '/sales';
   static const items = '/items';
+  static const invoices = '/invoices';
   static const newSale = '/sales/new';
   static const shop = '/shop';
   static const notification = '/notification';
@@ -11,7 +12,7 @@ class AppRoutes {
   static const Map<String, int> tabIndices = {
     home: 0,
     sales: 1,
-    items: 2,
+    invoices: 2,
     shop: 3,
   };
 }
@@ -21,4 +22,17 @@ class SalesRouteArgs {
 
   final String? openSaleId;
   final bool refreshFirst;
+}
+
+class InvoicesRouteArgs {
+  const InvoicesRouteArgs({this.openSaleId, this.refreshFirst = false});
+
+  final String? openSaleId;
+  final bool refreshFirst;
+}
+
+class NewSaleRouteArgs {
+  const NewSaleRouteArgs({this.startAsInvoice = false});
+
+  final bool startAsInvoice;
 }

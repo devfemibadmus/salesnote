@@ -2,6 +2,8 @@ part of '../newsales.dart';
 
 class _NewSaleDetailsStep extends StatelessWidget {
   const _NewSaleDetailsStep({
+    required this.title,
+    required this.saleStatus,
     required this.customerNameController,
     required this.customerContactController,
     required this.customerNameInvalid,
@@ -23,6 +25,7 @@ class _NewSaleDetailsStep extends StatelessWidget {
     required this.selectedSignatureId,
     required this.onSelectSignature,
     required this.onAddSignature,
+    required this.onStatusChanged,
     required this.total,
     required this.hasItems,
     required this.formatAmount,
@@ -30,6 +33,8 @@ class _NewSaleDetailsStep extends StatelessWidget {
     required this.onClose,
   });
 
+  final String title;
+  final SaleStatus saleStatus;
   final TextEditingController customerNameController;
   final TextEditingController customerContactController;
   final bool customerNameInvalid;
@@ -51,6 +56,7 @@ class _NewSaleDetailsStep extends StatelessWidget {
   final String? selectedSignatureId;
   final ValueChanged<String> onSelectSignature;
   final Future<void> Function() onAddSignature;
+  final ValueChanged<SaleStatus> onStatusChanged;
   final double total;
   final bool hasItems;
   final String Function(num amount, {int decimalDigits}) formatAmount;
@@ -72,9 +78,9 @@ class _NewSaleDetailsStep extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Row(
                     children: [
-                      const Text(
-                        'New Sale',
-                        style: TextStyle(
+                      Text(
+                        title,
+                        style: const TextStyle(
                           color: Color(0xFF0E1930),
                           fontSize: 23,
                           fontWeight: FontWeight.w700,
@@ -89,6 +95,36 @@ class _NewSaleDetailsStep extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _DocumentTypePill(
+                            label: 'Receipt',
+                            active: saleStatus == SaleStatus.paid,
+                            onTap: () => onStatusChanged(SaleStatus.paid),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _DocumentTypePill(
+                            label: 'Invoice',
+                            active: saleStatus == SaleStatus.invoice,
+                            onTap: () => onStatusChanged(SaleStatus.invoice),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 24),
                   child: _StepProgress(activeStep: 0),
@@ -236,6 +272,7 @@ class _NewSaleDetailsStep extends StatelessWidget {
 
 class _NewSaleItemsStep extends StatelessWidget {
   const _NewSaleItemsStep({
+    required this.previewLabel,
     required this.items,
     required this.drafts,
     required this.activeDraftId,
@@ -268,6 +305,7 @@ class _NewSaleItemsStep extends StatelessWidget {
     required this.formatAmount,
   });
 
+  final String previewLabel;
   final List<_DraftSaleItem> items;
   final List<_DraftSlot> drafts;
   final String activeDraftId;
@@ -632,9 +670,9 @@ class _NewSaleItemsStep extends StatelessWidget {
                             color: Colors.white,
                           ),
                         )
-                      : const Text(
-                          'Preview Sales  →',
-                          style: TextStyle(
+                      : Text(
+                          previewLabel,
+                          style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
                           ),
@@ -645,6 +683,53 @@ class _NewSaleItemsStep extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _DocumentTypePill extends StatelessWidget {
+  const _DocumentTypePill({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        height: 46,
+        decoration: BoxDecoration(
+          color: active ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: active
+              ? const [
+                  BoxShadow(
+                    color: Color(0x120F172A),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
     );
   }
 }

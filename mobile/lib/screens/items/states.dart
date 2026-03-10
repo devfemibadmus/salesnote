@@ -1,7 +1,9 @@
 part of 'items.dart';
 
 class _ItemsLoadingState extends StatelessWidget {
-  const _ItemsLoadingState();
+  const _ItemsLoadingState({required this.showBackButton});
+
+  final bool showBackButton;
 
   @override
   Widget build(BuildContext context) {
@@ -11,30 +13,35 @@ class _ItemsLoadingState extends StatelessWidget {
       ),
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-      children: const [
-        _ItemsHeader(),
+      children: [
+        _ItemsHeader(showBackButton: showBackButton),
         SizedBox(height: 20),
-        HistorySearchField(
+        const HistorySearchField(
           hasDateFilter: false,
           hintText: 'Search by item name',
         ),
-        SizedBox(height: 18),
-        _ItemsRowSkeleton(),
-        SizedBox(height: 12),
-        _ItemsRowSkeleton(),
-        SizedBox(height: 12),
-        _ItemsRowSkeleton(),
-        SizedBox(height: 12),
-        _ItemsRowSkeleton(),
+        const SizedBox(height: 18),
+        const _ItemsRowSkeleton(),
+        const SizedBox(height: 12),
+        const _ItemsRowSkeleton(),
+        const SizedBox(height: 12),
+        const _ItemsRowSkeleton(),
+        const SizedBox(height: 12),
+        const _ItemsRowSkeleton(),
       ],
     );
   }
 }
 
 class _ItemsEmptyState extends StatelessWidget {
-  const _ItemsEmptyState({required this.onAddSale, this.message});
+  const _ItemsEmptyState({
+    required this.onAddSale,
+    required this.showBackButton,
+    this.message,
+  });
 
   final VoidCallback onAddSale;
+  final bool showBackButton;
   final String? message;
 
   @override
@@ -46,7 +53,7 @@ class _ItemsEmptyState extends StatelessWidget {
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
       children: [
-        const _ItemsHeader(),
+        _ItemsHeader(showBackButton: showBackButton),
         const SizedBox(height: 82),
         const _EmptyItemsVisual(),
         const SizedBox(height: 28),
@@ -108,6 +115,7 @@ class _ItemsMainState extends StatelessWidget {
     required this.hasMore,
     required this.onLoadMore,
     required this.onDateTap,
+    required this.showBackButton,
     this.onClearDate,
     required this.hasDateFilter,
   });
@@ -119,6 +127,7 @@ class _ItemsMainState extends StatelessWidget {
   final bool hasMore;
   final Future<void> Function() onLoadMore;
   final VoidCallback? onDateTap;
+  final bool showBackButton;
   final VoidCallback? onClearDate;
   final bool hasDateFilter;
 
@@ -133,7 +142,7 @@ class _ItemsMainState extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
             child: Column(
               children: [
-                const _ItemsHeader(),
+                _ItemsHeader(showBackButton: showBackButton),
                 const SizedBox(height: 20),
                 HistorySearchField(
                   controller: queryController,

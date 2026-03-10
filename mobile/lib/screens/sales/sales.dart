@@ -50,6 +50,10 @@ class _SalesScreenState extends State<SalesScreen> {
   DateTime? _endDate;
   Timer? _searchDebounce;
 
+  List<Sale> _receiptRows(List<Sale> source) {
+    return source.where((sale) => sale.isPaidReceipt).toList();
+  }
+
   void _goTo(String route, {bool reset = false}) {
     _api.cancelInFlight();
     if (!mounted) return;
@@ -86,7 +90,7 @@ class _SalesScreenState extends State<SalesScreen> {
         _sales = cached.sales;
         _page = cached.page;
         _hasMore = cached.hasMore;
-        _baseDataKnownEmpty = cached.sales.isEmpty;
+        _baseDataKnownEmpty = _receiptRows(cached.sales).isEmpty;
         _error = null;
         _loading = false;
       });
@@ -142,6 +146,7 @@ class _SalesScreenState extends State<SalesScreen> {
             _sales = loaded.sales;
             _page = loaded.page;
             _hasMore = loaded.hasMore;
+            _baseDataKnownEmpty = _receiptRows(loaded.sales).isEmpty;
             _error = null;
             _loading = false;
           });
@@ -245,7 +250,7 @@ class _SalesScreenState extends State<SalesScreen> {
         _page = loaded.page;
         _hasMore = !hasActiveFilters && loaded.hasMore;
         if (!hasActiveFilters) {
-          _baseDataKnownEmpty = loaded.sales.isEmpty;
+          _baseDataKnownEmpty = _receiptRows(loaded.sales).isEmpty;
         }
       });
     } catch (e) {
@@ -279,7 +284,7 @@ class _SalesScreenState extends State<SalesScreen> {
         _page = loaded.page;
         _hasMore = !hasActiveFilters && loaded.hasMore;
         if (!hasActiveFilters) {
-          _baseDataKnownEmpty = loaded.sales.isEmpty;
+          _baseDataKnownEmpty = _receiptRows(loaded.sales).isEmpty;
         }
         _error = null;
       });
@@ -335,13 +340,14 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   List<Sale> get _filteredSales {
+    final receipts = _receiptRows(_sales);
     final normalized = _query.trim().toLowerCase();
     final hasSearch = normalized.isNotEmpty;
     final hasDates = _startDate != null || _endDate != null;
 
-    if (!hasSearch && !hasDates) return _sales;
+    if (!hasSearch && !hasDates) return receipts;
 
-    return _sales.where((sale) {
+    return receipts.where((sale) {
       if (hasSearch) {
         final customer = (sale.customerName ?? '').toLowerCase();
         final idText = sale.id.toLowerCase();
@@ -365,7 +371,7 @@ class _SalesScreenState extends State<SalesScreen> {
     return query.isNotEmpty || _startDate != null || _endDate != null;
   }
 
-  bool get _isDataEmpty => !_loading && _sales.isEmpty;
+  bool get _isDataEmpty => !_loading && _receiptRows(_sales).isEmpty;
 
   bool get _shouldShowFullEmptyState =>
       _isDataEmpty && _query.trim().isEmpty && _startDate == null && _endDate == null && _baseDataKnownEmpty;
@@ -417,7 +423,7 @@ class _SalesScreenState extends State<SalesScreen> {
         onHome: () => _goTo(AppRoutes.home, reset: true),
         onSales: () {},
         onAdd: () => _goTo(AppRoutes.newSale),
-        onItems: () => _goTo(AppRoutes.items, reset: true),
+        onItems: () => _goTo(AppRoutes.invoices, reset: true),
         onSettings: () => _goTo(AppRoutes.shop, reset: true),
       ),
     );

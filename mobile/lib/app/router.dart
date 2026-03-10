@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../screens/auth/auth.dart';
 import '../screens/home/home.dart';
 import '../screens/items/items.dart';
+import '../screens/invoices/invoices.dart';
 import '../screens/newsales/newsales.dart';
 import '../screens/notification/notification.dart';
 import '../screens/onboarding/onboarding.dart';
@@ -79,9 +80,15 @@ class AppRouter {
         final salesArgs = args is SalesRouteArgs ? args : null;
         return buildTab(SalesScreen(routeArgs: salesArgs));
       case AppRoutes.items:
-        return buildTab(const ItemsScreen());
+        return buildDefault(const ItemsScreen());
+      case AppRoutes.invoices:
+        final args = settings.arguments;
+        final invoiceArgs = args is InvoicesRouteArgs ? args : null;
+        return buildTab(InvoicesScreen(routeArgs: invoiceArgs));
       case AppRoutes.newSale:
-        return buildDefault(const NewSaleScreen());
+        final args = settings.arguments;
+        final newSaleArgs = args is NewSaleRouteArgs ? args : null;
+        return buildDefault(NewSaleScreen(routeArgs: newSaleArgs));
       case AppRoutes.shop:
         return buildTab(const ShopScreen());
       case AppRoutes.notification:

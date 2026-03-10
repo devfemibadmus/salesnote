@@ -9,6 +9,7 @@ import '../../services/api_client.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
 import '../../services/notice.dart';
+import '../../services/preview.dart';
 import '../../services/token_store.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/history.dart';
@@ -16,18 +17,22 @@ import '../../widgets/history.dart';
 part 'states.dart';
 part 'widgets.dart';
 
-class ItemsScreen extends StatefulWidget {
-  const ItemsScreen({super.key});
+class InvoicesScreen extends StatefulWidget {
+  const InvoicesScreen({super.key, this.routeArgs});
+
+  final InvoicesRouteArgs? routeArgs;
 
   @override
-  State<ItemsScreen> createState() => _ItemsScreenState();
+  State<InvoicesScreen> createState() => _InvoicesScreenState();
 }
 
-class _ItemsScreenState extends State<ItemsScreen> {
+class _InvoicesScreenState extends State<InvoicesScreen> {
   final ApiClient _api = ApiClient(TokenStore());
   final TextEditingController _searchController = TextEditingController();
   static const int _perPage = 20;
   static const int _filteredPerPage = 200;
+  late final String _invoiceCurrencySymbol;
+  late final String _invoiceLocale;
 
   bool _loading = true;
   bool _loadingMore = false;
@@ -38,8 +43,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
   String _query = '';
   int _page = 1;
   int _searchRequestId = 0;
-  late final String _currencySymbol;
-  late final String _currencyLocale;
+  bool _openingPreview = false;
+  bool _launchIntentHandled = false;
+  bool _launchIntentScheduled = false;
   DateTime? _startDate;
   DateTime? _endDate;
   Timer? _searchDebounce;
@@ -58,37 +64,39 @@ class _ItemsScreenState extends State<ItemsScreen> {
   void initState() {
     super.initState();
     final ctx = CurrencyService.resolveContext();
-    _currencyLocale = ctx.locale;
-    _currencySymbol = ctx.symbol;
+    _invoiceLocale = ctx.locale;
+    _invoiceCurrencySymbol = ctx.symbol;
     _searchController.addListener(_onSearchChanged);
-    _loadItemsFromCacheOrApi();
+    _loadInvoicesFromCacheOrApi();
   }
 
-  String _formatAmount(num amount, {int decimalDigits = 2}) {
+  String _formatInvoiceAmount(num amount) {
     return NumberFormat.currency(
-      locale: _currencyLocale,
-      symbol: _currencySymbol,
-      decimalDigits: decimalDigits,
+      locale: _invoiceLocale,
+      symbol: _invoiceCurrencySymbol,
+      decimalDigits: 2,
     ).format(amount);
   }
 
-  Future<void> _loadItemsFromCacheOrApi() async {
-    final cached = CacheLoader.loadSalesPageCache(includeItems: true);
+  Future<void> _loadInvoicesFromCacheOrApi() async {
+    final cached = CacheLoader.loadSalesPageCache(includeItems: false);
     if (cached != null) {
       if (!mounted) return;
       setState(() {
         _sales = cached.sales;
         _page = cached.page;
         _hasMore = cached.hasMore;
-        _baseDataKnownEmpty = cached.sales.isEmpty;
+        _baseDataKnownEmpty = _invoiceRows(cached.sales).isEmpty;
         _error = null;
         _loading = false;
       });
       if (_sales.isEmpty) {
-        unawaited(_refreshItemsInBackground());
+        unawaited(_refreshInvoicesInBackground());
       }
+      _scheduleLaunchIntent();
       return;
     }
+
     if (!mounted) return;
     setState(() {
       _sales = [];
@@ -98,7 +106,52 @@ class _ItemsScreenState extends State<ItemsScreen> {
       _error = null;
       _loading = false;
     });
-    unawaited(_refreshItemsInBackground());
+    unawaited(_refreshInvoicesInBackground());
+    _scheduleLaunchIntent();
+  }
+
+  void _scheduleLaunchIntent() {
+    if (_launchIntentScheduled || _launchIntentHandled) return;
+    _launchIntentScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _launchIntentScheduled = false;
+      if (!mounted || _launchIntentHandled) return;
+      unawaited(_handleLaunchIntent());
+    });
+  }
+
+  Future<void> _handleLaunchIntent() async {
+    if (_launchIntentHandled) return;
+    final saleId = widget.routeArgs?.openSaleId?.trim() ?? '';
+    if (saleId.isEmpty) {
+      _launchIntentHandled = true;
+      return;
+    }
+    _launchIntentHandled = true;
+
+    if (widget.routeArgs?.refreshFirst == true) {
+      try {
+        final loaded = await CacheLoader.fetchAndCacheSalesPage(
+          _api,
+          includeItems: false,
+          page: 1,
+          perPage: _perPage,
+        );
+        if (mounted) {
+          setState(() {
+            _sales = loaded.sales;
+            _page = loaded.page;
+            _hasMore = loaded.hasMore;
+            _baseDataKnownEmpty = _invoiceRows(loaded.sales).isEmpty;
+            _error = null;
+            _loading = false;
+          });
+        }
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    await _openSalePreviewById(saleId);
   }
 
   @override
@@ -119,7 +172,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
     });
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 320), () {
-      unawaited(_refreshItemsInBackground(searchQuery: next));
+      unawaited(_refreshInvoicesInBackground(searchQuery: next));
     });
   }
 
@@ -139,6 +192,11 @@ class _ItemsScreenState extends State<ItemsScreen> {
               onPrimary: Colors.white,
               onSurface: Color(0xFF0F172A),
             ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF007AFF),
+              ),
+            ),
           ),
           child: child!,
         );
@@ -150,7 +208,11 @@ class _ItemsScreenState extends State<ItemsScreen> {
         _startDate = picked.start;
         _endDate = picked.end.add(const Duration(hours: 23, minutes: 59, seconds: 59));
       });
-      unawaited(_refreshItemsInBackground());
+      unawaited(_refreshInvoicesInBackground());
+    } else if (_startDate != null || _endDate != null) {
+      // Clear filter if they cancel and a filter was active? 
+      // Actually, usually cancel means "don't change anything".
+      // Let's provide a way to clear if needed, or if picked is null we just keep current.
     }
   }
 
@@ -160,17 +222,17 @@ class _ItemsScreenState extends State<ItemsScreen> {
       _startDate = null;
       _endDate = null;
     });
-    unawaited(_refreshItemsInBackground());
+    unawaited(_refreshInvoicesInBackground());
   }
 
-  Future<void> _refreshItems() async {
+  Future<void> _refreshInvoices() async {
     final activeQuery = _query.trim();
     final hasActiveFilters = _hasActiveFiltersForQuery(activeQuery);
     final perPage = hasActiveFilters ? _filteredPerPage : _perPage;
     try {
       final loaded = await CacheLoader.fetchAndCacheSalesPage(
         _api,
-        includeItems: true,
+        includeItems: false,
         page: 1,
         perPage: perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
@@ -184,19 +246,19 @@ class _ItemsScreenState extends State<ItemsScreen> {
         _page = loaded.page;
         _hasMore = !hasActiveFilters && loaded.hasMore;
         if (!hasActiveFilters) {
-          _baseDataKnownEmpty = loaded.sales.isEmpty;
+          _baseDataKnownEmpty = _invoiceRows(loaded.sales).isEmpty;
         }
       });
     } catch (e) {
       if (!mounted) return;
       final message = e is ApiException
           ? e.message
-          : 'Unable to refresh items.';
+          : 'Unable to refresh invoices.';
       AppNotice.show(context, message);
     }
   }
 
-  Future<void> _refreshItemsInBackground({String? searchQuery}) async {
+  Future<void> _refreshInvoicesInBackground({String? searchQuery}) async {
     final activeQuery = (searchQuery ?? _query).trim();
     final requestId = _searchRequestId;
     final hasActiveFilters = _hasActiveFiltersForQuery(activeQuery);
@@ -204,7 +266,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
     try {
       final loaded = await CacheLoader.fetchAndCacheSalesPage(
         _api,
-        includeItems: true,
+        includeItems: false,
         page: 1,
         perPage: perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
@@ -218,14 +280,14 @@ class _ItemsScreenState extends State<ItemsScreen> {
         _page = loaded.page;
         _hasMore = !hasActiveFilters && loaded.hasMore;
         if (!hasActiveFilters) {
-          _baseDataKnownEmpty = loaded.sales.isEmpty;
+          _baseDataKnownEmpty = _invoiceRows(loaded.sales).isEmpty;
         }
         _error = null;
       });
     } catch (_) {}
   }
 
-  Future<void> _loadMore() async {
+  Future<void> _loadMoreInvoices() async {
     if (_loadingMore || !_hasMore || _loading || _hasActiveFiltersForQuery(_query.trim())) {
       return;
     }
@@ -235,7 +297,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       final nextPage = _page + 1;
       final loaded = await CacheLoader.fetchAndCacheSalesPage(
         _api,
-        includeItems: true,
+        includeItems: false,
         page: nextPage,
         perPage: _perPage,
         searchQuery: activeQuery.isEmpty ? null : activeQuery,
@@ -256,7 +318,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       });
       if (activeQuery.isEmpty) {
         await CacheLoader.saveSalesPageCache(
-          includeItems: true,
+          includeItems: false,
           data: CachedSalesPage(sales: _sales, page: _page, hasMore: _hasMore),
         );
       }
@@ -264,7 +326,7 @@ class _ItemsScreenState extends State<ItemsScreen> {
       if (!mounted) return;
       final message = e is ApiException
           ? e.message
-          : 'Unable to load more items.';
+          : 'Unable to load more invoices.';
       AppNotice.show(context, message);
     } finally {
       if (mounted) {
@@ -273,114 +335,84 @@ class _ItemsScreenState extends State<ItemsScreen> {
     }
   }
 
-  List<_ItemRow> get _itemRows {
+  List<Sale> _invoiceRows(List<Sale> source) {
+    return source.where((sale) => sale.isInvoice).toList();
+  }
+
+  List<Sale> get _filteredInvoices {
+    final invoices = _invoiceRows(_sales);
     final normalized = _query.trim().toLowerCase();
     final hasSearch = normalized.isNotEmpty;
     final hasDates = _startDate != null || _endDate != null;
 
-    final filteredSales = (hasSearch || hasDates)
-        ? _sales.where((sale) {
-            if (hasDates) {
-              final saleDate = DateTime.tryParse(sale.createdAt)?.toLocal();
-              if (saleDate == null) return false;
-              if (_startDate != null && saleDate.isBefore(_startDate!)) {
-                return false;
-              }
-              if (_endDate != null && saleDate.isAfter(_endDate!)) return false;
-            }
-            if (hasSearch) {
-              final customer = (sale.customerName ?? '').toLowerCase();
-              final idText = sale.id.toLowerCase();
-              final matchesCustomerOrId =
-                  customer.contains(normalized) || idText.contains(normalized);
+    if (!hasSearch && !hasDates) return invoices;
 
-              final matchesAnyItem = sale.items.any(
-                (item) => item.productName.toLowerCase().contains(normalized),
-              );
-
-              if (!matchesCustomerOrId && !matchesAnyItem) return false;
-            }
-            return true;
-          }).toList()
-        : _sales;
-
-    final byNameAndPrice = <String, _ItemRow>{};
-    for (final sale in filteredSales) {
-      for (final item in sale.items) {
-        final raw = item.productName.trim();
-        final name = raw.isEmpty ? 'Unnamed item' : raw;
-
-        // If we are searching, we should also filter at the item level 
-        // to show only matching items if the sale matched via items
-        if (hasSearch && !name.toLowerCase().contains(normalized)) {
-          // Check if sale matched via customer/id instead
-          final customer = (sale.customerName ?? '').toLowerCase();
-          final idText = sale.id.toLowerCase();
-          final matchesCustomerOrId = 
-              customer.contains(normalized) || idText.contains(normalized);
-          
-          if (!matchesCustomerOrId) continue;
-        }
-
-        final unitPrice = item.unitPrice;
-        final key = '$name|${unitPrice.toStringAsFixed(2)}';
-        final existing = byNameAndPrice[key];
-        if (existing == null) {
-          byNameAndPrice[key] = _ItemRow(
-            name: name,
-            unitPrice: unitPrice,
-            quantity: item.quantity,
-            total: item.lineTotal,
-          );
-        } else {
-          byNameAndPrice[key] = _ItemRow(
-            name: existing.name,
-            unitPrice: existing.unitPrice,
-            quantity: existing.quantity + item.quantity,
-            total: existing.total + item.lineTotal,
-          );
+    return invoices.where((sale) {
+      if (hasSearch) {
+        final customer = (sale.customerName ?? '').toLowerCase();
+        final idText = sale.id.toLowerCase();
+        if (!customer.contains(normalized) && !idText.contains(normalized)) {
+          return false;
         }
       }
-    }
 
-    var rows = byNameAndPrice.values.toList();
-    rows.sort((a, b) => b.quantity.compareTo(a.quantity));
-    return rows;
+      if (hasDates) {
+        final saleDate = DateTime.tryParse(sale.createdAt)?.toLocal();
+        if (saleDate == null) return false;
+        if (_startDate != null && saleDate.isBefore(_startDate!)) return false;
+        if (_endDate != null && saleDate.isAfter(_endDate!)) return false;
+      }
+
+      return true;
+    }).toList();
   }
-
-  bool get _isDataEmpty => !_loading && _sales.isEmpty;
 
   bool _hasActiveFiltersForQuery(String query) {
     return query.isNotEmpty || _startDate != null || _endDate != null;
   }
 
+  bool get _isDataEmpty => !_loading && _invoiceRows(_sales).isEmpty;
+
   bool get _shouldShowFullEmptyState =>
       _isDataEmpty && _query.trim().isEmpty && _startDate == null && _endDate == null && _baseDataKnownEmpty;
 
-  bool get _showBackButton => Navigator.of(context).canPop();
+  Future<void> _openSalePreviewById(String saleId) async {
+    if (_openingPreview) return;
+    setState(() => _openingPreview = true);
+    try {
+      await PreviewService.openById(saleId);
+    } finally {
+      if (mounted) {
+        setState(() => _openingPreview = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     Widget body;
     if (_loading) {
-      body = _ItemsLoadingState(showBackButton: _showBackButton);
+      body = const _InvoicesLoadingState();
     } else if (_shouldShowFullEmptyState) {
-      body = _ItemsEmptyState(
+      body = _InvoicesEmptyState(
         message: _error,
-        onAddSale: () => _goTo(AppRoutes.newSale),
-        showBackButton: _showBackButton,
+        onAddSale: () => Navigator.pushNamed(
+          context,
+          AppRoutes.newSale,
+          arguments: const NewSaleRouteArgs(startAsInvoice: true),
+        ),
       );
     } else {
-      body = _ItemsMainState(
+      body = _InvoicesMainState(
         queryController: _searchController,
-        rows: _itemRows,
-        formatAmount: _formatAmount,
+        sales: _filteredInvoices,
         loadingMore: _loadingMore,
         hasMore: _hasMore,
-        onLoadMore: _loadMore,
+        formatAmount: _formatInvoiceAmount,
+        onLoadMore: _loadMoreInvoices,
+        onOpenSale: (sale) => _openSalePreviewById(sale.id),
         onDateTap: _selectDateRange,
         onClearDate: _clearDateFilter,
-        showBackButton: _showBackButton,
         hasDateFilter: _startDate != null || _endDate != null,
       );
     }
@@ -388,30 +420,21 @@ class _ItemsScreenState extends State<ItemsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
       body: SafeArea(
-        child: RefreshIndicator(onRefresh: _refreshItems, child: body),
+        child: RefreshIndicator(onRefresh: _refreshInvoices, child: body),
       ),
       bottomNavigationBar: AppBottomNav(
-        activeTab: AppBottomTab.none,
+        activeTab: AppBottomTab.items,
         onHome: () => _goTo(AppRoutes.home, reset: true),
         onSales: () => _goTo(AppRoutes.sales, reset: true),
-        onAdd: () => _goTo(AppRoutes.newSale),
-        onItems: () => _goTo(AppRoutes.invoices, reset: true),
+        onAdd: () => Navigator.pushNamed(
+          context,
+          AppRoutes.newSale,
+          arguments: const NewSaleRouteArgs(startAsInvoice: true),
+        ),
+        onItems: () {},
         onSettings: () => _goTo(AppRoutes.shop, reset: true),
       ),
     );
   }
 }
 
-class _ItemRow {
-  const _ItemRow({
-    required this.name,
-    required this.unitPrice,
-    required this.quantity,
-    required this.total,
-  });
-
-  final String name;
-  final double unitPrice;
-  final double quantity;
-  final double total;
-}

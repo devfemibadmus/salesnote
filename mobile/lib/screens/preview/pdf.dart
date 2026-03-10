@@ -17,7 +17,7 @@ extension _PreviewPdf on _SalePreviewScreenState {
     final dateText = DateFormat('MMM d, yyyy | HH:mm').format(timestamp);
     final receiptNo =
         widget.receiptNumber ??
-        '#REC-${timestamp.millisecondsSinceEpoch % 1000000}';
+        '#${widget.status == SaleStatus.invoice ? 'INV' : 'REC'}-${timestamp.millisecondsSinceEpoch % 1000000}';
 
     final shopLogoBytes = await _loadNetworkImageBytes(widget.shop?.logoUrl);
     final signatureBytes = await _loadNetworkImageBytes(
@@ -509,7 +509,7 @@ extension _PreviewPdf on _SalePreviewScreenState {
         : 'Customer';
     final total = widget.total.toStringAsFixed(2);
     final stamp = DateFormat('yyyyMMdd_HHmmss').format(now);
-    return '${name}--${total}--$stamp.$extension';
+    return '$name--$total--$stamp.$extension';
   }
 
   Future<String> _savePdfToDevice(Uint8List bytes) async {

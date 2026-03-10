@@ -227,12 +227,36 @@ class SaleItemInput {
   };
 }
 
+enum SaleStatus { paid, invoice }
+
+SaleStatus _saleStatusFromJson(dynamic json) {
+  final raw = (json['status'] ??
+          json['payment_status'] ??
+          json['document_type'] ??
+          json['kind'])
+      ?.toString()
+      .trim()
+      .toLowerCase();
+  switch (raw) {
+    case 'invoice':
+    case 'unpaid':
+    case 'pending':
+      return SaleStatus.invoice;
+    case 'paid':
+    case 'receipt':
+    case 'sale':
+    default:
+      return SaleStatus.paid;
+  }
+}
+
 class SaleInput {
   SaleInput({
     required this.signatureId,
     required this.customerName,
     required this.customerContact,
     required this.items,
+    this.status = SaleStatus.paid,
     this.createdAt,
     this.discountAmount = 0,
     this.vatAmount = 0,
@@ -247,6 +271,7 @@ class SaleInput {
   final String customerName;
   final String customerContact;
   final List<SaleItemInput> items;
+  final SaleStatus status;
   final String? createdAt;
   final double discountAmount;
   final double vatAmount;
@@ -261,6 +286,7 @@ class SaleInput {
     'customer_name': customerName,
     'customer_contact': customerContact,
     'items': items.map((e) => e.toJson()).toList(),
+    'status': status.name,
     'created_at': createdAt,
     'discount_amount': discountAmount,
     'vat_amount': vatAmount,
@@ -278,6 +304,7 @@ class SaleUpdateInput {
     this.customerName,
     this.customerContact,
     this.items,
+    this.status,
     this.discountAmount,
     this.vatAmount,
     this.serviceFeeAmount,
@@ -291,6 +318,7 @@ class SaleUpdateInput {
   final String? customerName;
   final String? customerContact;
   final List<SaleItemInput>? items;
+  final SaleStatus? status;
   final double? discountAmount;
   final double? vatAmount;
   final double? serviceFeeAmount;
@@ -304,6 +332,7 @@ class SaleUpdateInput {
     'customer_name': customerName,
     'customer_contact': customerContact,
     'items': items?.map((e) => e.toJson()).toList(),
+    'status': status?.name,
     'discount_amount': discountAmount,
     'vat_amount': vatAmount,
     'service_fee_amount': serviceFeeAmount,
@@ -357,6 +386,7 @@ class Sale {
     required this.id,
     required this.shopId,
     required this.signatureId,
+    required this.status,
     this.customerName,
     this.customerContact,
     required this.subtotal,
@@ -375,6 +405,7 @@ class Sale {
   final String id;
   final String shopId;
   final String signatureId;
+  final SaleStatus status;
   final String? customerName;
   final String? customerContact;
   final double subtotal;
@@ -389,11 +420,19 @@ class Sale {
   final String createdAt;
   final List<SaleItem> items;
 
+  bool get isInvoice => status == SaleStatus.invoice;
+  bool get isPaidReceipt => status == SaleStatus.paid;
+  String get numberPrefix => isInvoice ? 'INV' : 'REC';
+  String get documentTitle => isInvoice ? 'Invoice' : 'E-Receipt';
+  String get createActionLabel =>
+      isInvoice ? 'Create Invoice' : 'Create Sale & Receipt';
+
   factory Sale.fromJson(dynamic json) {
     return Sale(
       id: json['id'].toString(),
       shopId: json['shop_id'].toString(),
       signatureId: json['signature_id'].toString(),
+      status: _saleStatusFromJson(json),
       customerName: json['customer_name'] as String?,
       customerContact: json['customer_contact'] as String?,
       subtotal: ((json['subtotal'] ?? json['total']) as num).toDouble(),
@@ -417,6 +456,7 @@ class Sale {
     'id': id,
     'shop_id': shopId,
     'signature_id': signatureId,
+    'status': status.name,
     'customer_name': customerName,
     'customer_contact': customerContact,
     'subtotal': subtotal,
