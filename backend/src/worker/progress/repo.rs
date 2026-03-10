@@ -74,7 +74,12 @@ pub async fn count_sales_between(
     end_dt: DateTime<Utc>,
 ) -> Result<i64, String> {
     let row = sqlx::query(
-        "SELECT COUNT(*) as cnt FROM sales WHERE shop_id = $1 AND created_at >= $2 AND created_at < $3",
+        "SELECT COUNT(*) as cnt
+         FROM sales
+         WHERE shop_id = $1
+           AND status = 'paid'
+           AND created_at >= $2
+           AND created_at < $3",
     )
     .bind(shop_id)
     .bind(start_dt)
@@ -96,7 +101,10 @@ pub async fn top_item_between(
         "SELECT si.product_name as name, SUM(si.quantity) as qty
          FROM sale_items si
          JOIN sales s ON s.id = si.sale_id
-         WHERE s.shop_id = $1 AND s.created_at >= $2 AND s.created_at < $3
+         WHERE s.shop_id = $1
+           AND s.status = 'paid'
+           AND s.created_at >= $2
+           AND s.created_at < $3
          GROUP BY si.product_name
          ORDER BY qty DESC
          LIMIT 1",

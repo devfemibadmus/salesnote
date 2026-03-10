@@ -176,13 +176,14 @@ impl AnalyticsSummary {
             ),
             recent_sales AS (
               SELECT
-                id, shop_id, signature_id, customer_name, customer_contact,
+                id, shop_id, signature_id, status, customer_name, customer_contact,
                 subtotal, discount_amount, vat_amount, service_fee_amount,
                 delivery_fee_amount, rounding_amount, other_amount, other_label,
                 total,
                 created_at::text AS created_at
               FROM sales
               WHERE shop_id = $1
+                AND status = 'paid'
               ORDER BY created_at DESC
               LIMIT 4
             )
@@ -261,6 +262,7 @@ impl AnalyticsSummary {
                     'id', s.id,
                     'shop_id', s.shop_id,
                     'signature_id', s.signature_id,
+                    'status', s.status,
                     'customer_name', s.customer_name,
                     'customer_contact', s.customer_contact,
                     'subtotal', s.subtotal,
@@ -650,6 +652,7 @@ impl AnalyticsSummary {
                  FROM sales s
                  INNER JOIN sale_items si ON si.sale_id = s.id
                  WHERE s.shop_id = $1
+                   AND s.status = 'paid'
                    AND s.created_at >= NOW() - interval '30 days'
                  GROUP BY si.product_name
                  ORDER BY qty DESC
