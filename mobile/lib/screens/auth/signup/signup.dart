@@ -6,6 +6,7 @@ import 'package:country_picker/country_picker.dart';
 import '../../../data/models.dart';
 import '../../../services/api_client.dart';
 import '../../../services/cache/local.dart';
+import '../../../services/currency.dart';
 import '../../../services/notice.dart';
 import '../../../services/phone.dart';
 import '../../../services/region.dart';
@@ -136,6 +137,7 @@ class _SignupState extends State<Signup> {
     final input = RegisterInput(
       shopName: _shopName.text.trim(),
       phone: phoneE164,
+      currencyCode: CurrencyService.currencyCodeForRegion(phoneRegion),
       email: _email.text.trim(),
       password: _password.text,
       address: _address.text.trim(),

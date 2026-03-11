@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/currency.dart';
+
 class HistorySlide extends StatelessWidget {
   const HistorySlide({super.key});
 
@@ -9,6 +11,10 @@ class HistorySlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final amount1 = CurrencyService.format(12500, decimalDigits: 0);
+    final amount2 = CurrencyService.format(8200, decimalDigits: 0);
+    final amount3 = CurrencyService.format(5000, decimalDigits: 0);
+
     return Column(
       children: [
         Expanded(
@@ -31,22 +37,22 @@ class HistorySlide extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const _HistoryRow(
+                        _HistoryRow(
                           title: 'Receipt #1024',
-                          subtitle: 'Rice • ₦12,500',
+                          subtitle: 'Rice • $amount1',
                           time: 'Today',
                           highlight: true,
                         ),
                         const SizedBox(height: 12),
-                        const _HistoryRow(
+                        _HistoryRow(
                           title: 'Receipt #1023',
-                          subtitle: 'Beans • ₦8,200',
+                          subtitle: 'Beans • $amount2',
                           time: 'Yesterday',
                         ),
                         const SizedBox(height: 12),
-                        const _HistoryRow(
+                        _HistoryRow(
                           title: 'Receipt #1022',
-                          subtitle: 'Palm oil • ₦5,000',
+                          subtitle: 'Palm oil • $amount3',
                           time: '2 days ago',
                         ),
                         const SizedBox(height: 16),

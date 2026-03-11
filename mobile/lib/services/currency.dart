@@ -60,6 +60,17 @@ class CurrencyService {
     return ' ';
   }
 
+  static String currencyCodeForRegion(
+    String? regionCode, {
+    String fallback = 'NGN',
+  }) {
+    final normalized = regionCode?.trim().toUpperCase();
+    if (normalized == null || normalized.isEmpty) {
+      return fallback;
+    }
+    return _regionToCurrency[normalized] ?? fallback;
+  }
+
   static String? _resolveCurrencyCode() {
     final shop = _loadShop();
     final code = shop?.currencyCode.trim().toUpperCase();
@@ -143,5 +154,63 @@ class CurrencyService {
     'USD': 'en_US',
     'VND': 'vi_VN',
     'ZAR': 'en_ZA',
+  };
+
+  static const Map<String, String> _regionToCurrency = {
+    'AE': 'AED',
+    'AR': 'ARS',
+    'AU': 'AUD',
+    'BD': 'BDT',
+    'BH': 'BHD',
+    'BR': 'BRL',
+    'CA': 'CAD',
+    'CH': 'CHF',
+    'CL': 'CLP',
+    'CN': 'CNY',
+    'CO': 'COP',
+    'CZ': 'CZK',
+    'DK': 'DKK',
+    'EC': 'USD',
+    'EG': 'EGP',
+    'ET': 'ETB',
+    'EU': 'EUR',
+    'GB': 'GBP',
+    'GH': 'GHS',
+    'HK': 'HKD',
+    'HU': 'HUF',
+    'ID': 'IDR',
+    'IE': 'EUR',
+    'IL': 'ILS',
+    'IN': 'INR',
+    'JP': 'JPY',
+    'KE': 'KES',
+    'KR': 'KRW',
+    'KW': 'KWD',
+    'MA': 'MAD',
+    'MX': 'MXN',
+    'MY': 'MYR',
+    'NG': 'NGN',
+    'NO': 'NOK',
+    'NZ': 'NZD',
+    'OM': 'OMR',
+    'PA': 'USD',
+    'PH': 'PHP',
+    'PK': 'PKR',
+    'PL': 'PLN',
+    'QA': 'QAR',
+    'RO': 'RON',
+    'RU': 'RUB',
+    'RW': 'RWF',
+    'SA': 'SAR',
+    'SE': 'SEK',
+    'SG': 'SGD',
+    'SV': 'USD',
+    'TH': 'THB',
+    'TR': 'TRY',
+    'TZ': 'TZS',
+    'UG': 'UGX',
+    'US': 'USD',
+    'VN': 'VND',
+    'ZA': 'ZAR',
   };
 }

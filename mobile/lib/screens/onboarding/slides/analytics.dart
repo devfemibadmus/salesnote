@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../../../services/currency.dart';
 
 class SmartAnalyticsSlide extends StatefulWidget {
   const SmartAnalyticsSlide({super.key});
@@ -43,6 +46,10 @@ class _SmartAnalyticsSlideState extends State<SmartAnalyticsSlide> {
 
   @override
   Widget build(BuildContext context) {
+    final totalSalesAmount = CurrencyService.format(450200, decimalDigits: 0);
+    final todaysSalesAmount = CurrencyService.format(98500, decimalDigits: 0);
+    final weeklySalesAmount = _formatCompactAmount(1200000);
+
     return Column(
       children: [
         Expanded(
@@ -61,36 +68,38 @@ class _SmartAnalyticsSlideState extends State<SmartAnalyticsSlide> {
                     final page = index % _cardCount;
                     switch (page) {
                       case 0:
-                        return const _AnalyticsCard(
+                        return _AnalyticsCard(
                           title: 'Total Sales',
                           period: 'This Month',
-                          amount: '₦450,200',
+                          amount: totalSalesAmount,
                           delta: '+12.5%',
                           deltaContext: 'vs last month',
                           trendUp: true,
-                          chart: _BarChart(bars: [0.3, 0.45, 0.35, 0.65, 0.55, 0.85, 1.0]),
+                          chart: const _BarChart(
+                            bars: [0.3, 0.45, 0.35, 0.65, 0.55, 0.85, 1.0],
+                          ),
                         );
                       case 1:
-                        return const _AnalyticsCard(
+                        return _AnalyticsCard(
                           title: 'Today’s Sales',
                           period: 'Today',
-                          amount: '₦98,500',
+                          amount: todaysSalesAmount,
                           delta: '+6.1%',
                           deltaContext: 'vs yesterday, same time',
                           trendUp: true,
-                          chart: _PulseBarsChart(
+                          chart: const _PulseBarsChart(
                             bars: [0.25, 0.4, 0.58, 0.46, 0.65, 0.78, 0.9],
                           ),
                         );
                       default:
-                        return const _AnalyticsCard(
+                        return _AnalyticsCard(
                           title: 'Weekly Sales',
                           period: 'Last 7 Days',
-                          amount: '₦1.2M',
+                          amount: weeklySalesAmount,
                           delta: '-3.8%',
                           deltaContext: 'vs previous week',
                           trendUp: false,
-                          chart: _CompareBarsChart(
+                          chart: const _CompareBarsChart(
                             thisWeek: [0.42, 0.58, 0.66, 0.48, 0.74, 0.63, 0.57],
                             lastWeek: [0.5, 0.61, 0.69, 0.53, 0.79, 0.67, 0.61],
                           ),
@@ -143,6 +152,19 @@ class _SmartAnalyticsSlideState extends State<SmartAnalyticsSlide> {
         ),
       ],
     );
+  }
+
+  String _formatCompactAmount(num amount) {
+    final context = CurrencyService.resolveContext();
+    try {
+      return NumberFormat.compactCurrency(
+        locale: context.locale,
+        symbol: context.symbol,
+        decimalDigits: 1,
+      ).format(amount);
+    } catch (_) {
+      return CurrencyService.format(amount, decimalDigits: 0);
+    }
   }
 }
 

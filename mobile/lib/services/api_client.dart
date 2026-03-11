@@ -195,7 +195,7 @@ class ApiClient {
         id: '',
         name: input.shopName,
         phone: input.phone,
-        currencyCode: 'NGN',
+        currencyCode: input.currencyCode,
         email: input.email,
         address: input.address,
         logoUrl: input.logoUrl,
