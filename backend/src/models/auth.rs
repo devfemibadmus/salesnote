@@ -201,6 +201,8 @@ pub struct ShopAuthRecord {
     pub name: String,
     pub phone: String,
     pub currency_code: String,
+    pub live_agent_tokens_used: i64,
+    pub live_agent_tokens_available: i64,
     pub email: String,
     pub address: Option<String>,
     pub logo_url: Option<String>,
@@ -218,6 +220,8 @@ impl ShopAuthRecord {
             name: self.name.clone(),
             phone: self.phone.clone(),
             currency_code: self.currency_code.clone(),
+            live_agent_tokens_used: self.live_agent_tokens_used,
+            live_agent_tokens_available: self.live_agent_tokens_available,
             email: self.email.clone(),
             address: self.address.clone(),
             logo_url: self.logo_url.clone(),
@@ -235,7 +239,9 @@ impl ShopAuthRecord {
         payload: &FindShopPayload,
     ) -> Result<Option<ShopAuthRecord>, sqlx::Error> {
         let row = sqlx::query(
-            "SELECT id, name, phone, currency_code, email, password_hash, address, logo_url,
+            "SELECT id, name, phone, currency_code,
+                    live_agent_tokens_used, live_agent_tokens_available,
+                    email, password_hash, address, logo_url,
                     created_at::text as created_at,
                     failed_login_attempts,
                     locked_until::text as locked_until,
@@ -252,6 +258,8 @@ impl ShopAuthRecord {
             name: row.get("name"),
             phone: row.get("phone"),
             currency_code: row.get("currency_code"),
+            live_agent_tokens_used: row.get("live_agent_tokens_used"),
+            live_agent_tokens_available: row.get("live_agent_tokens_available"),
             email: row.get("email"),
             address: row.get("address"),
             logo_url: row.get("logo_url"),
@@ -268,7 +276,9 @@ impl ShopAuthRecord {
         payload: &FindShopByEmailPayload,
     ) -> Result<Option<ShopAuthRecord>, sqlx::Error> {
         let row = sqlx::query(
-            "SELECT id, name, phone, currency_code, email, password_hash, address, logo_url,
+            "SELECT id, name, phone, currency_code,
+                    live_agent_tokens_used, live_agent_tokens_available,
+                    email, password_hash, address, logo_url,
                     created_at::text as created_at,
                     failed_login_attempts,
                     locked_until::text as locked_until,
@@ -284,6 +294,8 @@ impl ShopAuthRecord {
             name: row.get("name"),
             phone: row.get("phone"),
             currency_code: row.get("currency_code"),
+            live_agent_tokens_used: row.get("live_agent_tokens_used"),
+            live_agent_tokens_available: row.get("live_agent_tokens_available"),
             email: row.get("email"),
             address: row.get("address"),
             logo_url: row.get("logo_url"),
@@ -394,7 +406,9 @@ impl ShopAuthRecord {
                RETURNING id
              ),
              shop_row AS (
-               SELECT id, name, phone, currency_code, email, address, logo_url,
+               SELECT id, name, phone, currency_code,
+                      live_agent_tokens_used, live_agent_tokens_available,
+                      email, address, logo_url,
                       total_revenue, total_orders, total_customers, timezone,
                       created_at::text AS created_at,
                       COALESCE((
@@ -540,7 +554,9 @@ impl ShopAuthRecord {
                RETURNING id
              ),
              shop_row AS (
-               SELECT id, name, phone, currency_code, email, address, logo_url,
+               SELECT id, name, phone, currency_code,
+                      live_agent_tokens_used, live_agent_tokens_available,
+                      email, address, logo_url,
                       total_revenue, total_orders, total_customers, timezone,
                       created_at::text AS created_at,
                       COALESCE((
@@ -790,7 +806,9 @@ impl ShopAuthRecord {
             "WITH inserted_shop AS (
                INSERT INTO shops (name, phone, currency_code, email, password_hash, address, logo_url, timezone)
                VALUES ($1, $2, $3, $4, crypt($5, gen_salt('bf', 12)), $6, $7, $8)
-               RETURNING id, name, phone, currency_code, email, address, logo_url,
+               RETURNING id, name, phone, currency_code,
+                         live_agent_tokens_used, live_agent_tokens_available,
+                         email, address, logo_url,
                          total_revenue, total_orders, total_customers, timezone,
                          created_at::text AS created_at
              ),
@@ -987,7 +1005,9 @@ impl ShopAuthRecord {
                RETURNING id
              ),
              shop_row AS (
-               SELECT id, name, phone, currency_code, email, address, logo_url,
+               SELECT id, name, phone, currency_code,
+                      live_agent_tokens_used, live_agent_tokens_available,
+                      email, address, logo_url,
                       total_revenue, total_orders, total_customers, timezone,
                       created_at::text AS created_at,
                       COALESCE((
@@ -1292,6 +1312,8 @@ impl ShopProfile {
             name: payload.input.shop_name.clone(),
             phone: payload.input.phone.clone(),
             currency_code: currency_code.to_string(),
+            live_agent_tokens_used: 0,
+            live_agent_tokens_available: 3_000_000,
             email: payload.input.email.clone(),
             address: payload.input.address.clone(),
             logo_url: payload.input.logo_url.clone(),
@@ -1315,7 +1337,9 @@ impl ShopProfile {
             "WITH inserted_shop AS (
                INSERT INTO shops (name, phone, currency_code, email, password_hash, address, logo_url, timezone)
                VALUES ($1, $2, $3, $4, crypt($5, gen_salt('bf', 12)), $6, $7, $8)
-               RETURNING id, name, phone, currency_code, email, address, logo_url,
+               RETURNING id, name, phone, currency_code,
+                         live_agent_tokens_used, live_agent_tokens_available,
+                         email, address, logo_url,
                          total_revenue, total_orders, total_customers, timezone,
                          created_at::text AS created_at,
                          '[]'::json AS bank_accounts

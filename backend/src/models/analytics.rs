@@ -63,7 +63,9 @@ impl AnalyticsSummary {
             ),
             shop_row AS (
               SELECT
-                id, name, phone, currency_code, email, address, logo_url,
+                id, name, phone, currency_code,
+                live_agent_tokens_used, live_agent_tokens_available,
+                email, address, logo_url,
                 total_revenue, total_orders, total_customers, timezone,
                 created_at::text AS created_at,
                 COALESCE((

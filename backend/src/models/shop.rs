@@ -11,6 +11,8 @@ pub struct ShopProfile {
     pub name: String,
     pub phone: String,
     pub currency_code: String,
+    pub live_agent_tokens_used: i64,
+    pub live_agent_tokens_available: i64,
     pub email: String,
     pub address: Option<String>,
     pub logo_url: Option<String>,
@@ -92,7 +94,9 @@ impl ShopProfile {
     ) -> Result<Option<ShopProfile>, sqlx::Error> {
         let row = sqlx::query(
             "SELECT
-                s.id, s.name, s.phone, s.currency_code, s.email, s.address, s.logo_url,
+                s.id, s.name, s.phone, s.currency_code,
+                s.live_agent_tokens_used, s.live_agent_tokens_available,
+                s.email, s.address, s.logo_url,
                 s.total_revenue, s.total_orders, s.total_customers, s.timezone,
                 s.created_at::text as created_at,
                 COALESCE((
@@ -165,6 +169,7 @@ impl ShopProfile {
             SELECT
               s.id, s.name, s.phone, s.email, s.address, s.logo_url,
               s.currency_code,
+              s.live_agent_tokens_used, s.live_agent_tokens_available,
               s.total_revenue, s.total_orders, s.total_customers, s.timezone,
               s.created_at::text AS created_at,
               COALESCE((
@@ -207,6 +212,7 @@ impl ShopProfile {
               SELECT
                 s.id, s.name, s.phone, s.email, s.address, s.logo_url,
                 s.currency_code,
+                s.live_agent_tokens_used, s.live_agent_tokens_available,
                 s.total_revenue, s.total_orders, s.total_customers, s.timezone,
                 s.created_at::text AS created_at,
                 COALESCE((
@@ -389,6 +395,8 @@ fn shop_profile_from_row(row: sqlx::postgres::PgRow) -> Result<ShopProfile, sqlx
         name: row.get("name"),
         phone: row.get("phone"),
         currency_code: row.get("currency_code"),
+        live_agent_tokens_used: row.get("live_agent_tokens_used"),
+        live_agent_tokens_available: row.get("live_agent_tokens_available"),
         email: row.get("email"),
         address: row.get("address"),
         logo_url: row.get("logo_url"),
@@ -444,7 +452,9 @@ async fn load_shop_profile_tx(
 ) -> Result<Option<ShopProfile>, sqlx::Error> {
     let row = sqlx::query(
         "SELECT
-            s.id, s.name, s.phone, s.currency_code, s.email, s.address, s.logo_url,
+            s.id, s.name, s.phone, s.currency_code,
+            s.live_agent_tokens_used, s.live_agent_tokens_available,
+            s.email, s.address, s.logo_url,
             s.total_revenue, s.total_orders, s.total_customers, s.timezone,
             s.created_at::text AS created_at,
             COALESCE((

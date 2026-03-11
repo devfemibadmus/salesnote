@@ -331,6 +331,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       currencyCode: (settingsShop.currencyCode).trim().isEmpty
           ? homeShop.currencyCode
           : settingsShop.currencyCode,
+      liveAgentTokensUsed: settingsShop.liveAgentTokensUsed,
+      liveAgentTokensAvailable: settingsShop.liveAgentTokensAvailable,
       email: homeShop.email,
       address: homeShop.address,
       logoUrl: (settingsShop.logoUrl ?? '').trim().isEmpty

@@ -3,6 +3,19 @@ import 'package:flutter/material.dart';
 import '../../data/models.dart';
 import '../../services/media.dart';
 
+String _formatSettingsCount(int value) {
+  final text = value.toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < text.length; i++) {
+    final fromEnd = text.length - i;
+    buffer.write(text[i]);
+    if (fromEnd > 1 && fromEnd % 3 == 1) {
+      buffer.write(',');
+    }
+  }
+  return buffer.toString();
+}
+
 class SettingsMainView extends StatelessWidget {
   const SettingsMainView({
     super.key,
@@ -26,6 +39,7 @@ class SettingsMainView extends StatelessWidget {
     required this.onPrivacy,
     required this.onTerms,
     required this.onSupport,
+    required this.onBuyTokens,
     required this.onWebApp,
     required this.onLogout,
     required this.appVersion,
@@ -51,6 +65,7 @@ class SettingsMainView extends StatelessWidget {
   final VoidCallback onPrivacy;
   final VoidCallback onTerms;
   final VoidCallback onSupport;
+  final VoidCallback onBuyTokens;
   final VoidCallback onWebApp;
   final VoidCallback onLogout;
   final String appVersion;
@@ -93,10 +108,7 @@ class SettingsMainView extends StatelessWidget {
               value: (shop.address ?? '').isEmpty ? 'Not set' : shop.address!,
               onTap: onEditAddress,
             ),
-            SettingsInfoRow(
-              label: 'Timezone',
-              value: shop.timezone,
-            ),
+            SettingsInfoRow(label: 'Timezone', value: shop.timezone),
           ],
         ),
         const SizedBox(height: 16),
@@ -152,6 +164,24 @@ class SettingsMainView extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 16),
+        const SettingsSectionTitle('LIVE CASHIER'),
+        const SizedBox(height: 8),
+        SettingsWhiteCard(
+          children: [
+            SettingsInfoRow(
+              label: 'Tokens Used',
+              value: _formatSettingsCount(shop.liveAgentTokensUsed),
+              singleLineValue: true,
+            ),
+            SettingsInfoRow(
+              label: 'Tokens Available',
+              value: _formatSettingsCount(shop.liveAgentTokensAvailable),
+              singleLineValue: true,
+            ),
+            SettingsActionRow(title: 'Buy Tokens', onTap: onBuyTokens),
+          ],
+        ),
+        const SizedBox(height: 16),
         const SettingsSectionTitle('NOTIFICATIONS'),
         const SizedBox(height: 8),
         SettingsWhiteCard(
@@ -196,10 +226,7 @@ class SettingsMainView extends StatelessWidget {
             SettingsActionRow(title: 'Privacy Policy', onTap: onPrivacy),
             SettingsActionRow(title: 'Terms of Service', onTap: onTerms),
             SettingsActionRow(title: 'Contact Support', onTap: onSupport),
-            SettingsInfoRow(
-              label: 'App Version',
-              value: appVersion,
-            ),
+            SettingsInfoRow(label: 'App Version', value: appVersion),
           ],
         ),
         const SizedBox(height: 18),
@@ -723,6 +750,7 @@ class SettingsBankAccountRow extends StatelessWidget {
       ),
     );
   }
+
 }
 
 IconData deviceIconData(DeviceSession device) {

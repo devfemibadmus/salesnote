@@ -946,6 +946,8 @@ class _ShopScreenState extends State<ShopScreen> {
                   onDeleteBankAccount: _deleteBankAccount,
                   onAddSignature: _addSignature,
                   onDeleteSignature: _deleteSignature,
+                  onBuyTokens: () =>
+                      _showNotice('Token purchase is coming soon.'),
                   onWebApp: () =>
                       _openExternalUrl(AppConfig.apptUrl, 'web app'),
                   onPrivacy: () => _openExternalUrl(

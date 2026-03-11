@@ -196,6 +196,8 @@ class ApiClient {
         name: input.shopName,
         phone: input.phone,
         currencyCode: input.currencyCode,
+        liveAgentTokensUsed: 0,
+        liveAgentTokensAvailable: 3000000,
         email: input.email,
         address: input.address,
         logoUrl: input.logoUrl,

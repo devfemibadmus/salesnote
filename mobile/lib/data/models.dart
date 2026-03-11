@@ -96,6 +96,8 @@ class ShopProfile {
     required this.name,
     required this.phone,
     required this.currencyCode,
+    required this.liveAgentTokensUsed,
+    required this.liveAgentTokensAvailable,
     required this.email,
     this.address,
     this.logoUrl,
@@ -108,6 +110,8 @@ class ShopProfile {
   final String name;
   final String phone;
   final String currencyCode;
+  final int liveAgentTokensUsed;
+  final int liveAgentTokensAvailable;
   final String email;
   final String? address;
   final String? logoUrl;
@@ -126,6 +130,10 @@ class ShopProfile {
       name: json['name'] as String,
       phone: json['phone'] as String,
       currencyCode: rawCurrencyCode.toUpperCase(),
+      liveAgentTokensUsed:
+          (json['live_agent_tokens_used'] as num?)?.toInt() ?? 0,
+      liveAgentTokensAvailable:
+          (json['live_agent_tokens_available'] as num?)?.toInt() ?? 3000000,
       email: json['email'] as String,
       address: json['address'] as String?,
       logoUrl: json['logo_url'] as String?,
@@ -142,6 +150,8 @@ class ShopProfile {
     'name': name,
     'phone': phone,
     'currency_code': currencyCode,
+    'live_agent_tokens_used': liveAgentTokensUsed,
+    'live_agent_tokens_available': liveAgentTokensAvailable,
     'email': email,
     'address': address,
     'logo_url': logoUrl,
