@@ -268,9 +268,19 @@ pub async fn create_sale(
 
             actix_web::rt::spawn(async move {
                 let settings = Settings::load();
-                let currency_code = ShopProfile::currency_code_by_id(&pool, shop_id_val)
-                    .await
-                    .unwrap_or_else(|_| String::from("NGN"));
+                let currency_code = match ShopProfile::currency_code_by_id(&pool, shop_id_val).await
+                {
+                    Ok(code) => code,
+                    Err(err) => {
+                        tracing::warn!(
+                            sale_id,
+                            shop_id = shop_id_val,
+                            error = %err,
+                            "sale notification skipped: missing shop currency code"
+                        );
+                        return;
+                    }
+                };
                 if let Ok(tokens) = DeviceSession::get_fcm_tokens_for_shop(&pool, shop_id_val).await
                 {
                     if !tokens.is_empty() {
@@ -470,9 +480,19 @@ pub async fn update_sale(
 
                 actix_web::rt::spawn(async move {
                     let settings = Settings::load();
-                    let currency_code = ShopProfile::currency_code_by_id(&pool, shop_id_val)
-                        .await
-                        .unwrap_or_else(|_| String::from("NGN"));
+                    let currency_code =
+                        match ShopProfile::currency_code_by_id(&pool, shop_id_val).await {
+                            Ok(code) => code,
+                            Err(err) => {
+                                tracing::warn!(
+                                    sale_id = sale_id_val,
+                                    shop_id = shop_id_val,
+                                    error = %err,
+                                    "invoice paid notification skipped: missing shop currency code"
+                                );
+                                return;
+                            }
+                        };
                     if let Ok(tokens) =
                         DeviceSession::get_fcm_tokens_for_shop(&pool, shop_id_val).await
                     {
