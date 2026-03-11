@@ -47,12 +47,8 @@ class _SigninState extends State<Signin> {
     super.initState();
     _countries = CountryService().getAll();
     _deviceRegionCode = RegionService.getDeviceRegionCode();
-    Country initCountry;
-    try {
-      initCountry = CountryParser.parseCountryCode(_deviceRegionCode);
-    } catch (_) {
-      initCountry = CountryParser.parseCountryCode('NG');
-    }
+    final initCountry =
+        CountryParser.tryParseCountryCode(_deviceRegionCode) ?? _countries.first;
     _selectedCountry = ValueNotifier(initCountry);
     final initialIndex = _countries.indexWhere(
       (c) => c.countryCode == initCountry.countryCode,

@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:country_picker/country_picker.dart';
 
 import 'cache/local.dart';
@@ -5,28 +7,45 @@ import 'cache/local.dart';
 class RegionService {
   RegionService._();
 
-  static const String _fallbackRegionCode = 'NG';
-
   static String getDeviceRegionCode() {
-    return resolveAccountRegionCode();
+    final preferred = LocalCache.getPreferredRegionCode();
+    if (preferred != null && preferred.isNotEmpty) {
+      return preferred;
+    }
+
+    final localeCode = ui.PlatformDispatcher.instance.locale.countryCode
+        ?.trim()
+        .toUpperCase();
+    if (localeCode != null && localeCode.isNotEmpty) {
+      return localeCode;
+    }
+
+    return CountryService().getAll().first.countryCode.trim().toUpperCase();
   }
 
   static String resolveAccountRegionCode({
-    String fallback = _fallbackRegionCode,
+    String? fallback,
   }) {
-    final normalizedFallback = fallback.trim().toUpperCase();
     final phone = _loadAccountPhone();
     final regionCode = regionCodeFromE164(phone);
     if (regionCode != null && regionCode.isNotEmpty) {
       return regionCode;
     }
-    return normalizedFallback;
+    final preferred = LocalCache.getPreferredRegionCode();
+    if (preferred != null && preferred.isNotEmpty) {
+      return preferred;
+    }
+    final normalizedFallback = fallback?.trim().toUpperCase();
+    if (normalizedFallback != null && normalizedFallback.isNotEmpty) {
+      return normalizedFallback;
+    }
+    return getDeviceRegionCode();
   }
 
   static Country resolveAccountCountry({
-    String fallback = _fallbackRegionCode,
+    String? fallback,
   }) {
-    final fallbackRegionCode = fallback.trim().toUpperCase();
+    final fallbackRegionCode = fallback?.trim().toUpperCase();
     final phone = _loadAccountPhone();
     final phoneCode = countryPhoneCodeFromE164(phone);
     if (phoneCode != null) {
@@ -36,13 +55,12 @@ class RegionService {
       }
     }
 
-    final fromRegion = CountryParser.tryParseCountryCode(
-      resolveAccountRegionCode(fallback: fallbackRegionCode),
-    );
+    final resolvedRegion = resolveAccountRegionCode(fallback: fallbackRegionCode);
+    final fromRegion = CountryParser.tryParseCountryCode(resolvedRegion);
     if (fromRegion != null) {
       return fromRegion;
     }
-    return CountryParser.parseCountryCode(fallbackRegionCode);
+    return CountryService().getAll().first;
   }
 
   static String invalidPhoneMessage({

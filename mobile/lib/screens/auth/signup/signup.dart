@@ -61,11 +61,9 @@ class _SignupState extends State<Signup> {
   }
 
   void _initCountry() {
-    try {
-      _country = CountryParser.parseCountryCode(_deviceRegionCode);
-    } catch (_) {
-      _country = CountryParser.parseCountryCode('NG');
-    }
+    _country =
+        CountryParser.tryParseCountryCode(_deviceRegionCode) ??
+        CountryService().getAll().first;
   }
 
   @override
@@ -116,6 +114,12 @@ class _SignupState extends State<Signup> {
     }
 
     final phoneRegion = (_country?.countryCode ?? _deviceRegionCode);
+    final currencyCode = CurrencyService.currencyCodeForRegion(phoneRegion);
+    if (currencyCode == null || currencyCode.isEmpty) {
+      setState(() => _submitting = false);
+      _showError('Unable to determine currency for the selected country.');
+      return;
+    }
     final phoneE164 = await PhoneService.normalizeE164(
       _phone.text.trim(),
       phoneRegion,
@@ -137,7 +141,7 @@ class _SignupState extends State<Signup> {
     final input = RegisterInput(
       shopName: _shopName.text.trim(),
       phone: phoneE164,
-      currencyCode: CurrencyService.currencyCodeForRegion(phoneRegion),
+      currencyCode: currencyCode,
       email: _email.text.trim(),
       password: _password.text,
       address: _address.text.trim(),

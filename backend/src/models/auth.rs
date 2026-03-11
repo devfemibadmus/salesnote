@@ -784,6 +784,7 @@ impl ShopAuthRecord {
     ) -> Result<LoginSessionResult, sqlx::Error> {
         let refresh_token = generate_refresh_token();
         let refresh_hash = hash_refresh_token(&refresh_token);
+        let currency_code = currency_code_from_phone(&input.phone)?;
 
         let row = sqlx::query(
             "WITH inserted_shop AS (
@@ -816,7 +817,7 @@ impl ShopAuthRecord {
         )
         .bind(&input.shop_name)
         .bind(&input.phone)
-        .bind(currency_code_from_phone(&input.phone))
+        .bind(currency_code)
         .bind(&input.email)
         .bind(&input.password)
         .bind(&input.address)
@@ -1266,6 +1267,7 @@ impl ShopProfile {
         pool: &sqlx::PgPool,
         payload: &CreateShopPayload,
     ) -> Result<ShopProfile, sqlx::Error> {
+        let currency_code = currency_code_from_phone(&payload.input.phone)?;
         let row = sqlx::query(
             "INSERT INTO shops (name, phone, currency_code, email, password_hash, address, logo_url, timezone)
              VALUES ($1, $2, $3, $4, crypt($5, gen_salt('bf', 12)), $6, $7, $8)
@@ -1273,7 +1275,7 @@ impl ShopProfile {
         )
         .bind(&payload.input.shop_name)
         .bind(&payload.input.phone)
-        .bind(currency_code_from_phone(&payload.input.phone))
+        .bind(currency_code)
         .bind(&payload.input.email)
         .bind(&payload.password)
         .bind(&payload.input.address)
@@ -1289,7 +1291,7 @@ impl ShopProfile {
             id: shop_id,
             name: payload.input.shop_name.clone(),
             phone: payload.input.phone.clone(),
-            currency_code: currency_code_from_phone(&payload.input.phone).to_string(),
+            currency_code: currency_code.to_string(),
             email: payload.input.email.clone(),
             address: payload.input.address.clone(),
             logo_url: payload.input.logo_url.clone(),
@@ -1308,6 +1310,7 @@ impl ShopProfile {
         password: &str,
         dashboard_url: &str,
     ) -> Result<ShopProfile, sqlx::Error> {
+        let currency_code = currency_code_from_phone(&input.phone)?;
         let row = sqlx::query(
             "WITH inserted_shop AS (
                INSERT INTO shops (name, phone, currency_code, email, password_hash, address, logo_url, timezone)
@@ -1327,7 +1330,7 @@ impl ShopProfile {
         )
         .bind(&input.shop_name)
         .bind(&input.phone)
-        .bind(currency_code_from_phone(&input.phone))
+        .bind(currency_code)
         .bind(&input.email)
         .bind(password)
         .bind(&input.address)

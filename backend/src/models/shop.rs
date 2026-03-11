@@ -119,6 +119,12 @@ impl ShopProfile {
     }
 
     pub async fn update(pool: &PgPool, payload: &ShopUpdatePayload) -> Result<(), sqlx::Error> {
+        let currency_code = payload
+            .input
+            .phone
+            .as_deref()
+            .map(currency_code_from_phone)
+            .transpose()?;
         sqlx::query(
             "UPDATE shops SET
                 name = COALESCE($1, name),
@@ -136,7 +142,7 @@ impl ShopProfile {
         )
         .bind(&payload.input.name)
         .bind(&payload.input.phone)
-        .bind(payload.input.phone.as_deref().map(currency_code_from_phone))
+        .bind(currency_code)
         .bind(&payload.input.email)
         .bind(&payload.input.address)
         .bind(&payload.input.logo_url)
@@ -301,6 +307,12 @@ impl ShopProfile {
         payload: &AuthorizedShopUpdatePayload,
     ) -> Result<Option<ShopProfile>, sqlx::Error> {
         let mut tx: Transaction<'_, Postgres> = pool.begin().await?;
+        let currency_code = payload
+            .input
+            .phone
+            .as_deref()
+            .map(currency_code_from_phone)
+            .transpose()?;
         let sql = format!(
             r#"
             WITH {}
@@ -329,7 +341,7 @@ impl ShopProfile {
             .bind(payload.device_id)
             .bind(payload.input.name.as_deref())
             .bind(payload.input.phone.as_deref())
-            .bind(payload.input.phone.as_deref().map(currency_code_from_phone))
+            .bind(currency_code)
             .bind(payload.input.email.as_deref())
             .bind(payload.input.address.as_deref())
             .bind(payload.input.logo_url.as_deref())
@@ -358,10 +370,14 @@ impl ShopProfile {
             .fetch_optional(pool)
             .await?;
 
-        Ok(row
-            .and_then(|row| row.try_get::<String, _>("currency_code").ok())
-            .filter(|value| !value.trim().is_empty())
-            .unwrap_or_else(|| default_currency_code().to_string()))
+        row.and_then(|row| row.try_get::<String, _>("currency_code").ok())
+            .map(|value| value.trim().to_uppercase())
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| {
+                sqlx::Error::Protocol(
+                    format!("missing currency_code for shop {}", shop_id).into(),
+                )
+            })
     }
 }
 
@@ -456,24 +472,24 @@ async fn load_shop_profile_tx(
     row.map(shop_profile_from_row).transpose()
 }
 
-pub fn default_currency_code() -> &'static str {
-    "NGN"
-}
-
-pub fn currency_code_from_phone(phone: &str) -> &'static str {
+pub fn currency_code_from_phone(phone: &str) -> Result<&'static str, sqlx::Error> {
     let normalized = phone.trim();
     let digits = normalized.trim_start_matches('+');
     if digits.is_empty() {
-        return default_currency_code();
+        return Err(sqlx::Error::Protocol(
+            "cannot derive currency_code from empty shop phone".into(),
+        ));
     }
 
     for (code, currency) in PHONE_CODE_TO_CURRENCY {
         if digits.starts_with(code) {
-            return currency;
+            return Ok(currency);
         }
     }
 
-    default_currency_code()
+    Err(sqlx::Error::Protocol(
+        format!("unsupported phone code for currency derivation: {}", phone).into(),
+    ))
 }
 
 pub fn currency_symbol(code: &str) -> Option<&'static str> {
