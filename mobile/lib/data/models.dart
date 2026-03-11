@@ -93,6 +93,7 @@ class ShopProfile {
     required this.id,
     required this.name,
     required this.phone,
+    required this.currencyCode,
     required this.email,
     this.address,
     this.logoUrl,
@@ -104,6 +105,7 @@ class ShopProfile {
   final String id;
   final String name;
   final String phone;
+  final String currencyCode;
   final String email;
   final String? address;
   final String? logoUrl;
@@ -116,6 +118,9 @@ class ShopProfile {
       id: json['id'].toString(),
       name: json['name'] as String,
       phone: json['phone'] as String,
+      currencyCode: (json['currency_code'] as String? ?? 'NGN').trim().isEmpty
+          ? 'NGN'
+          : (json['currency_code'] as String).trim().toUpperCase(),
       email: json['email'] as String,
       address: json['address'] as String?,
       logoUrl: json['logo_url'] as String?,
@@ -131,6 +136,7 @@ class ShopProfile {
     'id': id,
     'name': name,
     'phone': phone,
+    'currency_code': currencyCode,
     'email': email,
     'address': address,
     'logo_url': logoUrl,

@@ -737,7 +737,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     return _isCustomerNameValid(_customerNameController.text) &&
         _isCustomerContactValid(_customerContactController.text) &&
         (_creatingInvoice
-            ? (_selectedBankAccountId?.isNotEmpty == true)
+            ? ((_selectedBankAccountId?.isNotEmpty == true) &&
+                (_selectedSignatureId?.isNotEmpty == true))
             : (_selectedSignatureId?.isNotEmpty == true));
   }
 
@@ -788,6 +789,11 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _showSnackBar('Select a bank account.');
       return;
     }
+    if (_creatingInvoice &&
+        (_selectedSignatureId == null || _selectedSignatureId!.isEmpty)) {
+      _showSnackBar('Select a signature.');
+      return;
+    }
     if (!_creatingInvoice &&
         (_selectedSignatureId == null || _selectedSignatureId!.isEmpty)) {
       _showSnackBar('Select a signature.');
@@ -817,6 +823,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       } else if (_creatingInvoice &&
           (_selectedBankAccountId == null || _selectedBankAccountId!.isEmpty)) {
         _showSnackBar('Select a bank account.');
+      } else if (_creatingInvoice &&
+          (_selectedSignatureId == null || _selectedSignatureId!.isEmpty)) {
+        _showSnackBar('Select a signature.');
       } else if (!_creatingInvoice &&
           (_selectedSignatureId == null || _selectedSignatureId!.isEmpty)) {
         _showSnackBar('Select a signature.');
@@ -848,7 +857,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         return null;
       }
       final input = SaleInput(
-        signatureId: _creatingInvoice ? null : _selectedSignatureId,
+        signatureId: _selectedSignatureId,
         customerName: _customerNameController.text.trim(),
         customerContact: contact,
         status: _saleStatus,
@@ -999,6 +1008,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       } else if (_creatingInvoice &&
           (_selectedBankAccountId == null || _selectedBankAccountId!.isEmpty)) {
         _showSnackBar('Select a bank account.');
+      } else if (_creatingInvoice &&
+          (_selectedSignatureId == null || _selectedSignatureId!.isEmpty)) {
+        _showSnackBar('Select a signature.');
       } else if (!_creatingInvoice &&
           (_selectedSignatureId == null || _selectedSignatureId!.isEmpty)) {
         _showSnackBar('Select a signature.');
@@ -1013,12 +1025,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     }
 
     SignatureItem? signature;
-    if (!_creatingInvoice) {
-      for (final item in _signatures) {
-        if (item.id == _selectedSignatureId) {
-          signature = item;
-          break;
-        }
+    for (final item in _signatures) {
+      if (item.id == _selectedSignatureId) {
+        signature = item;
+        break;
       }
     }
     final shop = _previewShop();

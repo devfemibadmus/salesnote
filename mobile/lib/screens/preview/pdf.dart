@@ -401,7 +401,7 @@ extension _PreviewPdf on _SalePreviewScreenState {
                             ),
                           ],
                         )
-                      else if (widget.status != SaleStatus.invoice) ...[
+                      else ...[
                         pw.Center(
                           child: pw.Container(
                             height: 52,

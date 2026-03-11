@@ -752,7 +752,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                                         ),
                                       ],
                                     )
-                                  else if (widget.status != SaleStatus.invoice)
+                                  else
                                     Column(
                                       children: [
                                         SizedBox(

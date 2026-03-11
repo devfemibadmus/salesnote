@@ -201,7 +201,8 @@ class _NewSaleDetailsStep extends StatelessWidget {
                   ),
                 ],
                 const SizedBox(height: 24),
-                if (saleStatus == SaleStatus.paid) ...[
+                if (saleStatus == SaleStatus.paid ||
+                    saleStatus == SaleStatus.invoice) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Row(
@@ -263,7 +264,11 @@ class _NewSaleDetailsStep extends StatelessWidget {
                             },
                           ),
                   ),
-                ] else ...[
+                ],
+                if (saleStatus == SaleStatus.invoice) ...[
+                  const SizedBox(height: 24),
+                ],
+                if (saleStatus == SaleStatus.invoice) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     child: Row(

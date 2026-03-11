@@ -68,18 +68,28 @@ Future<void> salesnoteFirebaseMessagingBackgroundHandler(
 class NotificationService {
   NotificationService._();
 
+  static const String _channelId = 'salesnote_alerts_v2';
+  static const String _channelName = 'Salesnote Notifications';
+  static const String _channelDescription =
+      'Default channel for Salesnote notifications';
+
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
   static final ValueNotifier<int> unreadCount = ValueNotifier<int>(0);
 
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    'salesnote_alerts_v1',
-    'Salesnote Notifications',
-    description: 'Default channel for Salesnote notifications',
+    _channelId,
+    _channelName,
+    description: _channelDescription,
     importance: Importance.max,
     sound: RawResourceAndroidNotificationSound('salesnote_notification'),
   );
+
+  static int _nextNotificationId() {
+    final millis = DateTime.now().millisecondsSinceEpoch;
+    return millis.remainder(2147483647);
+  }
 
   static Future<void> init() async {
     if (_initialized) {
@@ -116,6 +126,9 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
+    await androidPlugin?.deleteNotificationChannel(
+      channelId: 'salesnote_alerts_v1',
+    );
     await androidPlugin?.createNotificationChannel(_channel);
   }
 
@@ -418,9 +431,9 @@ class NotificationService {
     final payload = _encodePayload(message.data, title, body);
 
     const androidDetails = AndroidNotificationDetails(
-      'salesnote_alerts_v1',
-      'Salesnote Notifications',
-      channelDescription: 'Default channel for Salesnote notifications',
+      _channelId,
+      _channelName,
+      channelDescription: _channelDescription,
       importance: Importance.max,
       priority: Priority.max,
       playSound: true,
@@ -441,7 +454,7 @@ class NotificationService {
     );
 
     await _localNotifications.show(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      id: _nextNotificationId(),
       title: title,
       body: body,
       notificationDetails: details,
@@ -470,7 +483,8 @@ class NotificationService {
 
     final kind = data['type']?.toString().trim() ?? '';
     final saleId = data['sale_id']?.toString().trim() ?? '';
-    if (kind == 'new_sale' && saleId.isNotEmpty) {
+    if ((kind == 'new_sale' || kind == 'new_invoice' || kind == 'invoice_paid') &&
+        saleId.isNotEmpty) {
       PreviewService.openById(saleId);
       return;
     }

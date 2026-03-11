@@ -328,6 +328,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ? homeShop.name
           : settingsShop.name,
       phone: homeShop.phone,
+      currencyCode: (settingsShop.currencyCode).trim().isEmpty
+          ? homeShop.currencyCode
+          : settingsShop.currencyCode,
       email: homeShop.email,
       address: homeShop.address,
       logoUrl: (settingsShop.logoUrl ?? '').trim().isEmpty
