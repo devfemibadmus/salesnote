@@ -16,8 +16,23 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     if (_playerDisposed || _playerReady) {
       return;
     }
-    await _player.openPlayer();
-    _playerReady = true;
+    final existing = _playerInitFuture;
+    if (existing != null) {
+      await existing;
+      return;
+    }
+    final future = () async {
+      await _player.openPlayer();
+      _playerReady = true;
+    }();
+    _playerInitFuture = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_playerInitFuture, future)) {
+        _playerInitFuture = null;
+      }
+    }
   }
 
   Future<void> _ensurePlayerStarted(int sampleRate) async {
@@ -161,9 +176,9 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
         _log('socket:message:unsupported ${raw.runtimeType}');
         return;
       }
-      _log('socket:message ${_truncateLog(rawText)}');
       final decoded = jsonDecode(rawText);
       if (decoded is! Map<String, dynamic>) return;
+      _log('socket:message ${_socketMessageSummary(decoded)}');
 
       if (decoded.containsKey('setupComplete') && mounted) {
         _log('socket:setupComplete');
@@ -294,6 +309,92 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
       return value;
     }
     return '${value.substring(0, max)}...';
+  }
+
+  String _socketMessageSummary(Map<String, dynamic> decoded) {
+    final parts = <String>[];
+    if (decoded.containsKey('setupComplete')) {
+      parts.add('setupComplete');
+    }
+    final usageMetadata = decoded['usageMetadata'];
+    if (usageMetadata is Map<String, dynamic>) {
+      final totalTokens = usageMetadata['totalTokenCount'];
+      if (totalTokens != null) {
+        parts.add('usage.total=$totalTokens');
+      }
+    }
+    final serverContent = decoded['serverContent'];
+    if (serverContent is Map<String, dynamic>) {
+      if (serverContent['interrupted'] == true) {
+        parts.add('interrupted');
+      }
+      if (serverContent['generationComplete'] == true) {
+        parts.add('generationComplete');
+      }
+      if (serverContent['turnComplete'] == true) {
+        parts.add('turnComplete');
+      }
+      final inputTranscription = serverContent['inputTranscription'];
+      if (inputTranscription is Map<String, dynamic>) {
+        final text = (inputTranscription['text'] ??
+                inputTranscription['transcript'])
+            ?.toString()
+            .trim();
+        if (text != null && text.isNotEmpty) {
+          parts.add('input="${_truncateLog(text, max: 80)}"');
+        }
+      }
+      final outputTranscription = serverContent['outputTranscription'];
+      if (outputTranscription is Map<String, dynamic>) {
+        final text = (outputTranscription['text'] ??
+                outputTranscription['transcript'])
+            ?.toString()
+            .trim();
+        if (text != null && text.isNotEmpty) {
+          parts.add('output="${_truncateLog(text, max: 80)}"');
+        }
+      }
+      final modelTurn = serverContent['modelTurn'];
+      if (modelTurn is Map<String, dynamic>) {
+        final modelParts = modelTurn['parts'];
+        if (modelParts is List) {
+          var audioChunkCount = 0;
+          for (final part in modelParts) {
+            if (part is! Map<String, dynamic>) {
+              continue;
+            }
+            final inlineData = part['inlineData'];
+            if (inlineData is Map<String, dynamic>) {
+              final mimeType = inlineData['mimeType']?.toString() ?? '';
+              if (mimeType.startsWith('audio/pcm')) {
+                audioChunkCount += 1;
+              }
+            }
+          }
+          if (audioChunkCount > 0) {
+            parts.add('audioChunks=$audioChunkCount');
+          }
+        }
+      }
+    }
+    final toolCall = decoded['toolCall'];
+    if (toolCall is Map<String, dynamic>) {
+      final functionCalls = toolCall['functionCalls'];
+      if (functionCalls is List && functionCalls.isNotEmpty) {
+        final names = functionCalls
+            .whereType<Map<String, dynamic>>()
+            .map((call) => call['name']?.toString() ?? '')
+            .where((name) => name.trim().isNotEmpty)
+            .toList(growable: false);
+        if (names.isNotEmpty) {
+          parts.add('toolCall=${names.join(',')}');
+        }
+      }
+    }
+    if (parts.isEmpty) {
+      return 'payload';
+    }
+    return parts.join(' ');
   }
 
   String _mergeTranscript(String? current, String incoming) {

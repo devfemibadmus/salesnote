@@ -11,6 +11,7 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
     bool assignNewDraftId = false,
     bool clearDraftId = false,
   }) {
+    _lastPersistedDraftSnapshot = null;
     if (clearDraftId) {
       _draftCacheId = null;
     } else if (assignNewDraftId || (_draftCacheId ?? '').trim().isEmpty) {
@@ -318,8 +319,18 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
         : _draftCacheId!.trim();
     _draftCacheId = draftId;
 
-    final indexEntries = _loadDraftIndexEntries();
     final label = _currentDraftLabel();
+    final payload = _cachedDraftPayload();
+    final snapshot = jsonEncode({
+      'draft_id': draftId,
+      'label': label,
+      'payload': payload,
+    });
+    if (_lastPersistedDraftSnapshot == snapshot) {
+      return;
+    }
+
+    final indexEntries = _loadDraftIndexEntries();
     final existingIndex = indexEntries.indexWhere(
       (entry) => entry['id']?.toString() == draftId,
     );
@@ -333,10 +344,8 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
       'active_id': draftId,
       'drafts': indexEntries,
     });
-    await LocalCache.saveDraft(
-      _newSaleDraftStorageKey(draftId),
-      _cachedDraftPayload(),
-    );
+    await LocalCache.saveDraft(_newSaleDraftStorageKey(draftId), payload);
+    _lastPersistedDraftSnapshot = snapshot;
   }
 
   Future<void> _removeDraftFromLocalCache(String draftId) async {
@@ -348,6 +357,7 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
         .where((entry) => entry['id']?.toString() != normalized)
         .toList(growable: false);
     await LocalCache.clearDraft(_newSaleDraftStorageKey(normalized));
+    _lastPersistedDraftSnapshot = null;
     final nextEntries = indexEntries.isEmpty
         ? const <Map<String, dynamic>>[
             {'id': _newSaleDefaultDraftId, 'label': _newSaleDefaultDraftLabel},

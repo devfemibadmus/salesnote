@@ -4,6 +4,7 @@ use actix_ws::Message;
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
 use serde_json::{json, Map, Value};
+use std::sync::OnceLock;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMessage};
 
 use crate::api::middlewares::auth::AuthDeviceId;
@@ -53,6 +54,9 @@ pub struct LiveAgentAction {
     pub required_fields: Vec<&'static str>,
 }
 
+static LIVE_AGENT_CONTRACT: OnceLock<LiveAgentContract> = OnceLock::new();
+static LIVE_AGENT_FUNCTION_DECLARATIONS: OnceLock<Vec<Value>> = OnceLock::new();
+
 pub async fn create_live_agent_session(
     state: web::Data<AppState>,
     shop_id: ReqData<i64>,
@@ -101,7 +105,7 @@ pub async fn create_live_agent_session(
         tokens_used: balance.tokens_used,
         tokens_available: balance.tokens_available,
         system_instruction: live_agent_system_instruction(&currency_code),
-        contract: live_agent_contract(),
+        contract: cached_live_agent_contract().clone(),
     })
 }
 
@@ -359,6 +363,9 @@ fn live_gemini_setup_payload(state: &AppState, currency_code: &str) -> Value {
             "model": format!("models/{}", state.gemini_live_model.trim()),
             "generationConfig": {
                 "responseModalities": ["AUDIO"],
+                "thinkingConfig": {
+                    "thinkingBudget": 0
+                },
                 "mediaResolution": "MEDIA_RESOLUTION_MEDIUM",
                 "speechConfig": {
                     "voiceConfig": {
@@ -385,11 +392,20 @@ fn live_gemini_setup_payload(state: &AppState, currency_code: &str) -> Value {
             },
             "tools": [
                 {
-                    "functionDeclarations": build_function_declarations(&live_agent_contract())
+                    "functionDeclarations": cached_function_declarations().clone()
                 }
             ]
         }
     })
+}
+
+fn cached_live_agent_contract() -> &'static LiveAgentContract {
+    LIVE_AGENT_CONTRACT.get_or_init(live_agent_contract)
+}
+
+fn cached_function_declarations() -> &'static Vec<Value> {
+    LIVE_AGENT_FUNCTION_DECLARATIONS
+        .get_or_init(|| build_function_declarations(cached_live_agent_contract()))
 }
 
 fn build_function_declarations(contract: &LiveAgentContract) -> Vec<Value> {
@@ -592,40 +608,27 @@ fn unsupported_live_model_message(model: &str) -> Option<&'static str> {
 fn live_agent_system_instruction(currency_code: &str) -> String {
     let normalized_currency_code = currency_code.trim().to_uppercase();
     [
-        "You are the SalesNote friendly live cashier assistant.",
-        "Your goal is to help the user manage receipts, invoices, and reports proactively.",
-        &format!(
-            "The shop currency code is {}.",
-            normalized_currency_code
-        ),
-        "Never say or spell raw ISO currency codes like NGN, USD, or EUR aloud.",
-        "Whenever tool results include *_display money fields, use those display fields when speaking amounts instead of combining raw numbers with currency_code.",
-        "If a tool result includes a currency symbol, pronounce the currency naturally from that symbol rather than reading the code letter by letter.",
-        "Always acknowledge the user naturally when they speak to you.",
-        "Be conversational—if the user says 'hello' or 'thanks', respond warmly.",
-        "Keep the existing manual flow untouched and only guide or draft actions inside the app state you are given.",
-        "Always answer with only the final customer-facing words you want spoken out loud.",
-        "Do not explain your reasoning, process, plan, preparation, or internal steps.",
-        "Do not say things like 'I have crafted', 'I will', 'I am ready to', 'here is', or 'formulating'.",
-        "Do not use markdown, bullet points, labels, headings, or formatting markers such as asterisks.",
-        "Keep confirmations short and direct.",
-        "Never invent products, prices, customers, totals, IDs, bank accounts, signatures, or dates.",
-        "Only use items, customers, banks, signatures, and pages that the client provides in context.",
-        "For dashboard totals, recent sales, invoices, receipts, item movement, dates, and counts, always call the relevant tool first and answer from the tool result only.",
-        "Never answer dashboard or sales-history questions from memory, assumptions, or generic placeholders like 'today and yesterday' without checking tools.",
-        "For broader date-range totals, counts, recent activity, customer history, or product history beyond the dashboard snapshot, call the sales metrics tool first.",
-        "For questions about saved drafts, draft counts, draft names, or draft items, always call the saved drafts tool first and answer from the tool result only.",
-        "Use start_receipt_draft or start_invoice_draft to begin or continue the current draft for that document type.",
-        "Once you have started a draft in the current conversation, keep updating that same draft.",
-        "Only call start_new_draft when the user explicitly asks for another brand new draft or to switch the current draft into a new receipt or invoice.",
-        "Only call discard_current_draft when the user explicitly asks to cancel, discard, or delete the current draft.",
-        "After every draft-related tool call, inspect missing_fields in the tool response.",
-        "If customer_contact is missing, immediately ask the user for the customer's phone number or email before moving on.",
-        "Do not treat a draft as complete until customer name, customer phone or email, at least one item, item prices, a signature, and a bank account for invoices are present.",
-        "Before submit_receipt, submit_invoice, or confirm_submit_current_preview, make sure the draft already has customer name, customer contact, at least one item, item prices, a signature, and a bank account for invoices.",
-        "If a tool response says result=needs_input, ask only for the missing fields and wait.",
-        "Instead of claiming a database write succeeded, say you have 'prepared' or 'drafted' it.",
-        "If required data is missing for a draft, ask a short clarifying question.",
+        "You are SalesNote live cashier.",
+        "Speak only the final customer-facing words.",
+        "No reasoning, process talk, markdown, labels, bullets, or meta phrases.",
+        "Keep replies short, natural, and conversational.",
+        "Acknowledge greetings and thanks warmly.",
+        &format!("The shop currency code is {}.", normalized_currency_code),
+        "Never say raw ISO currency codes aloud.",
+        "When *_display money fields exist, use them.",
+        "If a currency symbol is present, pronounce the currency naturally from that symbol.",
+        "Never invent products, prices, customers, totals, IDs, dates, signatures, bank accounts, or hidden app state.",
+        "Use only client context and tool results.",
+        "For dashboard, sales history, item movement, saved drafts, and report questions, call the relevant tool first and answer only from tool results.",
+        "Use start_receipt_draft or start_invoice_draft to begin or continue the current draft.",
+        "Keep updating the same draft until the user explicitly asks for a new one or a different draft type.",
+        "Use start_new_draft only for an explicitly requested fresh draft.",
+        "Use discard_current_draft only on explicit cancel, discard, or delete intent.",
+        "After each draft tool call, inspect missing_fields.",
+        "If result=needs_input or customer_contact is missing, ask only for the missing fields and wait.",
+        "Required before preview or create: customer name, customer contact, at least one item, item prices, signature, and bank account for invoices.",
+        "Before submit_receipt, submit_invoice, or confirm_submit_current_preview, ensure those required fields already exist.",
+        "Say prepared or drafted until creation or mark-paid succeeds.",
     ]
     .join(" ")
 }
@@ -697,7 +700,7 @@ fn live_agent_contract() -> LiveAgentContract {
         actions: vec![
             LiveAgentAction {
                 name: "navigate",
-                description: "Open one of the supported app pages.",
+                description: "Open a supported page.",
                 required_fields: vec!["page_id"],
             },
             LiveAgentAction {
@@ -712,32 +715,27 @@ fn live_agent_contract() -> LiveAgentContract {
             },
             LiveAgentAction {
                 name: "start_new_draft",
-                description:
-                    "Explicitly start a brand new draft when the user asks for another draft or wants to switch to a fresh receipt or invoice.",
+                description: "Start a fresh receipt or invoice draft.",
                 required_fields: vec!["kind"],
             },
             LiveAgentAction {
                 name: "discard_current_draft",
-                description:
-                    "Discard the currently active draft only when the user explicitly asks to cancel, discard, or delete it.",
+                description: "Discard the current draft.",
                 required_fields: vec![],
             },
             LiveAgentAction {
                 name: "set_customer",
-                description:
-                    "Fill or update customer details in the active draft. Prefer explicit customer_name and customer_contact when known.",
+                description: "Set customer details on the draft.",
                 required_fields: vec!["customer_name_or_phone"],
             },
             LiveAgentAction {
                 name: "add_item",
-                description:
-                    "Add a known item to the active draft. Include unit_price only if the user stated or corrected it.",
+                description: "Add an item to the draft.",
                 required_fields: vec!["item_id_or_name", "quantity"],
             },
             LiveAgentAction {
                 name: "update_item",
-                description:
-                    "Change quantity or unit_price for an already drafted item. Use draft_item_id as either draft index or exact product name. Prefer explicit quantity or unit_price fields instead of mixed values.",
+                description: "Update draft item quantity or unit price.",
                 required_fields: vec!["draft_item_id"],
             },
             LiveAgentAction {
@@ -747,36 +745,32 @@ fn live_agent_contract() -> LiveAgentContract {
             },
             LiveAgentAction {
                 name: "select_signature",
-                description: "Select a stored signature for the active draft.",
+                description: "Set the draft signature.",
                 required_fields: vec!["signature_id"],
             },
             LiveAgentAction {
                 name: "select_bank_account",
-                description: "Select a stored bank account for an invoice draft.",
+                description: "Set the invoice bank account.",
                 required_fields: vec!["bank_account_id"],
             },
             LiveAgentAction {
                 name: "set_charge",
-                description:
-                    "Set or update an adjustment on the active draft. Use charge_type such as discount, vat, service_fee, delivery, rounding, or other.",
+                description: "Set a draft adjustment.",
                 required_fields: vec!["charge_type", "amount"],
             },
             LiveAgentAction {
                 name: "submit_receipt",
-                description:
-                    "Prepare the current receipt draft for preview and spoken confirmation. Do not assume it is created yet.",
+                description: "Prepare the receipt preview.",
                 required_fields: vec![],
             },
             LiveAgentAction {
                 name: "submit_invoice",
-                description:
-                    "Prepare the current invoice draft for preview and spoken confirmation. Do not assume it is created yet.",
+                description: "Prepare the invoice preview.",
                 required_fields: vec![],
             },
             LiveAgentAction {
                 name: "confirm_submit_current_preview",
-                description:
-                    "After you have listed items, prices, charges, and total and the user explicitly confirms, create the currently prepared preview.",
+                description: "Create the prepared preview after explicit confirmation.",
                 required_fields: vec![],
             },
             LiveAgentAction {
@@ -786,26 +780,22 @@ fn live_agent_contract() -> LiveAgentContract {
             },
             LiveAgentAction {
                 name: "search_receipts",
-                description:
-                    "Find paid receipts by customer text, item text, or exact date and optionally open the best match.",
+                description: "Search paid receipts.",
                 required_fields: vec![],
             },
             LiveAgentAction {
                 name: "search_invoices",
-                description:
-                    "Find unpaid invoices by customer text, item text, or exact date and optionally open the best match.",
+                description: "Search unpaid invoices.",
                 required_fields: vec![],
             },
             LiveAgentAction {
                 name: "query_sales_metrics",
-                description:
-                    "Fetch broader sales and invoice metrics for a date or date range, including totals, counts, recent matches, and product breakdowns.",
+                description: "Fetch sales or invoice metrics for a date or range.",
                 required_fields: vec![],
             },
             LiveAgentAction {
                 name: "list_saved_drafts",
-                description:
-                    "List locally saved receipt and invoice drafts, including how many there are, their names, and drafted items.",
+                description: "List saved receipt and invoice drafts.",
                 required_fields: vec![],
             },
             LiveAgentAction {
@@ -815,14 +805,12 @@ fn live_agent_contract() -> LiveAgentContract {
             },
             LiveAgentAction {
                 name: "query_dashboard_summary",
-                description:
-                    "Answer dashboard questions like revenue today, yesterday, recent receipts, and current top movers.",
+                description: "Fetch dashboard summary data.",
                 required_fields: vec![],
             },
             LiveAgentAction {
                 name: "search_item_sales",
-                description:
-                    "Find sold quantity and revenue for a product name and optionally restrict to an exact date.",
+                description: "Fetch sales for one item.",
                 required_fields: vec!["item_query"],
             },
             LiveAgentAction {

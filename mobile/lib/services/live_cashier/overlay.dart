@@ -60,6 +60,7 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   double _draftRoundingAmount = 0;
   double _draftOtherAmount = 0;
   String _draftOtherLabel = 'Others';
+  String? _lastPersistedDraftSnapshot;
   String? _pendingRoute;
   Object? _pendingArgs;
   bool _closeAfterToolResponse = false;
@@ -71,6 +72,7 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   bool _playerStarted = false;
   int _playerSampleRate = 24000;
   bool _playerDisposed = false;
+  Future<void>? _playerInitFuture;
 
   @override
   void initState() {
