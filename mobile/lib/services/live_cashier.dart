@@ -24,6 +24,13 @@ part 'live_cashier/service.dart';
 part 'live_cashier/overlay.dart';
 part 'live_cashier/socket.dart';
 part 'live_cashier/tools.dart';
-part 'live_cashier/draft.dart';
+part 'live_cashier/draft/shared.dart';
+part 'live_cashier/draft/state.dart';
+part 'live_cashier/draft/customer.dart';
+part 'live_cashier/draft/mutations.dart';
+part 'live_cashier/draft/storage.dart';
+part 'live_cashier/draft/requirements.dart';
+part 'live_cashier/draft/reports.dart';
+part 'live_cashier/draft/routes.dart';
 part 'live_cashier/widgets.dart';
 
