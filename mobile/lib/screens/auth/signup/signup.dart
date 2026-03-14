@@ -120,6 +120,8 @@ class _SignupState extends State<Signup> {
       _showError('Unable to determine currency for the selected country.');
       return;
     }
+    await LocalCache.setPreferredRegionCode(phoneRegion);
+    await LocalCache.setPreferredCurrencyCode(currencyCode);
     final phoneE164 = await PhoneService.normalizeE164(
       _phone.text.trim(),
       phoneRegion,

@@ -19,6 +19,7 @@ class LocalCache {
   static const _notificationPromptCooldownKey = 'notification_prompt_cooldown';
   static const _notificationOptOutKey = 'notification_opt_out';
   static const _preferredRegionCodeKey = 'preferred_region_code';
+  static const _preferredCurrencyCodeKey = 'preferred_currency_code';
   static const _cacheSchemaVersionKey = 'cache_schema_version';
   static const _cacheSchemaVersion = 3;
   static Future<void>? _initFuture;
@@ -242,6 +243,23 @@ class LocalCache {
     await box.put(_preferredRegionCodeKey, normalized);
   }
 
+  static String? getPreferredCurrencyCode() {
+    final box = Hive.box<String>(_pageBox);
+    final value = box.get(_preferredCurrencyCodeKey)?.trim().toUpperCase();
+    if (value == null || value.isEmpty) return null;
+    return value;
+  }
+
+  static Future<void> setPreferredCurrencyCode(String? code) async {
+    final box = Hive.box<String>(_pageBox);
+    final normalized = code?.trim().toUpperCase();
+    if (normalized == null || normalized.isEmpty) {
+      await box.delete(_preferredCurrencyCodeKey);
+      return;
+    }
+    await box.put(_preferredCurrencyCodeKey, normalized);
+  }
+
   static Future<void> saveHomeSummary(Map<String, dynamic> data) async {
     final box = Hive.box<String>(_pageBox);
     await box.put('home_summary', jsonEncode(data));
@@ -395,19 +413,30 @@ class LocalCache {
     final settingsBox = Hive.box<bool>(_settingsBox);
     final onboardingComplete = settingsBox.get(_onboardingKey) ?? false;
     final notificationOptOut = settingsBox.get(_notificationOptOutKey) ?? false;
+    final pageBox = Hive.box<String>(_pageBox);
+    final preferredRegionCode =
+        pageBox.get(_preferredRegionCodeKey)?.toString().trim();
+    final preferredCurrencyCode =
+        pageBox.get(_preferredCurrencyCodeKey)?.toString().trim();
 
     await Hive.box<String>(_receiptsBox).clear();
     await Hive.box<String>(_receiptDetailBox).clear();
     await Hive.box<String>(_salesDraftBox).clear();
     await settingsBox.clear();
     await Hive.box<int>(_metaBox).clear();
-    await Hive.box<String>(_pageBox).clear();
+    await pageBox.clear();
 
     if (onboardingComplete) {
       await settingsBox.put(_onboardingKey, true);
     }
     if (notificationOptOut) {
       await settingsBox.put(_notificationOptOutKey, true);
+    }
+    if ((preferredRegionCode ?? '').isNotEmpty) {
+      await pageBox.put(_preferredRegionCodeKey, preferredRegionCode!);
+    }
+    if ((preferredCurrencyCode ?? '').isNotEmpty) {
+      await pageBox.put(_preferredCurrencyCodeKey, preferredCurrencyCode!);
     }
   }
 

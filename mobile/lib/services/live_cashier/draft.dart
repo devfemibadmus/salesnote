@@ -649,6 +649,27 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
     }
   }
 
+  String _resolvedRequirementLabel(
+    String key, {
+    int availableSignatures = 0,
+    int availableBankAccounts = 0,
+  }) {
+    switch (key) {
+      case 'signature_id':
+        if (availableSignatures <= 0) {
+          return 'saved signature in settings';
+        }
+        return 'signature choice';
+      case 'bank_account_id':
+        if (availableBankAccounts <= 0) {
+          return 'saved bank account in settings';
+        }
+        return 'bank account choice';
+      default:
+        return _missingFieldLabel(key);
+    }
+  }
+
   bool _looksLikeCustomerContact(String value) {
     final normalized = value.trim();
     if (normalized.isEmpty) {
@@ -694,28 +715,86 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
   Future<Map<String, dynamic>> _draftRequirementsResponse({
     required bool isInvoice,
   }) async {
-    final missing = _currentDraftMissingFields(isInvoice: isInvoice);
+    var missing = _currentDraftMissingFields(isInvoice: isInvoice);
+    var signatures = const <SignatureItem>[];
+    var bankAccounts = const <ShopBankAccount>[];
+    final autoSelected = <String, dynamic>{};
+
+    if (missing.contains('signature_id')) {
+      signatures = await _toolSignatures();
+      if (signatures.length == 1) {
+        final selected = signatures.first;
+        _draftSignatureId = selected.id;
+        autoSelected['signature'] = {
+          'id': selected.id,
+          'name': selected.name,
+        };
+        missing = _currentDraftMissingFields(isInvoice: isInvoice);
+      }
+    }
+
+    if (missing.contains('bank_account_id')) {
+      final settings = await _toolSettingsSummary();
+      bankAccounts = settings?.shop.bankAccounts ?? const <ShopBankAccount>[];
+      if (bankAccounts.length == 1) {
+        final selected = bankAccounts.first;
+        _draftBankAccountId = selected.id;
+        autoSelected['bank_account'] = {
+          'id': selected.id,
+          'bank_name': selected.bankName,
+          'account_name': selected.accountName,
+          'account_number': selected.accountNumber,
+        };
+        missing = _currentDraftMissingFields(isInvoice: isInvoice);
+      }
+    }
+
     if (missing.isEmpty) {
       return {
         'result': 'ok',
-        'message': 'Draft has all required fields.',
+        'message': autoSelected.isEmpty
+            ? 'Draft has all required fields.'
+            : 'Draft ready with available shop details selected.',
         'missing_fields': const <String>[],
         'missing_labels': const <String>[],
+        'auto_selected_resources': autoSelected,
         'draft_summary': _draftSummary(),
       };
     }
 
-    final labels = missing.map(_missingFieldLabel).toList(growable: false);
+    if (missing.contains('signature_id') && signatures.isEmpty) {
+      signatures = await _toolSignatures();
+    }
+    if (missing.contains('bank_account_id') && bankAccounts.isEmpty) {
+      final settings = await _toolSettingsSummary();
+      bankAccounts = settings?.shop.bankAccounts ?? const <ShopBankAccount>[];
+    }
+
+    final labels = missing
+        .map(
+          (field) => _resolvedRequirementLabel(
+            field,
+            availableSignatures: signatures.length,
+            availableBankAccounts: bankAccounts.length,
+          ),
+        )
+        .toList(growable: false);
+    final selectionFields = <String>[
+      if (missing.contains('signature_id') && signatures.length > 1) 'signature_id',
+      if (missing.contains('bank_account_id') && bankAccounts.length > 1)
+        'bank_account_id',
+    ];
     final response = <String, dynamic>{
       'result': 'needs_input',
       'message': 'Need ${labels.join(', ')}.',
       'missing_fields': missing,
       'missing_labels': labels,
+      'selection_fields': selectionFields,
+      'auto_selected_resources': autoSelected,
       'draft_summary': _draftSummary(),
     };
 
     if (missing.contains('signature_id')) {
-      final signatures = await _toolSignatures();
       response['available_signatures'] = signatures
           .map((item) => {
                 'id': item.id,
@@ -725,9 +804,8 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
     }
 
     if (missing.contains('bank_account_id')) {
-      final settings = await _toolSettingsSummary();
       response['available_bank_accounts'] =
-          (settings?.shop.bankAccounts ?? const <ShopBankAccount>[])
+          bankAccounts
               .map((item) => {
                     'id': item.id,
                     'bank_name': item.bankName,

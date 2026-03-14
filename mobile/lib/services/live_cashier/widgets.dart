@@ -84,23 +84,182 @@ class _ReadyBody extends StatelessWidget {
           pending: true,
         ),
     ];
+    final contentSignature = <String>[
+      for (final message in transcriptMessages)
+        '${message.speaker.index}:${message.text.trim()}',
+      if (toolStatus != null && toolStatus!.trim().isNotEmpty)
+        'action:${toolStatus!.trim()}:$toolBusy',
+      if ((currentModelTranscript ?? '').trim().isNotEmpty)
+        'assistant_pending:${currentModelTranscript!.trim()}',
+      if ((currentUserTranscript ?? '').trim().isNotEmpty)
+        'user_pending:${currentUserTranscript!.trim()}',
+    ].join('\n');
 
-    return SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            _VoiceOrb(controller: controller, active: responding || (recording && !muted)),
-            const SizedBox(height: 22),
-            if (bubbles.isNotEmpty)
-              Column(
-                children: [
-                  for (final bubble in bubbles) ...[
-                    bubble,
-                    const SizedBox(height: 12),
-                  ],
-                ],
-              ),
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        _VoiceOrb(
+          controller: controller,
+          active: responding || (recording && !muted),
+        ),
+        const SizedBox(height: 22),
+        Expanded(
+          child: _TranscriptPanel(
+            bubbles: bubbles,
+            contentSignature: contentSignature,
+            emptyStateText: status,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TranscriptPanel extends StatefulWidget {
+  const _TranscriptPanel({
+    required this.bubbles,
+    required this.contentSignature,
+    required this.emptyStateText,
+  });
+
+  final List<Widget> bubbles;
+  final String contentSignature;
+  final String emptyStateText;
+
+  @override
+  State<_TranscriptPanel> createState() => _TranscriptPanelState();
+}
+
+class _TranscriptPanelState extends State<_TranscriptPanel> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleAutoScroll(jump: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TranscriptPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.contentSignature != widget.contentSignature) {
+      _scheduleAutoScroll();
+    }
+  }
+
+  void _scheduleAutoScroll({bool jump = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      final target = _scrollController.position.maxScrollExtent;
+      if (jump) {
+        _scrollController.jumpTo(target);
+        return;
+      }
+      try {
+        await _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+        );
+      } catch (_) {}
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final panelRadius = BorderRadius.circular(30);
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xB8FFFFFF),
+        borderRadius: panelRadius,
+        border: Border.all(color: const Color(0x88FFFFFF)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x160F172A),
+            blurRadius: 26,
+            offset: Offset(0, 14),
+          ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: panelRadius,
+        child: Stack(
+          children: [
+            if (widget.bubbles.isEmpty)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: Text(
+                    widget.emptyStateText,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              )
+            else
+              ListView.separated(
+                controller: _scrollController,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 26),
+                itemBuilder: (context, index) => widget.bubbles[index],
+                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                itemCount: widget.bubbles.length,
+              ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 30,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xF7FFFFFF),
+                        Colors.white.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 38,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        const Color(0xFFFFFFFF),
+                        Colors.white.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

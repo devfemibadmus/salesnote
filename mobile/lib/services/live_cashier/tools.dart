@@ -356,18 +356,23 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
     }
 
     if (draftFlowAction) {
-      await _persistCurrentDraftToLocalCache();
-    }
-
-    if (route != null) {
-      _pendingRoute = route;
-      _pendingArgs = routeArgs;
-    }
-
-    if (draftFlowAction) {
       final requirements = await _draftRequirementsResponse(
         isInvoice: _draftIsInvoice,
       );
+      if (routeArgs is NewSaleRouteArgs) {
+        routeArgs = NewSaleRouteArgs(
+          startAsInvoice: routeArgs.startAsInvoice,
+          draftId: _draftCacheId,
+          agentDraft: _newSaleArgs().agentDraft,
+          openPreviewOnLoad: routeArgs.openPreviewOnLoad,
+          autoCreateOnPreviewLoad: routeArgs.autoCreateOnPreviewLoad,
+        );
+      }
+      await _persistCurrentDraftToLocalCache();
+      if (route != null) {
+        _pendingRoute = route;
+        _pendingArgs = routeArgs;
+      }
       if (requirements['result'] == 'needs_input') {
         return {
           ...requirements,
@@ -379,6 +384,9 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
             'draft_items_count': routeArgs.agentDraft!.items.length,
         };
       }
+    } else if (route != null) {
+      _pendingRoute = route;
+      _pendingArgs = routeArgs;
     }
 
     return {

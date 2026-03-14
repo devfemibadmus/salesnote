@@ -10,6 +10,7 @@ import '../data/models.dart';
 import 'cache/local.dart';
 import 'media.dart';
 import 'notification.dart';
+import 'region.dart';
 import 'token_store.dart';
 
 class ApiClient {
@@ -148,6 +149,14 @@ class ApiClient {
         path.startsWith('/auth/refresh');
   }
 
+  Future<void> _persistAuthShopPreferences(AuthResult auth) async {
+    await LocalCache.setPreferredCurrencyCode(auth.shop.currencyCode);
+    final regionCode = RegionService.regionCodeFromE164(auth.shop.phone);
+    if (regionCode != null && regionCode.isNotEmpty) {
+      await LocalCache.setPreferredRegionCode(regionCode);
+    }
+  }
+
   Future<AuthResult> login(
     String phoneOrEmail,
     String password, {
@@ -177,6 +186,7 @@ class ApiClient {
     );
     final result = await _handle(response, (data) => AuthResult.fromJson(data));
     await _tokenStore.saveToken(result.data.accessToken);
+    await _persistAuthShopPreferences(result.data);
     return result.data;
   }
 
@@ -232,6 +242,7 @@ class ApiClient {
     );
     final result = await _handle(response, (data) => AuthResult.fromJson(data));
     await _tokenStore.saveToken(result.data.accessToken);
+    await _persistAuthShopPreferences(result.data);
     return result.data;
   }
 

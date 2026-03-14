@@ -1,7 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:country_picker/country_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../data/models.dart';
+import 'cache/local.dart';
 import 'cache/loader.dart';
 
 class CurrencyService {
@@ -103,6 +106,22 @@ class CurrencyService {
     final code = shop?.currencyCode.trim().toUpperCase();
     if (code != null && code.isNotEmpty) {
       return code;
+    }
+    final preferredCurrencyCode = LocalCache.getPreferredCurrencyCode();
+    if (preferredCurrencyCode != null && preferredCurrencyCode.isNotEmpty) {
+      return preferredCurrencyCode;
+    }
+    final preferredRegionCode = LocalCache.getPreferredRegionCode();
+    final preferredRegionCurrency = currencyCodeForRegion(preferredRegionCode);
+    if (preferredRegionCurrency != null && preferredRegionCurrency.isNotEmpty) {
+      return preferredRegionCurrency;
+    }
+    final localeRegionCode = ui.PlatformDispatcher.instance.locale.countryCode
+        ?.trim()
+        .toUpperCase();
+    final localeCurrency = currencyCodeForRegion(localeRegionCode);
+    if (localeCurrency != null && localeCurrency.isNotEmpty) {
+      return localeCurrency;
     }
     return null;
   }
