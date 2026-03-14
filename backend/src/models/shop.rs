@@ -34,6 +34,12 @@ pub struct ShopBankAccount {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LiveAgentTokenBalance {
+    pub tokens_used: i64,
+    pub tokens_available: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShopBankAccountInput {
     pub id: i16,
     pub bank_name: String,
@@ -382,6 +388,136 @@ impl ShopProfile {
             .ok_or_else(|| {
                 sqlx::Error::Protocol(format!("missing currency_code for shop {}", shop_id).into())
             })
+    }
+
+    pub async fn live_agent_balance_authorized(
+        pool: &PgPool,
+        shop_id: i64,
+        device_id: i64,
+    ) -> Result<Option<LiveAgentTokenBalance>, sqlx::Error> {
+        let sql = format!(
+            r#"
+            WITH {}
+            SELECT
+              s.live_agent_tokens_used,
+              s.live_agent_tokens_available
+            FROM shops s
+            WHERE s.id = $1
+              AND EXISTS (SELECT 1 FROM auth_active)
+            "#,
+            AUTH_CTE
+        );
+
+        let row = sqlx::query(&sql)
+            .bind(shop_id)
+            .bind(device_id)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(row.map(|row| LiveAgentTokenBalance {
+            tokens_used: row.get("live_agent_tokens_used"),
+            tokens_available: row.get("live_agent_tokens_available"),
+        }))
+    }
+
+    pub async fn consume_live_agent_tokens_authorized(
+        pool: &PgPool,
+        shop_id: i64,
+        device_id: i64,
+        tokens: i64,
+    ) -> Result<Option<LiveAgentTokenBalance>, sqlx::Error> {
+        let sql = format!(
+            r#"
+            WITH {}
+            UPDATE shops s
+            SET
+              live_agent_tokens_used = s.live_agent_tokens_used + $3,
+              live_agent_tokens_available = s.live_agent_tokens_available - $3
+            WHERE s.id = $1
+              AND EXISTS (SELECT 1 FROM auth_active)
+              AND s.live_agent_tokens_available >= $3
+            RETURNING s.live_agent_tokens_used, s.live_agent_tokens_available
+            "#,
+            AUTH_CTE
+        );
+
+        let row = sqlx::query(&sql)
+            .bind(shop_id)
+            .bind(device_id)
+            .bind(tokens)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(row.map(|row| LiveAgentTokenBalance {
+            tokens_used: row.get("live_agent_tokens_used"),
+            tokens_available: row.get("live_agent_tokens_available"),
+        }))
+    }
+
+    pub async fn refund_live_agent_tokens_authorized(
+        pool: &PgPool,
+        shop_id: i64,
+        device_id: i64,
+        tokens: i64,
+    ) -> Result<Option<LiveAgentTokenBalance>, sqlx::Error> {
+        let sql = format!(
+            r#"
+            WITH {}
+            UPDATE shops s
+            SET
+              live_agent_tokens_used = GREATEST(0, s.live_agent_tokens_used - $3),
+              live_agent_tokens_available = s.live_agent_tokens_available + $3
+            WHERE s.id = $1
+              AND EXISTS (SELECT 1 FROM auth_active)
+            RETURNING s.live_agent_tokens_used, s.live_agent_tokens_available
+            "#,
+            AUTH_CTE
+        );
+
+        let row = sqlx::query(&sql)
+            .bind(shop_id)
+            .bind(device_id)
+            .bind(tokens)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(row.map(|row| LiveAgentTokenBalance {
+            tokens_used: row.get("live_agent_tokens_used"),
+            tokens_available: row.get("live_agent_tokens_available"),
+        }))
+    }
+
+    pub async fn apply_live_agent_usage_authorized(
+        pool: &PgPool,
+        shop_id: i64,
+        device_id: i64,
+        tokens: i64,
+    ) -> Result<Option<LiveAgentTokenBalance>, sqlx::Error> {
+        let sql = format!(
+            r#"
+            WITH {}
+            UPDATE shops s
+            SET
+              live_agent_tokens_used = s.live_agent_tokens_used + $3,
+              live_agent_tokens_available = s.live_agent_tokens_available - $3
+            WHERE s.id = $1
+              AND EXISTS (SELECT 1 FROM auth_active)
+            RETURNING s.live_agent_tokens_used, s.live_agent_tokens_available
+            "#,
+            AUTH_CTE
+        );
+
+        let row = sqlx::query(&sql)
+            .bind(shop_id)
+            .bind(device_id)
+            .bind(tokens)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(row.map(|row| LiveAgentTokenBalance {
+            tokens_used: row.get("live_agent_tokens_used"),
+            tokens_available: row.get("live_agent_tokens_available"),
+        }))
     }
 }
 

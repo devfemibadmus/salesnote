@@ -90,4 +90,11 @@ pub fn init_routes(cfg: &mut web::ServiceConfig, state: AppState) {
             .wrap(auth_guard.clone())
             .route(web::get().to(analytics_summary)),
     );
+
+    cfg.service(
+        web::scope("/live-agent")
+            .wrap(auth_guard.clone())
+            .route("/session", web::post().to(create_live_agent_session))
+            .route("/socket", web::get().to(connect_live_agent_socket)),
+    );
 }

@@ -81,6 +81,12 @@ pub struct Settings {
     pub fcm_project_id: String,
     pub fcm_key_json_path: String,
     #[serde(default)]
+    pub gemini_api_key: String,
+    #[serde(default = "default_gemini_live_model")]
+    pub gemini_live_model: String,
+    #[serde(default = "default_gemini_live_max_session_tokens")]
+    pub gemini_live_max_session_tokens: i64,
+    #[serde(default)]
     pub gcs_bucket: Option<String>,
     #[serde(default)]
     pub gcs_key_json_path: Option<String>,
@@ -514,6 +520,14 @@ fn default_use_redis() -> bool {
 
 fn default_gcs_signed_url_ttl_secs() -> u32 {
     900
+}
+
+fn default_gemini_live_model() -> String {
+    "gemini-2.5-flash-native-audio-preview-12-2025".to_string()
+}
+
+fn default_gemini_live_max_session_tokens() -> i64 {
+    50_000
 }
 
 fn default_enable_backtrace() -> bool {

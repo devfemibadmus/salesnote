@@ -1,8 +1,11 @@
-use std::net::SocketAddr;
+use std::{env, net::{IpAddr, SocketAddr}};
 
 use actix_files::Files;
 use actix_web::{middleware::DefaultHeaders, middleware::Logger, web, App, HttpServer};
 use ipnet::IpNet;
+use ngrok::config::ForwarderBuilder;
+use ngrok::tunnel::EndpointInfo;
+use url::Url;
 
 use salesnote_backend::api::{
     middlewares::rate_limit::{AuthRateLimits, RateLimiter},
@@ -59,6 +62,9 @@ async fn main() -> std::io::Result<()> {
         smtp_password: settings.smtp_password.clone(),
         smtp_from: settings.smtp_from.clone(),
         dashboard_url: settings.dashboard_url.clone(),
+        gemini_api_key: settings.gemini_api_key.clone(),
+        gemini_live_model: settings.gemini_live_model.clone(),
+        gemini_live_max_session_tokens: settings.gemini_live_max_session_tokens,
         gcs_bucket: settings.gcs_bucket.clone(),
         gcs_key_json_path: settings.gcs_key_json_path.clone(),
         gcs_signed_url_ttl_secs: settings.gcs_signed_url_ttl_secs,
@@ -68,7 +74,7 @@ async fn main() -> std::io::Result<()> {
     let addr: SocketAddr = settings.bind.parse().expect("invalid bind addr");
     tracing::info!("listening on {}", addr);
 
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         let state = app_state.clone();
         App::new()
             .app_data(web::Data::new(state.clone()))
@@ -99,8 +105,46 @@ async fn main() -> std::io::Result<()> {
             .configure(|cfg| routes::init_routes(cfg, state.clone()))
     })
     .bind(addr)?
-    .run()
-    .await
+    .run();
+
+    let _ngrok_forwarder = if rate_limiting_disabled(&settings) {
+        let upstream_url = ngrok_upstream_url(addr)?;
+        let session = ngrok::Session::builder()
+            .authtoken_from_env()
+            .connect()
+            .await
+            .map_err(|err| std::io::Error::other(format!("ngrok connect failed: {err}")))?;
+        let domain = env::var("NGROK_DOMAIN")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+        let forwarder = match domain.as_deref() {
+            Some(domain) => {
+                tracing::info!("ngrok enabled with reserved domain {}", domain);
+                session
+                    .http_endpoint()
+                    .domain(domain)
+                    .listen_and_forward(upstream_url.clone())
+                    .await
+            }
+            None => {
+                tracing::info!("ngrok enabled with ephemeral domain");
+                session
+                    .http_endpoint()
+                    .listen_and_forward(upstream_url.clone())
+                    .await
+            }
+        }
+        .map_err(|err| std::io::Error::other(format!("ngrok forwarder failed: {err}")))?;
+
+        tracing::info!("ngrok tunnel established at {}", forwarder.url());
+        Some(forwarder)
+    } else {
+        tracing::info!("ngrok disabled because rate limiting is enabled");
+        None
+    };
+
+    server.await
 }
 
 fn parse_trusted_proxies(value: &str) -> Result<Vec<IpNet>, String> {
@@ -113,4 +157,20 @@ fn parse_trusted_proxies(value: &str) -> Result<Vec<IpNet>, String> {
                 .map_err(|_| format!("invalid trusted proxy range: {part}"))
         })
         .collect()
+}
+
+fn rate_limiting_disabled(settings: &config::Settings) -> bool {
+    !settings.use_redis
+}
+
+fn ngrok_upstream_url(addr: SocketAddr) -> std::io::Result<Url> {
+    let authority = match addr.ip() {
+        IpAddr::V4(ip) if ip.is_unspecified() => format!("127.0.0.1:{}", addr.port()),
+        IpAddr::V4(ip) => format!("{ip}:{}", addr.port()),
+        IpAddr::V6(ip) if ip.is_unspecified() => format!("[::1]:{}", addr.port()),
+        IpAddr::V6(ip) => format!("[{ip}]:{}", addr.port()),
+    };
+
+    Url::parse(&format!("http://{authority}"))
+        .map_err(|err| std::io::Error::other(format!("invalid ngrok upstream URL: {err}")))
 }
