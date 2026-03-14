@@ -8,6 +8,7 @@ import '../../data/models.dart';
 import '../../services/api_client.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
+import '../../services/live_cashier.dart';
 import '../../services/notice.dart';
 import '../../services/preview.dart';
 import '../../services/token_store.dart';
@@ -448,15 +449,16 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
       bottomNavigationBar: AppBottomNav(
         activeTab: AppBottomTab.items,
         onHome: () => _goTo(AppRoutes.home, reset: true),
-        onSales: () => _goTo(AppRoutes.sales, reset: true),
-        onAdd: () => Navigator.pushNamed(
-          context,
-          AppRoutes.newSale,
-          arguments: const NewSaleRouteArgs(startAsInvoice: true),
+          onSales: () => _goTo(AppRoutes.sales, reset: true),
+          onAdd: () => Navigator.pushNamed(
+            context,
+            AppRoutes.newSale,
+            arguments: const NewSaleRouteArgs(startAsInvoice: true),
+          ),
+          onAddLongPress: () => LiveCashierService.show(context),
+          onItems: () {},
+          onSettings: () => _goTo(AppRoutes.shop, reset: true),
         ),
-        onItems: () {},
-        onSettings: () => _goTo(AppRoutes.shop, reset: true),
-      ),
     );
   }
 }

@@ -4,6 +4,7 @@ class SalePreviewScreen extends StatefulWidget {
   const SalePreviewScreen({
     super.key,
     required this.isCreatedSale,
+    this.autoCreateOnLoad = false,
     required this.status,
     required this.shop,
     required this.signature,
@@ -29,6 +30,7 @@ class SalePreviewScreen extends StatefulWidget {
   });
 
   final bool isCreatedSale;
+  final bool autoCreateOnLoad;
   final SaleStatus status;
   final ShopProfile? shop;
   final SignatureItem? signature;
@@ -66,6 +68,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
   late final String _currencyLocale;
   final ScrollController _receiptScrollController = ScrollController();
   final GlobalKey _receiptBoundaryKey = GlobalKey();
+  bool _didAutoCreate = false;
 
   @override
   void initState() {
@@ -79,6 +82,13 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
             ? widget.shop!.bankAccounts.first.id
             : null);
     _syncSinglePageFlagWithRetry();
+    if (widget.autoCreateOnLoad && !widget.isCreatedSale && widget.onCreate != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _didAutoCreate) return;
+        _didAutoCreate = true;
+        unawaited(_handleCreate());
+      });
+    }
   }
 
   ShopBankAccount? get _selectedBankAccount {

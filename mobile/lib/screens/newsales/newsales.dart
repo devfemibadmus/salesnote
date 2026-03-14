@@ -71,6 +71,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   bool _uploadingSignature = false;
   bool _switchingDraft = false;
   bool _hydratingDraft = false;
+  bool _didAutoOpenAgentPreview = false;
   bool _customerNameTouched = false;
   bool _customerContactTouched = false;
   double _discountAmount = 0;
@@ -148,6 +149,17 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   Future<void> _initializeScreen() async {
     await _loadDraftBootstrap();
     await _loadSignatures();
+    if (widget.routeArgs?.openPreviewOnLoad == true && !_didAutoOpenAgentPreview) {
+      _didAutoOpenAgentPreview = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        unawaited(
+          _openPreview(
+            autoCreate: widget.routeArgs?.autoCreateOnPreviewLoad == true,
+          ),
+        );
+      });
+    }
   }
 
   void _syncStepController({bool animate = false}) {
@@ -258,6 +270,24 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   String _draftStorageKey(String draftId) => 'draft_new_sale_$draftId';
 
   Future<void> _loadDraftBootstrap() async {
+    void applyRouteDraftId() {
+      final routedDraftId = widget.routeArgs?.draftId?.trim() ?? '';
+      if (routedDraftId.isEmpty) {
+        return;
+      }
+      final existingIndex = _drafts.indexWhere((d) => d.id == routedDraftId);
+      if (existingIndex < 0) {
+        _drafts.add(
+          const _DraftSlot(id: '', label: _defaultDraftLabel),
+        );
+        _drafts[_drafts.length - 1] = _DraftSlot(
+          id: routedDraftId,
+          label: _defaultDraftLabel,
+        );
+      }
+      _activeDraftId = routedDraftId;
+    }
+
     final legacy = LocalCache.loadDraft(_legacyDraftKey);
     if (legacy != null) {
       await LocalCache.saveDraft(_draftStorageKey(_defaultDraftId), legacy);
@@ -270,6 +300,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         ..clear()
         ..add(const _DraftSlot(id: _defaultDraftId, label: _defaultDraftLabel));
       _activeDraftId = _defaultDraftId;
+      applyRouteDraftId();
       await _saveDraftIndex();
       await _loadDraft(_activeDraftId);
       return;
@@ -289,6 +320,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         ..clear()
         ..add(const _DraftSlot(id: _defaultDraftId, label: _defaultDraftLabel));
       _activeDraftId = _defaultDraftId;
+      applyRouteDraftId();
       await _saveDraftIndex();
       await _loadDraft(_activeDraftId);
       return;
@@ -327,7 +359,11 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     final ids = _drafts.map((d) => d.id).toList();
     final active = (index['active_id'] ?? '').toString();
     _activeDraftId = ids.contains(active) ? active : ids.first;
+    applyRouteDraftId();
     _activeDraftId = _pickBestActiveDraft(_activeDraftId);
+    if ((widget.routeArgs?.draftId?.trim().isNotEmpty ?? false)) {
+      _activeDraftId = widget.routeArgs!.draftId!.trim();
+    }
     await _saveDraftIndex();
     await _loadDraft(_activeDraftId);
   }
@@ -379,6 +415,58 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   }
 
   Future<void> _loadDraft(String draftId) async {
+    final agentDraft = widget.routeArgs?.agentDraft;
+    if (agentDraft != null) {
+      if (!mounted) return;
+      _hydratingDraft = true;
+      setState(() {
+        _customerNameController.text = agentDraft.customerName ?? '';
+        _customerContactController.text = agentDraft.customerContact ?? '';
+        _phoneError = null;
+        _discountAmount = agentDraft.discountAmount;
+        _vatAmount = agentDraft.vatAmount;
+        _serviceFeeAmount = agentDraft.serviceFeeAmount;
+        _deliveryFeeAmount = agentDraft.deliveryFeeAmount;
+        _roundingAmount = agentDraft.roundingAmount;
+        _otherAmount = agentDraft.otherAmount;
+        _otherLabel =
+            (agentDraft.otherLabel?.trim().isNotEmpty ?? false)
+                ? agentDraft.otherLabel!.trim()
+                : _defaultOtherLabel;
+        _selectedSignatureId = agentDraft.signatureId;
+        _selectedBankAccountId = _resolveBankAccountId(agentDraft.bankAccountId);
+        _saleStatus = widget.routeArgs?.startAsInvoice == true
+            ? SaleStatus.invoice
+            : SaleStatus.paid;
+        _step = agentDraft.items.isNotEmpty ||
+                (agentDraft.customerName?.trim().isNotEmpty ?? false) ||
+                (agentDraft.customerContact?.trim().isNotEmpty ?? false)
+            ? 1
+            : 0;
+        _stepSwipeUnlocked = _step == 1;
+        _customerNameTouched = false;
+        _customerContactTouched = false;
+        _items
+          ..clear()
+          ..addAll(
+            agentDraft.items.map(
+              (item) => _DraftSaleItem(
+                productName: item.productName,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice ?? 0,
+              ),
+            ),
+          );
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _syncStepController();
+      });
+      _hydratingDraft = false;
+      await _saveDraft();
+      return;
+    }
+
     final draft = LocalCache.loadDraft(_draftStorageKey(draftId));
     if (draft == null) {
       if (!mounted) return;
@@ -989,7 +1077,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     return CacheLoader.loadSettingsSummaryCache()?.shop;
   }
 
-  Future<void> _openPreview() async {
+  Future<void> _openPreview({bool autoCreate = false}) async {
     setState(() {
       _customerNameTouched = true;
       _customerContactTouched = true;
@@ -1036,6 +1124,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       MaterialPageRoute<String?>(
         builder: (_) => SalePreviewScreen(
           isCreatedSale: false,
+          autoCreateOnLoad: autoCreate,
           status: _saleStatus,
           shop: shop,
           selectedBankAccountId: _selectedBankAccountId,

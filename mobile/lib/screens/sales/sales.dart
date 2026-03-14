@@ -8,6 +8,7 @@ import '../../data/models.dart';
 import '../../services/api_client.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
+import '../../services/live_cashier.dart';
 import '../../services/notice.dart';
 import '../../services/preview.dart';
 import '../../services/token_store.dart';
@@ -442,13 +443,14 @@ class _SalesScreenState extends State<SalesScreen> {
         child: RefreshIndicator(onRefresh: _refreshSales, child: body),
       ),
       bottomNavigationBar: AppBottomNav(
-        activeTab: AppBottomTab.sales,
-        onHome: () => _goTo(AppRoutes.home, reset: true),
-        onSales: () {},
-        onAdd: () => _goTo(AppRoutes.newSale),
-        onItems: () => _goTo(AppRoutes.invoices, reset: true),
-        onSettings: () => _goTo(AppRoutes.shop, reset: true),
-      ),
+          activeTab: AppBottomTab.sales,
+          onHome: () => _goTo(AppRoutes.home, reset: true),
+          onSales: () {},
+          onAdd: () => _goTo(AppRoutes.newSale),
+          onAddLongPress: () => LiveCashierService.show(context),
+          onItems: () => _goTo(AppRoutes.invoices, reset: true),
+          onSettings: () => _goTo(AppRoutes.shop, reset: true),
+        ),
     );
   }
 }

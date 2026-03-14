@@ -9,6 +9,7 @@ class AppBottomNav extends StatelessWidget {
     required this.onHome,
     required this.onSales,
     required this.onAdd,
+    this.onAddLongPress,
     required this.onItems,
     required this.onSettings,
   });
@@ -17,6 +18,7 @@ class AppBottomNav extends StatelessWidget {
   final VoidCallback onHome;
   final VoidCallback onSales;
   final VoidCallback onAdd;
+  final VoidCallback? onAddLongPress;
   final VoidCallback onItems;
   final VoidCallback onSettings;
 
@@ -51,6 +53,7 @@ class AppBottomNav extends StatelessWidget {
             ),
             _TapScale(
               onTap: onAdd,
+              onLongPress: onAddLongPress,
               borderRadius: BorderRadius.circular(29),
               child: Container(
                 width: 58,
@@ -141,9 +144,11 @@ class _TapScale extends StatefulWidget {
     required this.onTap,
     required this.child,
     required this.borderRadius,
+    this.onLongPress,
   });
 
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final Widget child;
   final BorderRadius borderRadius;
 
@@ -170,6 +175,7 @@ class _TapScaleState extends State<_TapScale> {
         child: InkWell(
           borderRadius: widget.borderRadius,
           onTap: widget.onTap,
+          onLongPress: widget.onLongPress,
           onTapDown: (_) => _setPressed(true),
           onTapCancel: () => _setPressed(false),
           onTapUp: (_) => _setPressed(false),

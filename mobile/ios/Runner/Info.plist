@@ -51,6 +51,10 @@
 	<string>We need access to your photo library to save receipt images.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>We need permission to save receipt images to your photo library.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>We need microphone access for live cashier voice sessions.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We need camera access for live cashier product recognition.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

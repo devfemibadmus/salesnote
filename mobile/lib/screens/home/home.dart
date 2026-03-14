@@ -10,6 +10,7 @@ import '../../services/api_client.dart';
 import '../../services/cache/local.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
+import '../../services/live_cashier.dart';
 import '../../services/media.dart';
 import '../../services/notice.dart';
 import '../../services/notification.dart';
@@ -397,6 +398,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onHome: () {},
         onSales: () => _goTo(AppRoutes.sales, reset: true),
         onAdd: () => _goTo(AppRoutes.newSale),
+        onAddLongPress: () => LiveCashierService.show(context),
         onItems: () => _goTo(AppRoutes.invoices, reset: true),
         onSettings: () => _goTo(AppRoutes.shop, reset: true),
       ),

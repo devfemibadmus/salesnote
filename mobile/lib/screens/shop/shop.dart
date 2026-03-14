@@ -14,6 +14,7 @@ import '../../services/api_client.dart';
 import '../../services/bank_account.dart';
 import '../../services/cache/loader.dart';
 import '../../services/cache/local.dart';
+import '../../services/live_cashier.dart';
 import '../../services/notice.dart';
 import '../../services/notification.dart';
 import '../../services/phone.dart';
@@ -982,13 +983,14 @@ class _ShopScreenState extends State<ShopScreen> {
         ),
       ),
       bottomNavigationBar: AppBottomNav(
-        activeTab: AppBottomTab.settings,
-        onHome: () => _goTo(AppRoutes.home, reset: true),
-        onSales: () => _goTo(AppRoutes.sales, reset: true),
-        onAdd: () => _goTo(AppRoutes.newSale),
-        onItems: () => _goTo(AppRoutes.invoices, reset: true),
-        onSettings: () {},
-      ),
+          activeTab: AppBottomTab.settings,
+          onHome: () => _goTo(AppRoutes.home, reset: true),
+          onSales: () => _goTo(AppRoutes.sales, reset: true),
+          onAdd: () => _goTo(AppRoutes.newSale),
+          onAddLongPress: () => LiveCashierService.show(context),
+          onItems: () => _goTo(AppRoutes.invoices, reset: true),
+          onSettings: () {},
+        ),
     );
   }
 }

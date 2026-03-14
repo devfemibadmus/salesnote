@@ -183,6 +183,18 @@ class LocalCache {
     await box.delete(key);
   }
 
+  static List<String> listDraftKeys({String? prefix}) {
+    final box = Hive.box<String>(_salesDraftBox);
+    final normalizedPrefix = prefix?.trim();
+    return box.keys
+        .map((key) => key.toString())
+        .where((key) =>
+            normalizedPrefix == null ||
+            normalizedPrefix.isEmpty ||
+            key.startsWith(normalizedPrefix))
+        .toList(growable: false);
+  }
+
   static Future<bool> isOnboardingComplete() async {
     final box = Hive.box<bool>(_settingsBox);
     return box.get(_onboardingKey) ?? false;

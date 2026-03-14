@@ -58,6 +58,7 @@ class ApiClient {
   Future<Map<String, String>> _headers() async {
     final token = await _tokenStore.getToken();
     return {
+      ...AppConfig.defaultRequestHeaders,
       'Content-Type': 'application/json',
       if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
@@ -359,6 +360,7 @@ class ApiClient {
     final token = await _tokenStore.getToken();
     final request = http.MultipartRequest('PATCH', uri)
       ..files.add(await http.MultipartFile.fromPath('logo', imagePath));
+    request.headers.addAll(AppConfig.defaultRequestHeaders);
 
     if (token != null && token.isNotEmpty) {
       request.headers['Authorization'] = 'Bearer $token';
@@ -424,6 +426,7 @@ class ApiClient {
     final request = http.MultipartRequest('POST', uri)
       ..fields['name'] = name
       ..files.add(await http.MultipartFile.fromPath('image', imagePath));
+    request.headers.addAll(AppConfig.defaultRequestHeaders);
 
     if (token != null && token.isNotEmpty) {
       request.headers['Authorization'] = 'Bearer $token';
@@ -666,6 +669,21 @@ class ApiClient {
       (data) => HomeSummary.fromJson(data),
     );
     await MediaService.warmImage(result.data.shop.logoUrl);
+    return result.data;
+  }
+
+  Future<LiveAgentSession> createLiveAgentSession() async {
+    final uri = _uri('/live-agent/session');
+    final headers = await _headers();
+    final response = await _timedRequest(
+      'POST',
+      uri,
+      () => _client.post(uri, headers: headers, body: jsonEncode(const {})),
+    );
+    final result = await _handle(
+      response,
+      (data) => LiveAgentSession.fromJson(data),
+    );
     return result.data;
   }
 

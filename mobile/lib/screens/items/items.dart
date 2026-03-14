@@ -8,6 +8,7 @@ import '../../data/models.dart';
 import '../../services/api_client.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
+import '../../services/live_cashier.dart';
 import '../../services/notice.dart';
 import '../../services/token_store.dart';
 import '../../widgets/app_bottom_nav.dart';
@@ -398,13 +399,14 @@ class _ItemsScreenState extends State<ItemsScreen> {
         child: RefreshIndicator(onRefresh: _refreshItems, child: body),
       ),
       bottomNavigationBar: AppBottomNav(
-        activeTab: AppBottomTab.none,
-        onHome: () => _goTo(AppRoutes.home, reset: true),
-        onSales: () => _goTo(AppRoutes.sales, reset: true),
-        onAdd: () => _goTo(AppRoutes.newSale),
-        onItems: () => _goTo(AppRoutes.invoices, reset: true),
-        onSettings: () => _goTo(AppRoutes.shop, reset: true),
-      ),
+          activeTab: AppBottomTab.none,
+          onHome: () => _goTo(AppRoutes.home, reset: true),
+          onSales: () => _goTo(AppRoutes.sales, reset: true),
+          onAdd: () => _goTo(AppRoutes.newSale),
+          onAddLongPress: () => LiveCashierService.show(context),
+          onItems: () => _goTo(AppRoutes.invoices, reset: true),
+          onSettings: () => _goTo(AppRoutes.shop, reset: true),
+        ),
     );
   }
 }
