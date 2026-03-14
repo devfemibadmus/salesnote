@@ -16,6 +16,7 @@ import '../data/models.dart';
 import 'api_client.dart';
 import 'cache/loader.dart';
 import 'cache/local.dart';
+import 'currency.dart';
 import 'token_store.dart';
 import 'validators.dart';
 

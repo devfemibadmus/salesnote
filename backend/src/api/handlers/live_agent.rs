@@ -419,6 +419,12 @@ fn tool_properties_for_action(action_name: &str) -> Value {
                 json!({"type": "STRING", "description": "Destination page id."}),
             );
         }
+        "start_new_draft" => {
+            properties.insert(
+                "kind".to_string(),
+                json!({"type": "STRING", "description": "Draft kind to start: receipt or invoice."}),
+            );
+        }
         "set_customer" => {
             properties.insert(
                 "customer_name_or_phone".to_string(),
@@ -584,15 +590,17 @@ fn unsupported_live_model_message(model: &str) -> Option<&'static str> {
 }
 
 fn live_agent_system_instruction(currency_code: &str) -> String {
-    let spoken_currency = spoken_currency_name(currency_code);
+    let normalized_currency_code = currency_code.trim().to_uppercase();
     [
         "You are the SalesNote friendly live cashier assistant.",
         "Your goal is to help the user manage receipts, invoices, and reports proactively.",
         &format!(
-            "The shop currency is {}. Speak and interpret all monetary amounts in {} unless tool data explicitly says otherwise.",
-            currency_code.trim().to_uppercase(),
-            spoken_currency
+            "The shop currency code is {}.",
+            normalized_currency_code
         ),
+        "Never say or spell raw ISO currency codes like NGN, USD, or EUR aloud.",
+        "Whenever tool results include *_display money fields, use those display fields when speaking amounts instead of combining raw numbers with currency_code.",
+        "If a tool result includes a currency symbol, pronounce the currency naturally from that symbol rather than reading the code letter by letter.",
         "Always acknowledge the user naturally when they speak to you.",
         "Be conversational—if the user says 'hello' or 'thanks', respond warmly.",
         "Keep the existing manual flow untouched and only guide or draft actions inside the app state you are given.",
@@ -607,6 +615,10 @@ fn live_agent_system_instruction(currency_code: &str) -> String {
         "Never answer dashboard or sales-history questions from memory, assumptions, or generic placeholders like 'today and yesterday' without checking tools.",
         "For broader date-range totals, counts, recent activity, customer history, or product history beyond the dashboard snapshot, call the sales metrics tool first.",
         "For questions about saved drafts, draft counts, draft names, or draft items, always call the saved drafts tool first and answer from the tool result only.",
+        "Use start_receipt_draft or start_invoice_draft to begin or continue the current draft for that document type.",
+        "Once you have started a draft in the current conversation, keep updating that same draft.",
+        "Only call start_new_draft when the user explicitly asks for another brand new draft or to switch the current draft into a new receipt or invoice.",
+        "Only call discard_current_draft when the user explicitly asks to cancel, discard, or delete the current draft.",
         "After every draft-related tool call, inspect missing_fields in the tool response.",
         "If customer_contact is missing, immediately ask the user for the customer's phone number or email before moving on.",
         "Do not treat a draft as complete until customer name, customer phone or email, at least one item, item prices, a signature, and a bank account for invoices are present.",
@@ -616,19 +628,6 @@ fn live_agent_system_instruction(currency_code: &str) -> String {
         "If required data is missing for a draft, ask a short clarifying question.",
     ]
     .join(" ")
-}
-
-fn spoken_currency_name(currency_code: &str) -> &'static str {
-    match currency_code.trim().to_uppercase().as_str() {
-        "NGN" => "naira",
-        "USD" => "US dollars",
-        "EUR" => "euros",
-        "GBP" => "pounds sterling",
-        "GHS" => "cedis",
-        "KES" => "Kenyan shillings",
-        "ZAR" => "rand",
-        _ => "the shop currency",
-    }
 }
 
 fn live_agent_contract() -> LiveAgentContract {
@@ -703,12 +702,24 @@ fn live_agent_contract() -> LiveAgentContract {
             },
             LiveAgentAction {
                 name: "start_receipt_draft",
-                description: "Start a new paid sale draft.",
+                description: "Start or continue the current receipt draft.",
                 required_fields: vec![],
             },
             LiveAgentAction {
                 name: "start_invoice_draft",
-                description: "Start a new invoice draft.",
+                description: "Start or continue the current invoice draft.",
+                required_fields: vec![],
+            },
+            LiveAgentAction {
+                name: "start_new_draft",
+                description:
+                    "Explicitly start a brand new draft when the user asks for another draft or wants to switch to a fresh receipt or invoice.",
+                required_fields: vec!["kind"],
+            },
+            LiveAgentAction {
+                name: "discard_current_draft",
+                description:
+                    "Discard the currently active draft only when the user explicitly asks to cancel, discard, or delete it.",
                 required_fields: vec![],
             },
             LiveAgentAction {

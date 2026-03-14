@@ -9,6 +9,10 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
         return 'Starting receipt draft';
       case 'start_invoice_draft':
         return 'Starting invoice draft';
+      case 'start_new_draft':
+        return 'Starting new draft';
+      case 'discard_current_draft':
+        return 'Discarding current draft';
       case 'set_customer':
         return 'Updating customer';
       case 'add_item':
@@ -137,6 +141,7 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
     final draftFlowAction = const <String>{
       'start_receipt_draft',
       'start_invoice_draft',
+      'start_new_draft',
       'set_customer',
       'add_item',
       'remove_item',
@@ -158,15 +163,36 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
           }
           break;
         case 'start_receipt_draft':
-          _resetDraft(isInvoice: false);
+          if (!_hasActiveDraft(isInvoice: false)) {
+            _resetDraft(isInvoice: false);
+          }
           route = AppRoutes.newSale;
           routeArgs = _newSaleArgs();
           break;
         case 'start_invoice_draft':
-          _resetDraft(isInvoice: true);
+          if (!_hasActiveDraft(isInvoice: true)) {
+            _resetDraft(isInvoice: true);
+          }
           route = AppRoutes.newSale;
           routeArgs = _newSaleArgs();
           break;
+        case 'start_new_draft':
+          final normalizedKind = (args['kind']?.toString() ?? '').trim().toLowerCase();
+          if (normalizedKind != 'receipt' && normalizedKind != 'invoice') {
+            return {
+              'result': 'error',
+              'message': 'Draft kind must be receipt or invoice.',
+            };
+          }
+          final isInvoice = normalizedKind == 'invoice';
+          _startFreshDraft(isInvoice: isInvoice);
+          route = AppRoutes.newSale;
+          routeArgs = _newSaleArgs();
+          break;
+        case 'discard_current_draft':
+          _pendingRoute = null;
+          _pendingArgs = null;
+          return await _discardCurrentDraft();
         case 'set_customer':
           _applyCustomer(
             args['customer_name_or_phone']?.toString(),

@@ -6,8 +6,16 @@ const String _newSaleDefaultDraftId = 'draft_1';
 const String _newSaleDefaultDraftLabel = 'New Sale';
 
 extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
-  void _resetDraft({required bool isInvoice}) {
-    _draftCacheId = _nextLiveDraftId();
+  void _clearDraftState({
+    required bool isInvoice,
+    bool assignNewDraftId = false,
+    bool clearDraftId = false,
+  }) {
+    if (clearDraftId) {
+      _draftCacheId = null;
+    } else if (assignNewDraftId || (_draftCacheId ?? '').trim().isEmpty) {
+      _draftCacheId = _nextLiveDraftId();
+    }
     _draftIsInvoice = isInvoice;
     _draftCustomerName = null;
     _draftCustomerContact = null;
@@ -21,6 +29,31 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
     _draftRoundingAmount = 0;
     _draftOtherAmount = 0;
     _draftOtherLabel = 'Others';
+  }
+
+  bool _hasActiveDraft({
+    required bool isInvoice,
+    bool requireMeaningfulData = true,
+  }) {
+    final draftId = (_draftCacheId ?? '').trim();
+    if (draftId.isEmpty || _draftIsInvoice != isInvoice) {
+      return false;
+    }
+    if (!requireMeaningfulData) {
+      return true;
+    }
+    return _hasMeaningfulDraftState();
+  }
+
+  void _resetDraft({required bool isInvoice}) {
+    _clearDraftState(isInvoice: isInvoice);
+  }
+
+  void _startFreshDraft({required bool isInvoice}) {
+    _clearDraftState(
+      isInvoice: isInvoice,
+      assignNewDraftId: true,
+    );
   }
 
   void _applyCustomer(
@@ -306,6 +339,48 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
     );
   }
 
+  Future<void> _removeDraftFromLocalCache(String draftId) async {
+    final normalized = draftId.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+    final indexEntries = _loadDraftIndexEntries()
+        .where((entry) => entry['id']?.toString() != normalized)
+        .toList(growable: false);
+    await LocalCache.clearDraft(_newSaleDraftStorageKey(normalized));
+    final nextEntries = indexEntries.isEmpty
+        ? const <Map<String, dynamic>>[
+            {'id': _newSaleDefaultDraftId, 'label': _newSaleDefaultDraftLabel},
+          ]
+        : indexEntries;
+    final nextActiveId = nextEntries.first['id']?.toString() ?? _newSaleDefaultDraftId;
+    await LocalCache.saveDraft(_newSaleDraftIndexKey, {
+      'active_id': nextActiveId,
+      'drafts': nextEntries,
+    });
+  }
+
+  Future<Map<String, dynamic>> _discardCurrentDraft() async {
+    final currentDraftId = (_draftCacheId ?? '').trim();
+    final currentKind = _draftIsInvoice;
+    if (currentDraftId.isEmpty) {
+      _clearDraftState(isInvoice: currentKind, clearDraftId: true);
+      return {
+        'result': 'ok',
+        'message': 'No active draft to discard.',
+        'draft_summary': _draftSummary(),
+      };
+    }
+    await _removeDraftFromLocalCache(currentDraftId);
+    _clearDraftState(isInvoice: currentKind, clearDraftId: true);
+    return {
+      'result': 'ok',
+      'message': 'Current draft discarded.',
+      'discarded_draft_id': currentDraftId,
+      'draft_summary': _draftSummary(),
+    };
+  }
+
   bool _storedDraftHasMeaningfulData(Map<String, dynamic>? draft) {
     if (draft == null) {
       return false;
@@ -412,6 +487,7 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
 
   Map<String, dynamic> _draftSummary() {
     final currencyCode = _toolCurrencyCode();
+    final currencySymbol = _toolCurrencySymbol(currencyCode);
     final items = _draftItems
         .map((item) => {
               'product_name': item.productName,
@@ -445,6 +521,7 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
       'draft_id': _draftCacheId,
       'kind': _draftIsInvoice ? 'invoice' : 'receipt',
       'currency_code': currencyCode,
+      'currency_symbol': currencySymbol,
       'customer_name': _draftCustomerName,
       'customer_contact': _draftCustomerContact,
       'items': items,
@@ -493,12 +570,24 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
   }
 
   String _formatToolMoney(num amount, {String? currencyCode}) {
-    final code = (currencyCode ?? _toolCurrencyCode() ?? '').trim().toUpperCase();
     final normalized = amount.toDouble();
+    final code = (currencyCode ?? _toolCurrencyCode() ?? '').trim().toUpperCase();
     if (code.isEmpty) {
       return normalized.toStringAsFixed(2);
     }
-    return '$code ${normalized.toStringAsFixed(2)}';
+    return CurrencyService.formatForCode(
+      code,
+      normalized,
+      decimalDigits: 2,
+    );
+  }
+
+  String _toolCurrencySymbol(String? currencyCode) {
+    final code = (currencyCode ?? _toolCurrencyCode() ?? '').trim().toUpperCase();
+    if (code.isEmpty) {
+      return '';
+    }
+    return CurrencyService.symbolForCode(code);
   }
 
   Future<SettingsSummary?> _toolSettingsSummary() async {
@@ -653,6 +742,7 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
 
   Map<String, dynamic> _saleSummary(Sale sale) {
     final currencyCode = _toolCurrencyCode();
+    final currencySymbol = _toolCurrencySymbol(currencyCode);
     return {
       'id': sale.id,
       'status': sale.status.name,
@@ -660,6 +750,7 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
       'customer_contact': sale.customerContact,
       'total': sale.total,
       'currency_code': currencyCode,
+      'currency_symbol': currencySymbol,
       'total_display': _formatToolMoney(sale.total, currencyCode: currencyCode),
       'created_at': sale.createdAt,
       'items': sale.items
@@ -812,6 +903,7 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
     }
 
     final currencyCode = _toolCurrencyCode();
+    final currencySymbol = _toolCurrencySymbol(currencyCode);
     return {
       'status_filter': statusRaw.isEmpty ? 'all' : statusRaw,
       'start_date': startDate?.toIso8601String().split('T').first,
@@ -822,6 +914,8 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
       'customer_count': customerNames.length,
       'paid_receipts_count': paidReceipts.length,
       'invoice_count': invoices.length,
+      'currency_code': currencyCode,
+      'currency_symbol': currencySymbol,
       'paid_receipts_total': paidReceiptsTotal,
       'paid_receipts_total_display': _formatToolMoney(
         paidReceiptsTotal,
@@ -858,8 +952,10 @@ extension _LiveCashierOverlayDraft on _LiveCashierOverlayState {
     final today = daily.isNotEmpty ? daily.first : null;
     final yesterday = daily.length > 1 ? daily[1] : null;
     final currencyCode = home.shop.currencyCode.trim().toUpperCase();
+    final currencySymbol = _toolCurrencySymbol(currencyCode);
     return {
       'currency_code': currencyCode,
+      'currency_symbol': currencySymbol,
       'shop_timezone': home.shop.timezone,
       'today_period': today?.period,
       'today_total': today?.total ?? 0,

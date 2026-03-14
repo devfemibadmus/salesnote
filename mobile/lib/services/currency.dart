@@ -24,12 +24,31 @@ class CurrencyService {
   static String format(num amount, {int? decimalDigits}) {
     final locale = _currentLocale();
     final code = _resolveCurrencyCode();
+    return formatForCode(
+      code,
+      amount,
+      decimalDigits: decimalDigits,
+      fallbackLocale: locale,
+    );
+  }
+
+  static String formatForCode(
+    String? code,
+    num amount, {
+    int? decimalDigits,
+    String? fallbackLocale,
+  }) {
+    final normalizedCode = code?.trim().toUpperCase();
+    final locale =
+        (normalizedCode == null ? null : _currencyToLocale[normalizedCode]) ??
+            fallbackLocale ??
+            _currentLocale();
     try {
-      if (code != null) {
+      if (normalizedCode != null && normalizedCode.isNotEmpty) {
         return NumberFormat.currency(
           locale: locale,
-          name: code,
-          symbol: _currencySymbol(code),
+          name: normalizedCode,
+          symbol: _currencySymbol(normalizedCode),
           decimalDigits: decimalDigits,
         ).format(amount);
       }
@@ -38,11 +57,11 @@ class CurrencyService {
         decimalDigits: decimalDigits,
       ).format(amount);
     } catch (_) {
-      if (code != null) {
+      if (normalizedCode != null && normalizedCode.isNotEmpty) {
         return NumberFormat.currency(
           locale: locale,
-          name: code,
-          symbol: _currencySymbol(code),
+          name: normalizedCode,
+          symbol: _currencySymbol(normalizedCode),
           decimalDigits: decimalDigits,
         ).format(amount);
       }
@@ -55,8 +74,13 @@ class CurrencyService {
 
   static String symbol() {
     final code = _resolveCurrencyCode();
-    if (code != null) {
-      return _currencySymbol(code);
+    return symbolForCode(code);
+  }
+
+  static String symbolForCode(String? code) {
+    final normalizedCode = code?.trim().toUpperCase();
+    if (normalizedCode != null && normalizedCode.isNotEmpty) {
+      return _currencySymbol(normalizedCode);
     }
     return ' ';
   }
@@ -97,12 +121,23 @@ class CurrencyService {
   }
 
   static String _currencySymbol(String code) {
+    final locale = _currencyToLocale[code] ?? Intl.getCurrentLocale();
+    try {
+      final symbol =
+          NumberFormat.simpleCurrency(locale: locale, name: code).currencySymbol;
+      if (symbol.isNotEmpty && symbol != code) {
+        return symbol;
+      }
+    } catch (_) {}
     try {
       final symbol = NumberFormat.simpleCurrency(name: code).currencySymbol;
-      return symbol.isEmpty ? code : symbol;
+      if (symbol.isNotEmpty) {
+        return symbol;
+      }
     } catch (_) {
       return code;
     }
+    return code;
   }
 
   static String? _currencyCodeFromPhoneCode(String phoneCode) {
