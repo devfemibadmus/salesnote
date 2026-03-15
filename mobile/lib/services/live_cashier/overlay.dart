@@ -70,6 +70,16 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   int _playerSampleRate = 24000;
   bool _playerDisposed = false;
   Future<void>? _playerInitFuture;
+  Timer? _reconnectTimer;
+  int _reconnectAttempt = 0;
+  bool _reconnecting = false;
+  bool _closingOverlay = false;
+  bool _awaitingTurnCompletion = false;
+  String? _pendingReplayUserText;
+  Map<String, dynamic>? _pendingToolResponsePayload;
+  List<Map<String, dynamic>>? _pendingToolIntent;
+  String? _pendingToolIntentLabel;
+  bool _pendingNonReplayableToolIntent = false;
 
   @override
   void initState() {
@@ -129,6 +139,8 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
 
   @override
   void dispose() {
+    _closingOverlay = true;
+    _reconnectTimer?.cancel();
     _recordingSub?.cancel();
     _socket?.close();
     _playerDisposed = true;

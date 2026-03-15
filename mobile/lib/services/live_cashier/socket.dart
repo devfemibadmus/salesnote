@@ -74,6 +74,112 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     }
   }
 
+  void _markTurnPending({String? replayText}) {
+    _awaitingTurnCompletion = true;
+    final normalizedReplayText = (replayText ?? '').trim();
+    if (normalizedReplayText.isNotEmpty) {
+      _pendingReplayUserText = normalizedReplayText;
+    }
+  }
+
+  void _clearPendingTurnState() {
+    _awaitingTurnCompletion = false;
+    _pendingReplayUserText = null;
+    _pendingToolResponsePayload = null;
+    _pendingToolIntent = null;
+    _pendingToolIntentLabel = null;
+    _pendingNonReplayableToolIntent = false;
+  }
+
+  Future<void> _sendClientContentTurn(
+    String text, {
+    bool cacheForReplay = true,
+  }) async {
+    final socket = _socket;
+    if (socket == null || socket.readyState != WebSocket.open) {
+      return;
+    }
+    final normalized = text.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+    if (cacheForReplay) {
+      _markTurnPending(replayText: normalized);
+    }
+    socket.add(
+      jsonEncode({
+        'clientContent': {
+          'turns': [
+            {
+              'role': 'user',
+              'parts': [
+                {'text': normalized},
+              ],
+            },
+          ],
+          'turnComplete': true,
+        },
+      }),
+    );
+  }
+
+  Future<void> _restorePendingTurnIfNeeded() async {
+    if (!_awaitingTurnCompletion) {
+      return;
+    }
+    final socket = _socket;
+    if (socket == null || socket.readyState != WebSocket.open) {
+      return;
+    }
+    if (_pendingToolResponsePayload != null) {
+      _log('replay:toolResponse names=${_pendingToolIntentLabel ?? "-"}');
+      try {
+        socket.add(jsonEncode(_pendingToolResponsePayload));
+        if (mounted) {
+          _safeSetState(() {
+            _toolStatus = 'Restored interrupted action after reconnect.';
+          });
+        }
+        return;
+      } catch (e) {
+        _log('replay:toolResponse:error $e');
+      }
+    }
+
+    final replayableIntent = _pendingToolIntent;
+    if (replayableIntent != null && replayableIntent.isNotEmpty) {
+      _log('replay:toolIntent names=${_pendingToolIntentLabel ?? "-"}');
+      unawaited(_handleToolCalls(replayableIntent));
+      return;
+    }
+
+    if (_pendingNonReplayableToolIntent) {
+      _log(
+        'replay:skip nonReplayableToolIntent names=${_pendingToolIntentLabel ?? "-"}',
+      );
+      _clearPendingTurnState();
+      if (mounted) {
+        _safeSetState(() {
+          _toolStatus =
+              'Reconnected. Repeat the last action to avoid duplicate changes.';
+        });
+      }
+      return;
+    }
+
+    final replayText = (_pendingReplayUserText ?? '').trim();
+    if (replayText.isNotEmpty) {
+      _log('replay:userTurn text="$replayText"');
+      await _sendClientContentTurn(replayText, cacheForReplay: false);
+      if (mounted) {
+        _safeSetState(() {
+          _toolStatus = 'Re-sent last question after reconnect.';
+        });
+      }
+      return;
+    }
+  }
+
   Future<void> _finalizeTurn({required bool shouldUnmute}) async {
     if (_turnFinalizing) {
       return;
@@ -85,7 +191,10 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
       await _audioQueue;
       if (!mounted) return;
       _safeSetState(() {
-        _appendTranscriptMessage(_TranscriptSpeaker.user, _currentUserTranscript);
+        _appendTranscriptMessage(
+          _TranscriptSpeaker.user,
+          _currentUserTranscript,
+        );
         _appendTranscriptMessage(
           _TranscriptSpeaker.assistant,
           _currentModelTranscript,
@@ -97,6 +206,7 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
         _autoMutedForPlayback = false;
         _status = _currentStatus();
       });
+      _clearPendingTurnState();
       if (shouldUnmute || shouldRestoreMic) {
         await _ensureLiveMicReady();
       }
@@ -107,18 +217,21 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
 
   Future<void> _bootstrap() async {
     _log('bootstrap:start');
+    _closingOverlay = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _reconnectAttempt = 0;
+    _reconnecting = false;
     try {
       final token = await TokenStore().getToken();
-      
-      await Future.wait([
-        _connectLive(token),
-        _configurePlayer(),
-      ]);
+
+      await Future.wait([_connectLive(token), _configurePlayer()]);
 
       if (!mounted) return;
       _safeSetState(() {
+        _error = null;
         _loading = false;
-        _status = 'Starting live cashier...';
+        _status = _currentStatus();
       });
     } catch (e) {
       _log('bootstrap:error $e');
@@ -134,7 +247,10 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     }
   }
 
-  Future<void> _connectLive(String? token) async {
+  Future<void> _connectLive(
+    String? token, {
+    bool backgroundReconnect = false,
+  }) async {
     final uri = _backendLiveSocketUri();
     final headers = <String, dynamic>{
       ...AppConfig.defaultRequestHeaders,
@@ -143,6 +259,8 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
 
     try {
       _log('socket:connect $uri');
+      _socket = null;
+      _setupReady = false;
       final socket = await WebSocket.connect(uri.toString(), headers: headers);
       socket.pingInterval = const Duration(seconds: 20);
       _socket = socket;
@@ -156,18 +274,74 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
       if (!mounted) return;
       _safeSetState(() {
         _connected = true;
-        _status = 'Starting live cashier...';
+        _error = null;
+        _reconnecting = false;
+        _reconnectAttempt = 0;
+        _status = backgroundReconnect
+            ? 'Reconnected. Restoring session...'
+            : 'Starting live cashier...';
       });
     } catch (e) {
       _log('socket:connect:error $e');
       if (!mounted) return;
       _safeSetState(() {
-        _error = 'Unable to connect live session.';
-        _status = '$e';
+        _connected = false;
+        _status = backgroundReconnect ? _currentStatus() : '$e';
+        if (!backgroundReconnect) {
+          _error = 'Unable to connect live session.';
+        }
       });
+      rethrow;
     }
   }
 
+  void _scheduleReconnect({String? reason}) {
+    if (_closingOverlay || !mounted) {
+      return;
+    }
+    if (_reconnectTimer != null) {
+      return;
+    }
+    _reconnecting = true;
+    _reconnectAttempt += 1;
+    final delaySeconds = _reconnectAttempt <= 1
+        ? 1
+        : _reconnectAttempt == 2
+        ? 2
+        : _reconnectAttempt == 3
+        ? 4
+        : _reconnectAttempt == 4
+        ? 8
+        : 12;
+    _log(
+      'socket:reconnect:scheduled attempt=$_reconnectAttempt '
+      'delay=${delaySeconds}s reason=${reason ?? "-"}',
+    );
+    _safeSetState(() {
+      _toolBusy = false;
+      _toolStatus = 'Disconnected. Reconnecting in ${delaySeconds}s.';
+      _status = _currentStatus();
+    });
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      _reconnectTimer = null;
+      unawaited(_attemptReconnect());
+    });
+  }
+
+  Future<void> _attemptReconnect() async {
+    if (_closingOverlay || !mounted) {
+      return;
+    }
+    try {
+      final token = await TokenStore().getToken();
+      await _connectLive(token, backgroundReconnect: true);
+    } catch (e) {
+      if (!mounted || _closingOverlay) {
+        return;
+      }
+      _scheduleReconnect(reason: e.toString());
+    }
+  }
 
   void _handleSocketMessage(dynamic raw) {
     try {
@@ -204,28 +378,34 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
 
         final inputTranscription = serverContent['inputTranscription'];
         if (inputTranscription is Map<String, dynamic>) {
-          final text = (inputTranscription['text'] ??
-                  inputTranscription['transcript'])
-              ?.toString();
+          final text =
+              (inputTranscription['text'] ?? inputTranscription['transcript'])
+                  ?.toString();
           if (text != null && text.trim().isNotEmpty && mounted) {
+            final replayText = _mergeTranscript(_pendingReplayUserText, text);
+            _markTurnPending(replayText: replayText);
             _safeSetState(() {
-              _currentUserTranscript =
-                  _mergeTranscript(_currentUserTranscript, text);
+              _currentUserTranscript = _mergeTranscript(
+                _currentUserTranscript,
+                text,
+              );
             });
           }
         }
 
         final outputTranscription = serverContent['outputTranscription'];
         if (outputTranscription is Map<String, dynamic>) {
-          final text = (outputTranscription['text'] ??
-                  outputTranscription['transcript'])
-              ?.toString();
+          final text =
+              (outputTranscription['text'] ?? outputTranscription['transcript'])
+                  ?.toString();
           final spoken = text?.trim();
           if (spoken != null && spoken.isNotEmpty && mounted) {
             unawaited(_muteMicForPlayback());
             _safeSetState(() {
-              _currentModelTranscript =
-                  _mergeTranscript(_currentModelTranscript, spoken);
+              _currentModelTranscript = _mergeTranscript(
+                _currentModelTranscript,
+                spoken,
+              );
               _modelResponding = true;
               _status = _currentStatus();
             });
@@ -336,20 +516,20 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
       }
       final inputTranscription = serverContent['inputTranscription'];
       if (inputTranscription is Map<String, dynamic>) {
-        final text = (inputTranscription['text'] ??
-                inputTranscription['transcript'])
-            ?.toString()
-            .trim();
+        final text =
+            (inputTranscription['text'] ?? inputTranscription['transcript'])
+                ?.toString()
+                .trim();
         if (text != null && text.isNotEmpty) {
           parts.add('input="${_truncateLog(text, max: 80)}"');
         }
       }
       final outputTranscription = serverContent['outputTranscription'];
       if (outputTranscription is Map<String, dynamic>) {
-        final text = (outputTranscription['text'] ??
-                outputTranscription['transcript'])
-            ?.toString()
-            .trim();
+        final text =
+            (outputTranscription['text'] ?? outputTranscription['transcript'])
+                ?.toString()
+                .trim();
         if (text != null && text.isNotEmpty) {
           parts.add('output="${_truncateLog(text, max: 80)}"');
         }
@@ -402,12 +582,11 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     if (next.isEmpty) return current ?? '';
     var existing = (current ?? '').trim();
     if (existing.isEmpty) return next;
-    
+
     if (next.contains(existing)) return next;
-    
+
     return '$existing $next';
   }
-
 
   Future<void> _captureAndSendPhoto() async {
     final socket = _socket;
@@ -439,16 +618,15 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
       }
       final bytes = await file.readAsBytes();
       _log('photo:send bytes=${bytes.length}');
-      socket.add(jsonEncode({
-        'realtimeInput': {
-          'mediaChunks': [
-            {
-              'mimeType': 'image/jpeg',
-              'data': base64Encode(bytes),
-            }
-          ],
-        }
-      }));
+      socket.add(
+        jsonEncode({
+          'realtimeInput': {
+            'mediaChunks': [
+              {'mimeType': 'image/jpeg', 'data': base64Encode(bytes)},
+            ],
+          },
+        }),
+      );
       if (!mounted) return;
       _safeSetState(() {
         _capturingPhoto = false;
@@ -573,20 +751,23 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
         _micMuted) {
       return;
     }
+    _markTurnPending();
 
     if (_audioChunkLogCount < 5) {
       _audioChunkLogCount += 1;
       _log('audio:chunk bytes=${chunk.length}');
     }
 
-    socket.add(jsonEncode({
-      'realtimeInput': {
-        'audio': {
-          'mimeType': 'audio/pcm;rate=16000',
-          'data': base64Encode(chunk),
+    socket.add(
+      jsonEncode({
+        'realtimeInput': {
+          'audio': {
+            'mimeType': 'audio/pcm;rate=16000',
+            'data': base64Encode(chunk),
+          },
         },
-      }
-    }));
+      }),
+    );
   }
 
   Future<void> _stopVoiceCapture() async {
@@ -606,9 +787,11 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
 
     final socket = _socket;
     if (socket != null && socket.readyState == WebSocket.open) {
-      socket.add(jsonEncode({
-        'realtimeInput': {'audioStreamEnd': true}
-      }));
+      socket.add(
+        jsonEncode({
+          'realtimeInput': {'audioStreamEnd': true},
+        }),
+      );
     }
   }
 
@@ -617,8 +800,16 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     _setupReady = true;
     if (mounted) {
       _safeSetState(() {
-        _status = 'Starting live cashier...';
+        _toolStatus = null;
+        _status = _currentStatus();
       });
+    }
+    if (_openingGreetingSent) {
+      await _restorePendingTurnIfNeeded();
+      if (!_micMuted) {
+        await _ensureLiveMicReady();
+      }
+      return;
     }
     _sendOpeningGreeting();
   }
@@ -644,9 +835,11 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
       return;
     }
     if (!wasMuted && value && sendAudioEnd) {
-      socket.add(jsonEncode({
-        'realtimeInput': {'audioStreamEnd': true}
-      }));
+      socket.add(
+        jsonEncode({
+          'realtimeInput': {'audioStreamEnd': true},
+        }),
+      );
     }
   }
 
@@ -697,25 +890,17 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
         _status = _currentStatus();
       });
     }
-    socket.add(jsonEncode({
-      'clientContent': {
-        'turns': [
-          {
-            'role': 'user',
-            'parts': [
-              {
-                'text':
-                    'Reply with exactly this and nothing else: Hello from SalesNote Live Cashier. How can I help with receipts, invoices, items, or reports?'
-              }
-            ],
-          }
-        ],
-        'turnComplete': true,
-      }
-    }));
+    unawaited(
+      _sendClientContentTurn(
+        'Reply with exactly this and nothing else: Hello from SalesNote Live Cashier. How can I help with receipts, invoices, items, or reports?',
+      ),
+    );
   }
 
   String _currentStatus() {
+    if (!_connected) {
+      return _reconnecting ? 'Disconnected. Reconnecting...' : 'Disconnected';
+    }
     if (_modelResponding) {
       return '';
     }
@@ -728,11 +913,10 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     return 'Connecting...';
   }
 
-
-  void _handleSocketDone() {
-    _log(
-      'socket:done code=${_socket?.closeCode} reason=${_socket?.closeReason}',
-    );
+  void _handleSocketDisconnect({required String reason, dynamic error}) {
+    _log(reason);
+    _socket = null;
+    _setupReady = false;
     _recordingSub?.cancel();
     _recordingSub = null;
     unawaited(_stopPlayerStream());
@@ -740,24 +924,30 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     _safeSetState(() {
       _connected = false;
       _isRecording = false;
-      _status = 'Connection ended.';
+      _modelResponding = false;
+      _status = _currentStatus();
     });
+    if (_closingOverlay) {
+      return;
+    }
+    _scheduleReconnect(reason: error?.toString() ?? reason);
+  }
+
+  void _handleSocketDone() {
+    _handleSocketDisconnect(
+      reason:
+          'socket:done code=${_socket?.closeCode} reason=${_socket?.closeReason}',
+    );
   }
 
   void _handleSocketError(dynamic error) {
-    _log('socket:error $error');
-    _recordingSub?.cancel();
-    _recordingSub = null;
-    unawaited(_stopPlayerStream());
-    if (!mounted) return;
-    _safeSetState(() {
-      _connected = false;
-      _isRecording = false;
-      _status = 'Live cashier unavailable.';
-    });
+    _handleSocketDisconnect(reason: 'socket:error $error', error: error);
   }
 
   Future<void> _closeOverlay() async {
+    _closingOverlay = true;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     await _stopVoiceCapture();
     await _stopPlayerStream(forceStop: true);
     await _socket?.close();
@@ -765,7 +955,10 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     if (!mounted) return;
     Navigator.of(context).pop();
     if (_pendingRoute != null) {
-      AppNavigator.key.currentState?.pushNamed(_pendingRoute!, arguments: _pendingArgs);
+      AppNavigator.key.currentState?.pushNamed(
+        _pendingRoute!,
+        arguments: _pendingArgs,
+      );
     }
   }
 }

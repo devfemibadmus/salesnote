@@ -1,6 +1,19 @@
 part of '../live_cashier.dart';
 
 extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
+  static const Set<String> _readOnlyToolNames = <String>{
+    'search_receipts',
+    'search_invoices',
+    'list_saved_drafts',
+    'open_sale_preview',
+    'query_dashboard_summary',
+    'query_sales_metrics',
+    'forecast_sales',
+    'search_item_sales',
+    'get_fast_moving_items',
+    'get_slow_moving_items',
+  };
+
   String _toolActionLabel(String name) {
     switch (name) {
       case 'navigate':
@@ -81,11 +94,52 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
     return 'Unable to complete action';
   }
 
+  bool _isRecoverableToolNetworkError(Object error) {
+    return error is SocketException ||
+        error is HttpException ||
+        error is TimeoutException ||
+        error is WebSocketException ||
+        error is http.ClientException;
+  }
+
+  String _toolErrorMessage(String name, Object error) {
+    if (error is ApiException) {
+      return error.message;
+    }
+    if (_isRecoverableToolNetworkError(error)) {
+      return 'Connection dropped while ${_toolActionLabel(name).toLowerCase()}. Reconnecting now. Ask again in a moment.';
+    }
+    return 'Unable to complete that action right now.';
+  }
+
   Future<void> _handleToolCalls(List functionCalls) async {
     final responses = <Map<String, dynamic>>[];
+    final pendingCalls = functionCalls
+        .whereType<Map<String, dynamic>>()
+        .map(
+          (call) => <String, dynamic>{
+            'id': call['id']?.toString() ?? '',
+            'name': call['name']?.toString() ?? '',
+            'args':
+                ((call['args'] as Map?)?.cast<String, dynamic>() ??
+                const <String, dynamic>{}),
+          },
+        )
+        .toList(growable: false);
+    if (pendingCalls.isNotEmpty) {
+      final replayableIntent = pendingCalls.every(
+        (call) => _readOnlyToolNames.contains(call['name']?.toString() ?? ''),
+      );
+      _pendingToolIntent = replayableIntent ? pendingCalls : null;
+      _pendingNonReplayableToolIntent = !replayableIntent;
+      _pendingToolIntentLabel = pendingCalls
+          .map((call) => call['name']?.toString() ?? '')
+          .where((name) => name.trim().isNotEmpty)
+          .join(',');
+      _awaitingTurnCompletion = true;
+    }
     try {
-      for (final call in functionCalls) {
-        if (call is! Map<String, dynamic>) continue;
+      for (final call in pendingCalls) {
         final id = call['id']?.toString() ?? '';
         final name = call['name']?.toString() ?? '';
         final args =
@@ -109,11 +163,34 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
         responses.add({'id': id, 'name': name, 'response': response});
       }
       if (responses.isNotEmpty) {
-        _socket?.add(
-          jsonEncode({
-            'toolResponse': {'functionResponses': responses},
-          }),
-        );
+        final payload = <String, dynamic>{
+          'toolResponse': {'functionResponses': responses},
+        };
+        _pendingToolResponsePayload = payload;
+        _pendingToolIntentLabel = pendingCalls
+            .map((call) => call['name']?.toString() ?? '')
+            .where((name) => name.trim().isNotEmpty)
+            .join(',');
+        final socket = _socket;
+        if (socket == null || socket.readyState != WebSocket.open) {
+          _log('tool:response:skipped socket unavailable');
+          if (mounted) {
+            _safeSetState(() {
+              _toolStatus = 'Disconnected. Reconnecting...';
+            });
+          }
+        } else {
+          try {
+            socket.add(jsonEncode(payload));
+          } catch (e) {
+            _log('tool:response:error $e');
+            if (mounted) {
+              _safeSetState(() {
+                _toolStatus = 'Disconnected. Reconnecting...';
+              });
+            }
+          }
+        }
         if (_closeAfterToolResponse) {
           _closeAfterToolResponse = false;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -368,9 +445,8 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
       _log('tool:error name=$name error=$e');
       return {
         'result': 'error',
-        'message': e is ApiException
-            ? e.message
-            : 'Unable to complete that action right now.',
+        'message': _toolErrorMessage(name, e),
+        'retryable': _isRecoverableToolNetworkError(e),
       };
     }
 

@@ -6,6 +6,7 @@ import 'dart:ui';
 
 import 'package:flutter_sound/flutter_sound.dart' as fs;
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 
@@ -33,6 +34,11 @@ part 'live_cashier/draft/requirements.dart';
 part 'live_cashier/draft/reports.dart';
 part 'live_cashier/draft/routes.dart';
 part 'live_cashier/templates/models.dart';
+part 'live_cashier/templates/common.dart';
 part 'live_cashier/templates/builder.dart';
+part 'live_cashier/templates/customer.dart';
+part 'live_cashier/templates/item.dart';
+part 'live_cashier/templates/receipts.dart';
+part 'live_cashier/templates/invoice.dart';
 part 'live_cashier/templates/widgets.dart';
 part 'live_cashier/widgets.dart';
