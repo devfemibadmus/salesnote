@@ -91,6 +91,28 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     _pendingNonReplayableToolIntent = false;
   }
 
+  void _prepareInterruptedTurnForReplay({String? replayText}) {
+    final normalizedReplayText = (replayText ?? '').trim();
+    if (!mounted) {
+      if ((_currentUserTranscript ?? '').trim().isEmpty &&
+          normalizedReplayText.isNotEmpty) {
+        _currentUserTranscript = normalizedReplayText;
+      }
+      _currentModelTranscript = null;
+      _modelResponding = false;
+      return;
+    }
+    _safeSetState(() {
+      if ((_currentUserTranscript ?? '').trim().isEmpty &&
+          normalizedReplayText.isNotEmpty) {
+        _currentUserTranscript = normalizedReplayText;
+      }
+      _currentModelTranscript = null;
+      _modelResponding = false;
+      _status = _currentStatus();
+    });
+  }
+
   Future<void> _sendClientContentTurn(
     String text, {
     bool cacheForReplay = true,
@@ -134,6 +156,7 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     if (_pendingToolResponsePayload != null) {
       _log('replay:toolResponse names=${_pendingToolIntentLabel ?? "-"}');
       try {
+        _prepareInterruptedTurnForReplay();
         socket.add(jsonEncode(_pendingToolResponsePayload));
         if (mounted) {
           _safeSetState(() {
@@ -149,6 +172,7 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     final replayableIntent = _pendingToolIntent;
     if (replayableIntent != null && replayableIntent.isNotEmpty) {
       _log('replay:toolIntent names=${_pendingToolIntentLabel ?? "-"}');
+      _prepareInterruptedTurnForReplay();
       unawaited(_handleToolCalls(replayableIntent));
       return;
     }
@@ -170,6 +194,7 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     final replayText = (_pendingReplayUserText ?? '').trim();
     if (replayText.isNotEmpty) {
       _log('replay:userTurn text="$replayText"');
+      _prepareInterruptedTurnForReplay(replayText: replayText);
       await _sendClientContentTurn(replayText, cacheForReplay: false);
       if (mounted) {
         _safeSetState(() {
@@ -578,12 +603,34 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
   }
 
   String _mergeTranscript(String? current, String incoming) {
-    var next = incoming.trim();
-    if (next.isEmpty) return current ?? '';
-    var existing = (current ?? '').trim();
-    if (existing.isEmpty) return next;
+    final next = incoming.trim();
+    if (next.isEmpty) {
+      return (current ?? '').trim();
+    }
 
-    if (next.contains(existing)) return next;
+    final existing = (current ?? '').trim();
+    if (existing.isEmpty) {
+      return next;
+    }
+
+    final existingLower = existing.toLowerCase();
+    final nextLower = next.toLowerCase();
+    if (existingLower == nextLower) {
+      return existing;
+    }
+    if (nextLower.contains(existingLower)) {
+      return next;
+    }
+    if (existingLower.contains(nextLower)) {
+      return existing;
+    }
+
+    final maxOverlap = math.min(existing.length, next.length);
+    for (var overlap = maxOverlap; overlap > 0; overlap--) {
+      if (existingLower.endsWith(nextLower.substring(0, overlap))) {
+        return '$existing${next.substring(overlap)}'.trim();
+      }
+    }
 
     return '$existing $next';
   }
