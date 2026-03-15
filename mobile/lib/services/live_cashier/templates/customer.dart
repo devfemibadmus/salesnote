@@ -6,6 +6,7 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
     Map<String, dynamic> response,
   ) {
     final customerQuery = _templateText(response['customer_query']);
+    final customers = _templateMapList(response['customers']);
     final matchedCustomers = _templateStringList(response['matched_customers']);
     final drafts = _templateMapList(response['drafts'])
         .where((draft) {
@@ -126,6 +127,92 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
                   _templateText(match['customer_contact']),
                 ]),
                 trailing: _templateText(match['total_display']),
+              );
+            })
+            .toList(growable: false),
+      );
+    }
+
+    if ((name == 'list_customers' || name == 'query_sales_metrics') &&
+        customers.isNotEmpty) {
+      if (customers.length == 1) {
+        final customer = customers.first;
+        final title = _templateText(customer['customer_name']).isEmpty
+            ? 'Customer'
+            : _templateText(customer['customer_name']);
+        return _TemplateCardData(
+          kind: _TemplateKind.saleReport,
+          signature: _templateSignature(name, <Object?>[
+            'customer-single',
+            title,
+            customer['total_display'],
+            customer['sales_count'],
+          ]),
+          eyebrow: 'Customer',
+          title: title,
+          subtitle: _joinTemplateParts(<String>[
+            _templateText(customer['customer_contact']),
+            _compactTemplateDate(customer['last_sale_at']?.toString()),
+          ]),
+          metrics: <_TemplateMetric>[
+            _TemplateMetric(
+              label: 'Total',
+              value: _templateMetricValue(customer['total_display']),
+            ),
+            _TemplateMetric(
+              label: 'Sales',
+              value: _templateMetricValue(customer['sales_count']),
+            ),
+            _TemplateMetric(
+              label: 'Receipts',
+              value: _templateMetricValue(customer['receipts_count']),
+            ),
+            _TemplateMetric(
+              label: 'Invoices',
+              value: _templateMetricValue(customer['invoice_count']),
+            ),
+          ],
+        );
+      }
+      return _TemplateCardData(
+        kind: _TemplateKind.list,
+        signature: _templateSignature(name, <Object?>[
+          'customer-list',
+          customers.length,
+          customers
+              .map((customer) => _templateText(customer['customer_name']))
+              .join('|'),
+        ]),
+        eyebrow: 'Customer',
+        title: customerQuery.isEmpty
+            ? 'Customers'
+            : 'Customers for $customerQuery',
+        subtitle: '${customers.length} results',
+        metrics: <_TemplateMetric>[
+          if (_templateText(response['all_total_display']).isNotEmpty)
+            _TemplateMetric(
+              label: 'Total',
+              value: _templateMetricValue(response['all_total_display']),
+            ),
+          _TemplateMetric(
+            label: 'Customers',
+            value: _templateMetricValue(response['count']),
+          ),
+        ],
+        rows: customers
+            .take(5)
+            .map((customer) {
+              final title = _templateText(customer['customer_name']).isEmpty
+                  ? 'Customer'
+                  : _templateText(customer['customer_name']);
+              return _TemplateRow(
+                title: title,
+                subtitle: _joinTemplateParts(<String>[
+                  _templateText(customer['customer_contact']),
+                  if (_templateText(customer['sales_count']).isNotEmpty)
+                    '${_templateText(customer['sales_count'])} sales',
+                ]),
+                trailing: _templateText(customer['total_display']),
               );
             })
             .toList(growable: false),

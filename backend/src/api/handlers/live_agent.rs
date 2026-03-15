@@ -555,7 +555,7 @@ fn tool_properties_for_action(action_name: &str) -> Value {
             );
             properties.insert(
                 "customer_query".to_string(),
-                json!({"type": "STRING", "description": "Optional customer or general search text."}),
+                json!({"type": "STRING", "description": "Optional customer name, phone, or email."}),
             );
             properties.insert(
                 "item_query".to_string(),
@@ -564,6 +564,58 @@ fn tool_properties_for_action(action_name: &str) -> Value {
             properties.insert(
                 "limit".to_string(),
                 json!({"type": "STRING", "description": "Maximum matching sales to return."}),
+            );
+        }
+        "list_customers" => {
+            properties.insert(
+                "start_date".to_string(),
+                json!({"type": "STRING", "description": "Optional range start date in YYYY-MM-DD."}),
+            );
+            properties.insert(
+                "end_date".to_string(),
+                json!({"type": "STRING", "description": "Optional range end date in YYYY-MM-DD."}),
+            );
+            properties.insert(
+                "date".to_string(),
+                json!({"type": "STRING", "description": "Optional exact date in YYYY-MM-DD."}),
+            );
+            properties.insert(
+                "status".to_string(),
+                json!({"type": "STRING", "description": "Optional filter: all, receipt, paid, or invoice."}),
+            );
+            properties.insert(
+                "customer_query".to_string(),
+                json!({"type": "STRING", "description": "Optional customer name, phone, or email filter."}),
+            );
+            properties.insert(
+                "limit".to_string(),
+                json!({"type": "STRING", "description": "Maximum customers to return."}),
+            );
+        }
+        "list_items" => {
+            properties.insert(
+                "start_date".to_string(),
+                json!({"type": "STRING", "description": "Optional range start date in YYYY-MM-DD."}),
+            );
+            properties.insert(
+                "end_date".to_string(),
+                json!({"type": "STRING", "description": "Optional range end date in YYYY-MM-DD."}),
+            );
+            properties.insert(
+                "date".to_string(),
+                json!({"type": "STRING", "description": "Optional exact date in YYYY-MM-DD."}),
+            );
+            properties.insert(
+                "status".to_string(),
+                json!({"type": "STRING", "description": "Optional filter: all, receipt, paid, or invoice."}),
+            );
+            properties.insert(
+                "item_query".to_string(),
+                json!({"type": "STRING", "description": "Optional product name or fragment filter."}),
+            );
+            properties.insert(
+                "limit".to_string(),
+                json!({"type": "STRING", "description": "Maximum items to return."}),
             );
         }
         "forecast_sales" => {
@@ -700,7 +752,16 @@ fn live_agent_system_instruction(currency_code: &str) -> String {
         "If a currency symbol is present, pronounce the currency naturally from that symbol.",
         "Never invent products, prices, customers, totals, IDs, dates, signatures, bank accounts, or hidden app state.",
         "Use only client context and tool results.",
-        "For dashboard, sales history, item movement, saved drafts, shop forecast, customer forecast, item forecast, and report questions, call the relevant tool first and answer only from tool results.",
+        "For dashboard, sales history, customer lists, item lists, receipt lists, invoice lists, saved drafts, shop forecast, customer forecast, item forecast, and report questions, call the relevant tool first and answer only from tool results.",
+        "For any request to list, show, name, count, compare, inspect, summarize, or detail customers, items, receipts, invoices, drafts, or sales, call a tool first. Do not answer those from memory or conversation context alone.",
+        "Use list_customers for customer lists, customer names, customer counts, customer details, and customer rankings.",
+        "Use list_items for item lists, item names, sold item lists, item counts, and top item summaries.",
+        "Use search_receipts for receipt or sales lists and receipt details.",
+        "Use search_invoices for invoice lists and invoice details.",
+        "Use list_saved_drafts for draft lists, draft names, and draft item details.",
+        "Use query_sales_metrics for totals, counts, and date-range summaries instead of detailed name lists.",
+        "Prefer dedicated list tools over query_sales_metrics whenever the user asks for names, lists, or detailed records.",
+        "After a list or detail tool call, keep the spoken reply short because the screen shows the detailed card.",
         "Use forecast_sales when the user asks for a forecast, projection, estimate, expected sales, likely future revenue, customer forecast, or item forecast.",
         "Customer forecasts are supported. When the user names a customer, pass that value as customer_query and answer from the returned customer forecast fields.",
         "Item forecasts are supported. When the user names an item, pass that value as item_query and answer from the returned item forecast fields.",
@@ -883,7 +944,17 @@ fn live_agent_contract() -> LiveAgentContract {
             },
             LiveAgentAction {
                 name: "query_sales_metrics",
-                description: "Fetch sales or invoice metrics for a date or range.",
+                description: "Fetch summarized totals and counts for sales or invoices in a date or range.",
+                required_fields: vec![],
+            },
+            LiveAgentAction {
+                name: "list_customers",
+                description: "List customers from receipts and invoices, optionally filtered by customer name, phone, email, status, or date range.",
+                required_fields: vec![],
+            },
+            LiveAgentAction {
+                name: "list_items",
+                description: "List sold items from receipts and invoices, optionally filtered by item name, status, or date range.",
                 required_fields: vec![],
             },
             LiveAgentAction {

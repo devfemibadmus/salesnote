@@ -49,6 +49,10 @@ extension _LiveCashierOverlayTemplates on _LiveCashierOverlayState {
     }
 
     switch (name) {
+      case 'list_customers':
+        return _buildCustomerTemplateCard(name, response);
+      case 'list_items':
+        return _buildItemTemplateCard(name, response);
       case 'search_receipts':
         return _buildReceiptTemplateCard(name, response);
       case 'search_invoices':

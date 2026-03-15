@@ -4,6 +4,8 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
   static const Set<String> _readOnlyToolNames = <String>{
     'search_receipts',
     'search_invoices',
+    'list_customers',
+    'list_items',
     'list_saved_drafts',
     'open_sale_preview',
     'query_dashboard_summary',
@@ -52,6 +54,10 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
         return 'Searching receipts';
       case 'search_invoices':
         return 'Searching invoices';
+      case 'list_customers':
+        return 'Checking customers';
+      case 'list_items':
+        return 'Checking items';
       case 'list_saved_drafts':
         return 'Checking saved drafts';
       case 'open_sale_preview':
@@ -399,6 +405,12 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
               refreshFirst: true,
             );
           }
+          break;
+        case 'list_customers':
+          extra.addAll(await _listCustomersTool(args));
+          break;
+        case 'list_items':
+          extra.addAll(await _listItemsTool(args));
           break;
         case 'list_saved_drafts':
           extra.addAll(await _savedDraftsTool(args));

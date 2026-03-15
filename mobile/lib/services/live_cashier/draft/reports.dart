@@ -71,15 +71,206 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     }
     final normalizedQuery = _normalizedForecastCustomerText(customerQuery);
     final customerName = (sale.customerName ?? '').trim().toLowerCase();
-    final customerContact = _normalizedForecastCustomerText(sale.customerContact);
+    final customerContact = _normalizedForecastCustomerText(
+      sale.customerContact,
+    );
 
     final nameMatches = customerName.isNotEmpty && customerName.contains(query);
-    final contactMatches = normalizedQuery.isNotEmpty &&
+    final contactMatches =
+        normalizedQuery.isNotEmpty &&
         customerContact.isNotEmpty &&
         (customerContact.contains(normalizedQuery) ||
             customerContact.endsWith(normalizedQuery) ||
             normalizedQuery.endsWith(customerContact));
     return nameMatches || contactMatches;
+  }
+
+  String _customerAggregateKey(Sale sale) {
+    final customerName = (sale.customerName ?? '').trim().toLowerCase();
+    final customerContact = _normalizedForecastCustomerText(
+      sale.customerContact,
+    );
+    if (customerContact.isNotEmpty) {
+      return 'contact:$customerContact';
+    }
+    if (customerName.isNotEmpty) {
+      return 'name:$customerName';
+    }
+    return '';
+  }
+
+  List<Map<String, dynamic>> _customerSummaries(
+    Iterable<Sale> sales, {
+    required String? currencyCode,
+  }) {
+    final summaries = <String, Map<String, dynamic>>{};
+    for (final sale in sales) {
+      final key = _customerAggregateKey(sale);
+      if (key.isEmpty) {
+        continue;
+      }
+      final existing = summaries[key];
+      final saleDate = DateTime.tryParse(sale.createdAt);
+      final customerName = (sale.customerName ?? '').trim();
+      final customerContact = (sale.customerContact ?? '').trim();
+      if (existing == null) {
+        summaries[key] = {
+          'customer_name': customerName,
+          'customer_contact': customerContact,
+          'sales_count': 1,
+          'receipts_count': sale.status == SaleStatus.paid ? 1 : 0,
+          'invoice_count': sale.status == SaleStatus.invoice ? 1 : 0,
+          'total': sale.total,
+          'last_sale_at': sale.createdAt,
+          '_last_sale_sort': saleDate,
+        };
+        continue;
+      }
+      existing['sales_count'] = (existing['sales_count'] as int) + 1;
+      existing['receipts_count'] =
+          (existing['receipts_count'] as int) +
+          (sale.status == SaleStatus.paid ? 1 : 0);
+      existing['invoice_count'] =
+          (existing['invoice_count'] as int) +
+          (sale.status == SaleStatus.invoice ? 1 : 0);
+      existing['total'] = (existing['total'] as double) + sale.total;
+      if ((existing['customer_name'] as String).trim().isEmpty &&
+          customerName.isNotEmpty) {
+        existing['customer_name'] = customerName;
+      }
+      if ((existing['customer_contact'] as String).trim().isEmpty &&
+          customerContact.isNotEmpty) {
+        existing['customer_contact'] = customerContact;
+      }
+      final currentLastSale = existing['_last_sale_sort'] as DateTime?;
+      if (saleDate != null &&
+          (currentLastSale == null || saleDate.isAfter(currentLastSale))) {
+        existing['last_sale_at'] = sale.createdAt;
+        existing['_last_sale_sort'] = saleDate;
+      }
+    }
+
+    final rows = summaries.values
+        .map((entry) {
+          return {
+            'customer_name': entry['customer_name'],
+            'customer_contact': entry['customer_contact'],
+            'sales_count': entry['sales_count'],
+            'receipts_count': entry['receipts_count'],
+            'invoice_count': entry['invoice_count'],
+            'total': entry['total'],
+            'total_display': _formatToolMoney(
+              (entry['total'] as num).toDouble(),
+              currencyCode: currencyCode,
+            ),
+            'last_sale_at': entry['last_sale_at'],
+            '_last_sale_sort': entry['_last_sale_sort'],
+          };
+        })
+        .toList(growable: false);
+    rows.sort((a, b) {
+      final totalCompare = ((b['total'] as num?)?.toDouble() ?? 0).compareTo(
+        (a['total'] as num?)?.toDouble() ?? 0,
+      );
+      if (totalCompare != 0) {
+        return totalCompare;
+      }
+      final left = a['_last_sale_sort'] as DateTime?;
+      final right = b['_last_sale_sort'] as DateTime?;
+      if (left == null && right == null) {
+        return 0;
+      }
+      if (left == null) {
+        return 1;
+      }
+      if (right == null) {
+        return -1;
+      }
+      return right.compareTo(left);
+    });
+    return rows
+        .map(
+          (entry) =>
+              Map<String, dynamic>.from(entry)..remove('_last_sale_sort'),
+        )
+        .toList(growable: false);
+  }
+
+  List<Map<String, dynamic>> _itemSummaries(
+    Iterable<Sale> sales, {
+    required String? currencyCode,
+    String itemQuery = '',
+  }) {
+    final normalizedQuery = itemQuery.trim().toLowerCase();
+    final summaries = <String, Map<String, dynamic>>{};
+    for (final sale in sales) {
+      final saleDate = DateTime.tryParse(sale.createdAt);
+      for (final item in sale.items) {
+        final productName = item.productName.trim();
+        if (productName.isEmpty) {
+          continue;
+        }
+        if (normalizedQuery.isNotEmpty &&
+            !productName.toLowerCase().contains(normalizedQuery)) {
+          continue;
+        }
+        final key = productName.toLowerCase();
+        final existing = summaries[key];
+        if (existing == null) {
+          summaries[key] = {
+            'product_name': productName,
+            'quantity': item.quantity,
+            'revenue': item.lineTotal,
+            'sales_count': 1,
+            'last_sold_at': sale.createdAt,
+            '_last_sold_sort': saleDate,
+          };
+          continue;
+        }
+        existing['quantity'] = (existing['quantity'] as double) + item.quantity;
+        existing['revenue'] = (existing['revenue'] as double) + item.lineTotal;
+        existing['sales_count'] = (existing['sales_count'] as int) + 1;
+        final currentLastSold = existing['_last_sold_sort'] as DateTime?;
+        if (saleDate != null &&
+            (currentLastSold == null || saleDate.isAfter(currentLastSold))) {
+          existing['last_sold_at'] = sale.createdAt;
+          existing['_last_sold_sort'] = saleDate;
+        }
+      }
+    }
+
+    final rows = summaries.values
+        .map((entry) {
+          return {
+            'product_name': entry['product_name'],
+            'quantity': entry['quantity'],
+            'revenue': entry['revenue'],
+            'revenue_display': _formatToolMoney(
+              (entry['revenue'] as num).toDouble(),
+              currencyCode: currencyCode,
+            ),
+            'sales_count': entry['sales_count'],
+            'last_sold_at': entry['last_sold_at'],
+            '_last_sold_sort': entry['_last_sold_sort'],
+          };
+        })
+        .toList(growable: false);
+    rows.sort((a, b) {
+      final revenueCompare = ((b['revenue'] as num?)?.toDouble() ?? 0)
+          .compareTo((a['revenue'] as num?)?.toDouble() ?? 0);
+      if (revenueCompare != 0) {
+        return revenueCompare;
+      }
+      return ((b['quantity'] as num?)?.toDouble() ?? 0).compareTo(
+        (a['quantity'] as num?)?.toDouble() ?? 0,
+      );
+    });
+    return rows
+        .map(
+          (entry) =>
+              Map<String, dynamic>.from(entry)..remove('_last_sold_sort'),
+        )
+        .toList(growable: false);
   }
 
   String _toolTrendDirection(double slope, double baselineAverage) {
@@ -124,19 +315,21 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       'total_display': _formatToolMoney(sale.total, currencyCode: currencyCode),
       'created_at': sale.createdAt,
       'items': sale.items
-          .map((item) => {
-                'product_name': item.productName,
-                'quantity': item.quantity,
-                'unit_price': item.unitPrice,
-                'unit_price_display': _formatToolMoney(
-                  item.unitPrice,
-                  currencyCode: currencyCode,
-                ),
-                'line_total_display': _formatToolMoney(
-                  item.lineTotal,
-                  currencyCode: currencyCode,
-                ),
-              })
+          .map(
+            (item) => {
+              'product_name': item.productName,
+              'quantity': item.quantity,
+              'unit_price': item.unitPrice,
+              'unit_price_display': _formatToolMoney(
+                item.unitPrice,
+                currencyCode: currencyCode,
+              ),
+              'line_total_display': _formatToolMoney(
+                item.lineTotal,
+                currencyCode: currencyCode,
+              ),
+            },
+          )
           .toList(growable: false),
     };
   }
@@ -147,10 +340,9 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
   ) async {
     final limit = _toolLimit(args['limit'], fallback: 5, max: 25);
     final date = _toolDate(args['date']?.toString());
-    final query = (args['customer_query']?.toString() ??
-            args['query']?.toString() ??
-            '')
-        .trim();
+    final query =
+        (args['customer_query']?.toString() ?? args['query']?.toString() ?? '')
+            .trim();
     final sales = await _api.listSales(
       page: 1,
       perPage: 50,
@@ -196,7 +388,9 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     return results;
   }
 
-  Future<Map<String, dynamic>> _salesMetricsTool(Map<String, dynamic> args) async {
+  Future<Map<String, dynamic>> _salesMetricsTool(
+    Map<String, dynamic> args,
+  ) async {
     final limit = _toolLimit(args['limit'], fallback: 10, max: 50);
     final startDate = _toolDate(
       args['start_date']?.toString() ?? args['date']?.toString(),
@@ -204,10 +398,9 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     final endDate = _toolDate(
       args['end_date']?.toString() ?? args['date']?.toString(),
     );
-    final customerQuery = (args['customer_query']?.toString() ??
-            args['query']?.toString() ??
-            '')
-        .trim();
+    final customerQuery =
+        (args['customer_query']?.toString() ?? args['query']?.toString() ?? '')
+            .trim();
     final itemQuery = (args['item_query']?.toString() ?? '').trim();
     final statusRaw = (args['status']?.toString() ?? '').trim().toLowerCase();
     final status = switch (statusRaw) {
@@ -215,7 +408,8 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       'invoice' => SaleStatus.invoice,
       _ => null,
     };
-    final searchQuery = (customerQuery.isNotEmpty ? customerQuery : itemQuery).trim();
+    final searchQuery = (customerQuery.isNotEmpty ? customerQuery : itemQuery)
+        .trim();
     final sales = await _listSalesWindow(
       status: status,
       searchQuery: searchQuery.isEmpty ? null : searchQuery,
@@ -226,11 +420,14 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     final loweredItemQuery = itemQuery.toLowerCase();
     final filteredSales = itemQuery.isEmpty
         ? sales
-        : sales.where((sale) {
-            return sale.items.any(
-              (item) => item.productName.toLowerCase().contains(loweredItemQuery),
-            );
-          }).toList(growable: false);
+        : sales
+              .where((sale) {
+                return sale.items.any(
+                  (item) =>
+                      item.productName.toLowerCase().contains(loweredItemQuery),
+                );
+              })
+              .toList(growable: false);
 
     final paidReceipts = filteredSales
         .where((sale) => sale.status == SaleStatus.paid)
@@ -246,7 +443,10 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       0,
       (sum, sale) => sum + sale.total,
     );
-    final allTotal = filteredSales.fold<double>(0, (sum, sale) => sum + sale.total);
+    final allTotal = filteredSales.fold<double>(
+      0,
+      (sum, sale) => sum + sale.total,
+    );
     final customerNames = filteredSales
         .map((sale) => (sale.customerName ?? '').trim())
         .where((name) => name.isNotEmpty)
@@ -274,6 +474,15 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
 
     final currencyCode = _toolCurrencyCode();
     final currencySymbol = _toolCurrencySymbol(currencyCode);
+    final customers = _customerSummaries(
+      filteredSales,
+      currencyCode: currencyCode,
+    );
+    final items = _itemSummaries(
+      filteredSales,
+      currencyCode: currencyCode,
+      itemQuery: itemQuery,
+    );
     return {
       'status_filter': statusRaw.isEmpty ? 'all' : statusRaw,
       'start_date': startDate?.toIso8601String().split('T').first,
@@ -301,7 +510,12 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
         allTotal,
         currencyCode: currencyCode,
       ),
-      'matches': filteredSales.take(limit).map(_saleSummary).toList(growable: false),
+      'customers': customers.take(limit).toList(growable: false),
+      'items': items.take(limit).toList(growable: false),
+      'matches': filteredSales
+          .take(limit)
+          .map(_saleSummary)
+          .toList(growable: false),
       'item_breakdown': itemBreakdown.values
           .map(
             (item) => {
@@ -316,30 +530,146 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     };
   }
 
-  Future<Map<String, dynamic>> _forecastSalesTool(Map<String, dynamic> args) async {
+  Future<Map<String, dynamic>> _listCustomersTool(
+    Map<String, dynamic> args,
+  ) async {
+    final limit = _toolLimit(args['limit'], fallback: 10, max: 50);
+    final startDate = _toolDate(
+      args['start_date']?.toString() ?? args['date']?.toString(),
+    );
+    final endDate = _toolDate(
+      args['end_date']?.toString() ?? args['date']?.toString(),
+    );
+    final customerQuery =
+        (args['customer_query']?.toString() ?? args['query']?.toString() ?? '')
+            .trim();
+    final statusRaw = (args['status']?.toString() ?? '').trim().toLowerCase();
+    final status = switch (statusRaw) {
+      'receipt' || 'paid' => SaleStatus.paid,
+      'invoice' => SaleStatus.invoice,
+      _ => null,
+    };
+    final sales = await _listSalesWindow(
+      status: status,
+      searchQuery: customerQuery.isEmpty ? null : customerQuery,
+      startDate: startDate,
+      endDate: endDate,
+    );
+    final filteredSales = customerQuery.isEmpty
+        ? sales
+        : sales
+              .where((sale) => _saleMatchesCustomerQuery(sale, customerQuery))
+              .toList(growable: false);
+    final currencyCode = _toolCurrencyCode();
+    final customers = _customerSummaries(
+      filteredSales,
+      currencyCode: currencyCode,
+    );
+    final total = customers.fold<double>(
+      0,
+      (sum, customer) => sum + ((customer['total'] as num?)?.toDouble() ?? 0),
+    );
+    return {
+      'status_filter': statusRaw.isEmpty ? 'all' : statusRaw,
+      'start_date': startDate?.toIso8601String().split('T').first,
+      'end_date': endDate?.toIso8601String().split('T').first,
+      'customer_query': customerQuery.isEmpty ? null : customerQuery,
+      'count': customers.length,
+      'matched_customer_count': customers.length,
+      'currency_code': currencyCode,
+      'currency_symbol': _toolCurrencySymbol(currencyCode),
+      'all_total': total,
+      'all_total_display': _formatToolMoney(total, currencyCode: currencyCode),
+      'customers': customers.take(limit).toList(growable: false),
+    };
+  }
+
+  Future<Map<String, dynamic>> _listItemsTool(Map<String, dynamic> args) async {
+    final limit = _toolLimit(args['limit'], fallback: 10, max: 50);
+    final startDate = _toolDate(
+      args['start_date']?.toString() ?? args['date']?.toString(),
+    );
+    final endDate = _toolDate(
+      args['end_date']?.toString() ?? args['date']?.toString(),
+    );
+    final itemQuery =
+        (args['item_query']?.toString() ?? args['query']?.toString() ?? '')
+            .trim();
+    final statusRaw = (args['status']?.toString() ?? '').trim().toLowerCase();
+    final status = switch (statusRaw) {
+      'receipt' || 'paid' => SaleStatus.paid,
+      'invoice' => SaleStatus.invoice,
+      _ => null,
+    };
+    final sales = await _listSalesWindow(
+      status: status,
+      searchQuery: itemQuery.isEmpty ? null : itemQuery,
+      startDate: startDate,
+      endDate: endDate,
+    );
+    final currencyCode = _toolCurrencyCode();
+    final items = _itemSummaries(
+      sales,
+      currencyCode: currencyCode,
+      itemQuery: itemQuery,
+    );
+    final totalRevenue = items.fold<double>(
+      0,
+      (sum, item) => sum + ((item['revenue'] as num?)?.toDouble() ?? 0),
+    );
+    final totalQuantity = items.fold<double>(
+      0,
+      (sum, item) => sum + ((item['quantity'] as num?)?.toDouble() ?? 0),
+    );
+    return {
+      'status_filter': statusRaw.isEmpty ? 'all' : statusRaw,
+      'start_date': startDate?.toIso8601String().split('T').first,
+      'end_date': endDate?.toIso8601String().split('T').first,
+      'item_query': itemQuery.isEmpty ? null : itemQuery,
+      'count': items.length,
+      'currency_code': currencyCode,
+      'currency_symbol': _toolCurrencySymbol(currencyCode),
+      'all_total': totalRevenue,
+      'all_total_display': _formatToolMoney(
+        totalRevenue,
+        currencyCode: currencyCode,
+      ),
+      'total_quantity': totalQuantity,
+      'items': items.take(limit).toList(growable: false),
+    };
+  }
+
+  Future<Map<String, dynamic>> _forecastSalesTool(
+    Map<String, dynamic> args,
+  ) async {
     final now = _toolDayStart(DateTime.now());
     final horizonDays = _toolLimit(
       args['horizon_days'] ?? args['days'],
       fallback: 7,
       max: 31,
     );
-    final lookbackDays = _toolLimit(args['lookback_days'], fallback: 30, max: 180);
+    final lookbackDays = _toolLimit(
+      args['lookback_days'],
+      fallback: 30,
+      max: 180,
+    );
     final explicitStartDate = _toolDate(args['start_date']?.toString());
     final explicitEndDate = _toolDate(args['end_date']?.toString());
     var startDate = explicitStartDate == null
         ? now.subtract(Duration(days: lookbackDays - 1))
         : _toolDayStart(explicitStartDate);
-    var endDate = explicitEndDate == null ? now : _toolDayStart(explicitEndDate);
+    var endDate = explicitEndDate == null
+        ? now
+        : _toolDayStart(explicitEndDate);
     if (startDate.isAfter(endDate)) {
       final swap = startDate;
       startDate = endDate;
       endDate = swap;
     }
 
-    final customerQuery = (args['customer_query']?.toString() ??
-            args['query']?.toString() ??
-            '')
-        .trim();
+    final customerQuery =
+        (args['customer_query']?.toString() ?? args['query']?.toString() ?? '')
+            .trim();
     final itemQuery = (args['item_query']?.toString() ?? '').trim();
     final statusRaw = (args['status']?.toString() ?? '').trim().toLowerCase();
     final status = switch (statusRaw) {
@@ -347,7 +677,8 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       'invoice' => SaleStatus.invoice,
       _ => null,
     };
-    final searchQuery = (customerQuery.isNotEmpty ? customerQuery : itemQuery).trim();
+    final searchQuery = (customerQuery.isNotEmpty ? customerQuery : itemQuery)
+        .trim();
     final sales = await _listSalesWindow(
       status: status,
       searchQuery: searchQuery.isEmpty ? null : searchQuery,
@@ -358,25 +689,28 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     final customerFilteredSales = customerQuery.isEmpty
         ? sales
         : sales
-            .where((sale) => _saleMatchesCustomerQuery(sale, customerQuery))
-            .toList(growable: false);
+              .where((sale) => _saleMatchesCustomerQuery(sale, customerQuery))
+              .toList(growable: false);
     final filteredSales = itemQuery.isEmpty
         ? customerFilteredSales
-        : customerFilteredSales.where((sale) {
-            return sale.items.any(
-              (item) => item.productName.toLowerCase().contains(loweredItemQuery),
-            );
-          }).toList(growable: false);
+        : customerFilteredSales
+              .where((sale) {
+                return sale.items.any(
+                  (item) =>
+                      item.productName.toLowerCase().contains(loweredItemQuery),
+                );
+              })
+              .toList(growable: false);
     final forecastScope = customerQuery.isNotEmpty
         ? 'customer'
         : itemQuery.isNotEmpty
-            ? 'item'
-            : 'shop';
+        ? 'item'
+        : 'shop';
     final scopeLabel = customerQuery.isNotEmpty
         ? 'customer "$customerQuery"'
         : itemQuery.isNotEmpty
-            ? 'item "$itemQuery"'
-            : 'overall shop sales';
+        ? 'item "$itemQuery"'
+        : 'overall shop sales';
     final matchedCustomerNames = filteredSales
         .map((sale) => (sale.customerName ?? '').trim())
         .where((name) => name.isNotEmpty)
@@ -419,7 +753,10 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     final recentOrderAverage = _toolAverage(recentOrderSeries);
     final revenueSlope = _toolSlope(revenueSeries);
     final orderSlope = _toolSlope(orderSeries);
-    final trendDirection = _toolTrendDirection(revenueSlope, baselineRevenueAverage);
+    final trendDirection = _toolTrendDirection(
+      revenueSlope,
+      baselineRevenueAverage,
+    );
     final nonZeroDays = revenueSeries.where((value) => value > 0).length;
     final confidence = _toolForecastConfidence(
       lookbackDays: totalDays,
@@ -433,9 +770,12 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     for (var dayIndex = 1; dayIndex <= horizonDays; dayIndex++) {
       final forecastDate = endDate.add(Duration(days: dayIndex));
       final projectedRevenue =
-          (recentRevenueAverage + (revenueSlope * dayIndex)).clamp(0, double.infinity);
-      final projectedOrders =
-          (recentOrderAverage + (orderSlope * dayIndex)).clamp(0, double.infinity);
+          (recentRevenueAverage + (revenueSlope * dayIndex)).clamp(
+            0,
+            double.infinity,
+          );
+      final projectedOrders = (recentOrderAverage + (orderSlope * dayIndex))
+          .clamp(0, double.infinity);
       forecastRevenueTotal += projectedRevenue;
       forecastOrdersTotal += projectedOrders;
       forecastPoints.add({
@@ -455,8 +795,8 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       final missingMessage = customerQuery.isNotEmpty
           ? 'Not enough sales data to forecast this customer yet.'
           : itemQuery.isNotEmpty
-              ? 'Not enough sales data to forecast this item yet.'
-              : 'Not enough sales data to forecast yet.';
+          ? 'Not enough sales data to forecast this item yet.'
+          : 'Not enough sales data to forecast yet.';
       return {
         'result': 'insufficient_data',
         'message': missingMessage,
@@ -485,7 +825,9 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       'customer_query': customerQuery.isEmpty ? null : customerQuery,
       'item_query': itemQuery.isEmpty ? null : itemQuery,
       'matched_customer_count': matchedCustomerNames.length,
-      'matched_customers': matchedCustomerNames.take(10).toList(growable: false),
+      'matched_customers': matchedCustomerNames
+          .take(10)
+          .toList(growable: false),
       'currency_code': currencyCode,
       'currency_symbol': currencySymbol,
       'historical_sales_count': filteredSales.length,
@@ -504,7 +846,9 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
         forecastRevenueTotal,
         currencyCode: currencyCode,
       ),
-      'forecast_average_per_day': horizonDays <= 0 ? 0 : forecastRevenueTotal / horizonDays,
+      'forecast_average_per_day': horizonDays <= 0
+          ? 0
+          : forecastRevenueTotal / horizonDays,
       'forecast_average_per_day_display': _formatToolMoney(
         horizonDays <= 0 ? 0 : forecastRevenueTotal / horizonDays,
         currencyCode: currencyCode,
@@ -521,7 +865,10 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
             return {
               'period': key,
               'total': total,
-              'total_display': _formatToolMoney(total, currencyCode: currencyCode),
+              'total_display': _formatToolMoney(
+                total,
+                currencyCode: currencyCode,
+              ),
               'orders': dailyOrders[key] ?? 0,
             };
           })
@@ -557,31 +904,43 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       'yesterday_units': yesterday?.units ?? 0,
       'daily_points': daily
           .take(7)
-          .map((point) => {
-                'period': point.period,
-                'total': point.total,
-                'total_display': _formatToolMoney(
-                  point.total,
-                  currencyCode: currencyCode,
-                ),
-                'units': point.units,
-              })
+          .map(
+            (point) => {
+              'period': point.period,
+              'total': point.total,
+              'total_display': _formatToolMoney(
+                point.total,
+                currencyCode: currencyCode,
+              ),
+              'units': point.units,
+            },
+          )
           .toList(growable: false),
-      'recent_receipts': home.recentSales.take(5).map(_saleSummary).toList(growable: false),
-      'recent_sales': home.recentSales.take(5).map(_saleSummary).toList(growable: false),
+      'recent_receipts': home.recentSales
+          .take(5)
+          .map(_saleSummary)
+          .toList(growable: false),
+      'recent_sales': home.recentSales
+          .take(5)
+          .map(_saleSummary)
+          .toList(growable: false),
       'fast_moving': home.analytics.fastMoving
           .take(3)
-          .map((item) => {
-                'product_name': item.productName,
-                'quantity': item.quantity,
-              })
+          .map(
+            (item) => {
+              'product_name': item.productName,
+              'quantity': item.quantity,
+            },
+          )
           .toList(growable: false),
       'slow_moving': home.analytics.slowMoving
           .take(3)
-          .map((item) => {
-                'product_name': item.productName,
-                'quantity': item.quantity,
-              })
+          .map(
+            (item) => {
+              'product_name': item.productName,
+              'quantity': item.quantity,
+            },
+          )
           .toList(growable: false),
     };
   }
@@ -589,10 +948,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
   Future<Map<String, dynamic>> _itemSalesTool(Map<String, dynamic> args) async {
     final query = (args['item_query']?.toString() ?? '').trim();
     if (query.isEmpty) {
-      return const {
-        'matches': <Map<String, dynamic>>[],
-        'count': 0,
-      };
+      return const {'matches': <Map<String, dynamic>>[], 'count': 0};
     }
     final date = _toolDate(args['date']?.toString());
     final sales = await _api.listSales(
@@ -634,11 +990,13 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     final analytics = await _api.getAnalytics();
     final items = (fast ? analytics.fastMoving : analytics.slowMoving)
         .take(_toolLimit(limit))
-        .map((item) => {
-              'product_name': item.productName,
-              'quantity': item.quantity,
-              'sold_30_days': item.sold30Days,
-            })
+        .map(
+          (item) => {
+            'product_name': item.productName,
+            'quantity': item.quantity,
+            'sold_30_days': item.sold30Days,
+          },
+        )
         .toList(growable: false);
     return items;
   }

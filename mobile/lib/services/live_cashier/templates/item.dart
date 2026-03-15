@@ -149,6 +149,86 @@ extension _LiveCashierOverlayItemTemplates on _LiveCashierOverlayState {
       );
     }
 
+    if ((name == 'list_items' || name == 'query_sales_metrics') &&
+        items.isNotEmpty) {
+      if (items.length == 1) {
+        final item = items.first;
+        final title = _templateText(item['product_name']).isEmpty
+            ? 'Item'
+            : _templateText(item['product_name']);
+        return _TemplateCardData(
+          kind: _TemplateKind.saleReport,
+          signature: _templateSignature(name, <Object?>[
+            'item-single',
+            title,
+            item['revenue_display'],
+            item['sales_count'],
+          ]),
+          eyebrow: 'Item',
+          title: title,
+          subtitle: _compactTemplateDate(item['last_sold_at']?.toString()),
+          metrics: <_TemplateMetric>[
+            _TemplateMetric(
+              label: 'Revenue',
+              value: _templateMetricValue(item['revenue_display']),
+            ),
+            _TemplateMetric(
+              label: 'Qty',
+              value: _templateMetricValue(item['quantity']),
+            ),
+            _TemplateMetric(
+              label: 'Sales',
+              value: _templateMetricValue(item['sales_count']),
+            ),
+          ],
+        );
+      }
+      return _TemplateCardData(
+        kind: _TemplateKind.list,
+        signature: _templateSignature(name, <Object?>[
+          'item-list',
+          items.length,
+          items.map((item) => _templateText(item['product_name'])).join('|'),
+        ]),
+        eyebrow: 'Item',
+        title: itemQuery.isEmpty ? 'Items' : 'Items for $itemQuery',
+        subtitle: '${items.length} results',
+        metrics: <_TemplateMetric>[
+          if (_templateText(response['all_total_display']).isNotEmpty)
+            _TemplateMetric(
+              label: 'Revenue',
+              value: _templateMetricValue(response['all_total_display']),
+            ),
+          if (_templateText(response['total_quantity']).isNotEmpty)
+            _TemplateMetric(
+              label: 'Qty',
+              value: _templateMetricValue(response['total_quantity']),
+            ),
+          _TemplateMetric(
+            label: 'Items',
+            value: _templateMetricValue(response['count']),
+          ),
+        ],
+        rows: items
+            .take(5)
+            .map((item) {
+              return _TemplateRow(
+                title: _templateText(item['product_name']).isEmpty
+                    ? 'Item'
+                    : _templateText(item['product_name']),
+                subtitle: _joinTemplateParts(<String>[
+                  if (_templateText(item['quantity']).isNotEmpty)
+                    '${_templateText(item['quantity'])} units',
+                  if (_templateText(item['sales_count']).isNotEmpty)
+                    '${_templateText(item['sales_count'])} sales',
+                ]),
+                trailing: _templateText(item['revenue_display']),
+              );
+            })
+            .toList(growable: false),
+      );
+    }
+
     return null;
   }
 }
