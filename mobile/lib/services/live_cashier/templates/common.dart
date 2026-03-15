@@ -119,22 +119,29 @@ extension _LiveCashierOverlayTemplateCommon on _LiveCashierOverlayState {
         .toList(growable: false);
   }
 
+  Map<String, dynamic>? _templateResolvedSingleSale(
+    Map<String, dynamic> response,
+  ) {
+    final sale = _templateMap(response['sale']);
+    if (sale != null) {
+      return sale;
+    }
+    final matches = _templateMapList(response['matches']);
+    if (matches.length == 1) {
+      return matches.first;
+    }
+    return null;
+  }
+
   Map<String, dynamic>? _templateSingleSale(
     Map<String, dynamic> response, {
     required bool invoice,
   }) {
-    final sale = _templateMap(response['sale']);
+    final sale = _templateResolvedSingleSale(response);
     if (sale != null) {
       final status = _templateText(sale['status']).toLowerCase();
       if (invoice ? status == 'invoice' : status == 'paid') {
         return sale;
-      }
-    }
-    final matches = _templateMapList(response['matches']);
-    if (matches.length == 1) {
-      final status = _templateText(matches.first['status']).toLowerCase();
-      if (invoice ? status == 'invoice' : status == 'paid') {
-        return matches.first;
       }
     }
     return null;

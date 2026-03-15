@@ -6,6 +6,7 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
     Map<String, dynamic> response,
   ) {
     final customerQuery = _templateText(response['customer_query']);
+    final customer = _templateMap(response['customer']);
     final customers = _templateMapList(response['customers']);
     final matchedCustomers = _templateStringList(response['matched_customers']);
     final itemBreakdown = _templateMapList(response['item_breakdown']);
@@ -16,6 +17,15 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
         })
         .toList(growable: false);
     final matches = _templateMapList(response['matches']);
+
+    if (customer != null) {
+      return _buildSingleCustomerTemplate(
+        name,
+        customer,
+        itemBreakdown: itemBreakdown,
+        matches: matches,
+      );
+    }
 
     if (name == 'forecast_sales' &&
         _templateText(response['forecast_scope']).toLowerCase() == 'customer') {
@@ -63,8 +73,8 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
           ),
         ],
         rows: <_TemplateRow>[
-          for (final customer in matchedCustomers)
-            _TemplateRow(title: customer, subtitle: 'Matched customer'),
+          for (final matched in matchedCustomers)
+            _TemplateRow(title: matched, subtitle: 'Matched customer'),
           for (final point in points)
             _TemplateRow(
               title: _templateText(point['period']),
@@ -80,20 +90,37 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
       );
     }
 
-    if (name == 'query_sales_metrics' && customerQuery.isNotEmpty) {
-      final title = customerQuery.isEmpty
-          ? 'Customer report'
-          : 'Customer report for $customerQuery';
+    if ((name == 'list_customers' || name == 'query_sales_metrics') &&
+        customers.isNotEmpty) {
+      if (customers.length == 1) {
+        return _buildSingleCustomerTemplate(
+          name,
+          customers.first,
+          itemBreakdown: itemBreakdown,
+          matches: matches,
+        );
+      }
+      return _buildCustomerListTemplate(
+        name,
+        response,
+        customers,
+        customerQuery: customerQuery,
+      );
+    }
+
+    if (name == 'query_sales_metrics' &&
+        customerQuery.isNotEmpty &&
+        matches.isNotEmpty) {
       return _TemplateCardData(
         kind: _TemplateKind.saleReport,
         signature: _templateSignature(name, <Object?>[
+          'customer-report',
           customerQuery,
           response['all_total_display'],
-          response['count'],
           matches.length,
         ]),
         eyebrow: 'Customer',
-        title: title,
+        title: 'Customer report for $customerQuery',
         subtitle: _joinTemplateParts(<String>[
           if (_templateText(response['status_filter']).isNotEmpty &&
               _templateText(response['status_filter']).toLowerCase() != 'all')
@@ -117,8 +144,8 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
           ),
         ],
         rows: matches
-            .map((match) {
-              return _TemplateRow(
+            .map(
+              (match) => _TemplateRow(
                 title: _templateText(match['customer_name']).isEmpty
                     ? _templateText(match['id'])
                     : _templateText(match['customer_name']),
@@ -127,131 +154,8 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
                   _templateText(match['customer_contact']),
                 ]),
                 trailing: _templateText(match['total_display']),
-              );
-            })
-            .toList(growable: false),
-      );
-    }
-
-    if ((name == 'list_customers' || name == 'query_sales_metrics') &&
-        customers.isNotEmpty) {
-      if (customers.length == 1) {
-        final customer = customers.first;
-        final title = _templateText(customer['customer_name']).isEmpty
-            ? 'Customer'
-            : _templateText(customer['customer_name']);
-        final detailRows = itemBreakdown.isNotEmpty
-            ? itemBreakdown
-                  .map((item) {
-                    return _TemplateRow(
-                      title: _templateText(item['product_name']).isEmpty
-                          ? 'Item'
-                          : _templateText(item['product_name']),
-                      subtitle: _templateText(item['quantity']).isEmpty
-                          ? null
-                          : '${_templateText(item['quantity'])} units',
-                      trailing: _templateText(item['revenue_display']),
-                    );
-                  })
-                  .toList(growable: false)
-            : matches
-                  .map((match) {
-                    return _TemplateRow(
-                      title:
-                          _compactTemplateDate(
-                            match['created_at']?.toString(),
-                          ).isEmpty
-                          ? 'Sale'
-                          : _compactTemplateDate(
-                              match['created_at']?.toString(),
-                            ),
-                      subtitle: _joinTemplateParts(<String>[
-                        _templateText(match['id']),
-                        _templateText(match['status']),
-                      ]),
-                      trailing: _templateText(match['total_display']),
-                    );
-                  })
-                  .toList(growable: false);
-        return _TemplateCardData(
-          kind: _TemplateKind.saleReport,
-          signature: _templateSignature(name, <Object?>[
-            'customer-single',
-            title,
-            customer['total_display'],
-            customer['sales_count'],
-            detailRows.length,
-          ]),
-          eyebrow: 'Customer',
-          title: title,
-          subtitle: _joinTemplateParts(<String>[
-            _templateText(customer['customer_contact']),
-            _compactTemplateDate(customer['last_sale_at']?.toString()),
-          ]),
-          metrics: <_TemplateMetric>[
-            _TemplateMetric(
-              label: 'Total',
-              value: _templateMetricValue(customer['total_display']),
-            ),
-            _TemplateMetric(
-              label: 'Sales',
-              value: _templateMetricValue(customer['sales_count']),
-            ),
-            _TemplateMetric(
-              label: 'Receipts',
-              value: _templateMetricValue(customer['receipts_count']),
-            ),
-            _TemplateMetric(
-              label: 'Invoices',
-              value: _templateMetricValue(customer['invoice_count']),
-            ),
-          ],
-          rows: detailRows,
-          footer: itemBreakdown.isNotEmpty
-              ? 'Top purchased items'
-              : (matches.isNotEmpty ? 'Recent sales' : null),
-        );
-      }
-      return _TemplateCardData(
-        kind: _TemplateKind.list,
-        signature: _templateSignature(name, <Object?>[
-          'customer-list',
-          customers.length,
-          customers
-              .map((customer) => _templateText(customer['customer_name']))
-              .join('|'),
-        ]),
-        eyebrow: 'Customer',
-        title: customerQuery.isEmpty
-            ? 'Customers'
-            : 'Customers for $customerQuery',
-        subtitle: _templateListSubtitle(customers.length),
-        metrics: <_TemplateMetric>[
-          if (_templateText(response['all_total_display']).isNotEmpty)
-            _TemplateMetric(
-              label: 'Total',
-              value: _templateMetricValue(response['all_total_display']),
-            ),
-          _TemplateMetric(
-            label: 'Customers',
-            value: _templateMetricValue(response['count']),
-          ),
-        ],
-        rows: customers
-            .map((customer) {
-              final title = _templateText(customer['customer_name']).isEmpty
-                  ? 'Customer'
-                  : _templateText(customer['customer_name']);
-              return _TemplateRow(
-                title: title,
-                subtitle: _joinTemplateParts(<String>[
-                  _templateText(customer['customer_contact']),
-                  if (_templateText(customer['sales_count']).isNotEmpty)
-                    '${_templateText(customer['sales_count'])} sales',
-                ]),
-                trailing: _templateText(customer['total_display']),
-              );
-            })
+              ),
+            )
             .toList(growable: false),
       );
     }
@@ -260,12 +164,13 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
       return _TemplateCardData(
         kind: _TemplateKind.list,
         signature: _templateSignature(name, <Object?>[
+          'customer-drafts',
           drafts.length,
           drafts
               .map((draft) => _templateText(draft['customer_name']))
               .join('|'),
         ]),
-        eyebrow: 'Customer',
+        eyebrow: 'Customers',
         title: 'Customers with drafts',
         subtitle: '${drafts.length} saved drafts',
         rows: drafts
@@ -288,5 +193,139 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
     }
 
     return null;
+  }
+
+  _TemplateCardData _buildSingleCustomerTemplate(
+    String name,
+    Map<String, dynamic> customer, {
+    required List<Map<String, dynamic>> itemBreakdown,
+    required List<Map<String, dynamic>> matches,
+  }) {
+    final title = _templateText(customer['customer_name']).isEmpty
+        ? 'Customer'
+        : _templateText(customer['customer_name']);
+    final detailRows = itemBreakdown.isNotEmpty
+        ? itemBreakdown
+              .map(
+                (item) => _TemplateRow(
+                  title: _templateText(item['product_name']).isNotEmpty
+                      ? _templateText(item['product_name'])
+                      : 'Item',
+                  subtitle: _templateText(item['quantity']).isEmpty
+                      ? null
+                      : '${_templateText(item['quantity'])} units',
+                  trailing: _templateText(item['revenue_display']),
+                ),
+              )
+              .toList(growable: false)
+        : matches
+              .map(
+                (match) => _TemplateRow(
+                  title:
+                      _compactTemplateDate(
+                        match['created_at']?.toString(),
+                      ).isEmpty
+                      ? (_templateText(match['id']).isEmpty
+                            ? 'Sale'
+                            : _templateText(match['id']))
+                      : _compactTemplateDate(match['created_at']?.toString()),
+                  subtitle: _joinTemplateParts(<String>[
+                    _templateText(match['id']),
+                    _templateText(match['status']),
+                  ]),
+                  trailing: _templateText(match['total_display']),
+                ),
+              )
+              .toList(growable: false);
+    return _TemplateCardData(
+      kind: _TemplateKind.saleReport,
+      signature: _templateSignature(name, <Object?>[
+        'customer-single',
+        title,
+        customer['total_display'],
+        customer['sales_count'],
+        detailRows.length,
+      ]),
+      eyebrow: 'Customer',
+      title: title,
+      subtitle: _joinTemplateParts(<String>[
+        _templateText(customer['customer_contact']),
+        _compactTemplateDate(customer['last_sale_at']?.toString()),
+      ]),
+      badges: <String>[
+        if (_templateText(customer['sales_count']).isNotEmpty)
+          '${_templateText(customer['sales_count'])} sales',
+      ],
+      metrics: <_TemplateMetric>[
+        _TemplateMetric(
+          label: 'Total',
+          value: _templateMetricValue(customer['total_display']),
+        ),
+        _TemplateMetric(
+          label: 'Receipts',
+          value: _templateMetricValue(customer['receipts_count']),
+        ),
+        _TemplateMetric(
+          label: 'Invoices',
+          value: _templateMetricValue(customer['invoice_count']),
+        ),
+      ],
+      rows: detailRows,
+      footer: itemBreakdown.isNotEmpty
+          ? 'Purchased items'
+          : (matches.isNotEmpty ? 'Related sales' : null),
+    );
+  }
+
+  _TemplateCardData _buildCustomerListTemplate(
+    String name,
+    Map<String, dynamic> response,
+    List<Map<String, dynamic>> customers, {
+    required String customerQuery,
+  }) {
+    return _TemplateCardData(
+      kind: _TemplateKind.list,
+      signature: _templateSignature(name, <Object?>[
+        'customer-list',
+        customers.length,
+        customers
+            .map((entry) => _templateText(entry['customer_name']))
+            .join('|'),
+      ]),
+      eyebrow: 'Customers',
+      title: customerQuery.isEmpty ? 'Customer list' : 'Customer matches',
+      subtitle: _joinTemplateParts(<String>[
+        _templateListSubtitle(customers.length),
+        if (_templateText(response['start_date']).isNotEmpty &&
+            _templateText(response['end_date']).isNotEmpty)
+          '${_templateText(response['start_date'])} to ${_templateText(response['end_date'])}',
+      ]),
+      metrics: <_TemplateMetric>[
+        if (_templateText(response['all_total_display']).isNotEmpty)
+          _TemplateMetric(
+            label: 'Total',
+            value: _templateMetricValue(response['all_total_display']),
+          ),
+        _TemplateMetric(
+          label: 'Customers',
+          value: _templateMetricValue(response['count']),
+        ),
+      ],
+      rows: customers
+          .map(
+            (entry) => _TemplateRow(
+              title: _templateText(entry['customer_name']).isEmpty
+                  ? 'Customer'
+                  : _templateText(entry['customer_name']),
+              subtitle: _joinTemplateParts(<String>[
+                _templateText(entry['customer_contact']),
+                if (_templateText(entry['sales_count']).isNotEmpty)
+                  '${_templateText(entry['sales_count'])} sales',
+              ]),
+              trailing: _templateText(entry['total_display']),
+            ),
+          )
+          .toList(growable: false),
+    );
   }
 }

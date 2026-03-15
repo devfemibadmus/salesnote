@@ -39,6 +39,7 @@ part 'live_cashier/templates/common.dart';
 part 'live_cashier/templates/builder.dart';
 part 'live_cashier/templates/customer.dart';
 part 'live_cashier/templates/item.dart';
+part 'live_cashier/templates/sales.dart';
 part 'live_cashier/templates/receipts.dart';
 part 'live_cashier/templates/invoice.dart';
 part 'live_cashier/templates/widgets.dart';

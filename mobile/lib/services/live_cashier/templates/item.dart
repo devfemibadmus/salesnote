@@ -92,8 +92,7 @@ extension _LiveCashierOverlayItemTemplates on _LiveCashierOverlayState {
       );
     }
 
-    if (name == 'search_item_sales' ||
-        (name == 'query_sales_metrics' && itemQuery.isNotEmpty)) {
+    if (name == 'search_item_sales') {
       final rows = (breakdown.isNotEmpty ? breakdown : matches)
           .map((item) {
             final revenueDisplay = _templateMoney(

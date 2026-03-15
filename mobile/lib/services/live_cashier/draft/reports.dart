@@ -365,8 +365,10 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     final matches = (limit == null ? sales : sales.take(limit))
         .map(_saleSummary)
         .toList(growable: false);
+    final sale = matches.length == 1 ? matches.first : null;
     final shouldOpen = args['open_first_match'] == true && sales.isNotEmpty;
     return {
+      ...?sale == null ? null : {'sale': sale},
       'matches': matches,
       'count': sales.length,
       if (shouldOpen) 'open_sale_id': sales.first.id,
@@ -536,6 +538,21 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
 
     final currencyCode = _toolCurrencyCode();
     final currencySymbol = _toolCurrencySymbol(currencyCode);
+    final customerSummaries = customerQuery.isEmpty
+        ? const <Map<String, dynamic>>[]
+        : _customerSummaries(filteredSales, currencyCode: currencyCode);
+    final itemSummaries = itemQuery.isEmpty
+        ? const <Map<String, dynamic>>[]
+        : _itemSummaries(
+            filteredSales,
+            currencyCode: currencyCode,
+            itemQuery: itemQuery,
+          );
+    final saleMatches =
+        (limit == null ? filteredSales : filteredSales.take(limit))
+            .map(_saleSummary)
+            .toList(growable: false);
+    final singleSale = saleMatches.length == 1 ? saleMatches.first : null;
     return {
       'status_filter': statusRaw.isEmpty ? 'all' : statusRaw,
       'start_date': startDate?.toIso8601String().split('T').first,
@@ -563,9 +580,12 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
         allTotal,
         currencyCode: currencyCode,
       ),
-      'matches': (limit == null ? filteredSales : filteredSales.take(limit))
-          .map(_saleSummary)
-          .toList(growable: false),
+      ...?singleSale == null ? null : {'sale': singleSale},
+      'matches': saleMatches,
+      if (customerSummaries.isNotEmpty) 'customers': customerSummaries,
+      if (customerSummaries.length == 1) 'customer': customerSummaries.first,
+      if (itemSummaries.isNotEmpty) 'items': itemSummaries,
+      if (itemSummaries.length == 1) 'item': itemSummaries.first,
       'item_breakdown': itemBreakdown.values
           .map(
             (item) => {
@@ -634,6 +654,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       0,
       (sum, customer) => sum + ((customer['total'] as num?)?.toDouble() ?? 0),
     );
+    final singleCustomer = customers.length == 1 ? customers.first : null;
     return {
       'status_filter': statusRaw.isEmpty ? 'all' : statusRaw,
       'start_date': startDate?.toIso8601String().split('T').first,
@@ -645,6 +666,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       'currency_symbol': _toolCurrencySymbol(currencyCode),
       'all_total': total,
       'all_total_display': _formatToolMoney(total, currencyCode: currencyCode),
+      ...?singleCustomer == null ? null : {'customer': singleCustomer},
       'customers': (limit == null ? customers : customers.take(limit)).toList(
         growable: false,
       ),

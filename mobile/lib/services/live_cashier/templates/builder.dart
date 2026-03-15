@@ -74,16 +74,22 @@ extension _LiveCashierOverlayTemplates on _LiveCashierOverlayState {
         if (_responseSaleStatus(response).isNotEmpty) {
           return _buildReceiptTemplateCard(name, response);
         }
-        return null;
+        return _buildSalesTemplateCard(name, response);
       case 'query_sales_metrics':
         final customerQuery = _templateText(response['customer_query']);
         final itemQuery = _templateText(response['item_query']);
         final status = _templateText(response['status_filter']).toLowerCase();
         if (customerQuery.isNotEmpty) {
-          return _buildCustomerTemplateCard(name, response);
+          final card = _buildCustomerTemplateCard(name, response);
+          if (card != null) {
+            return card;
+          }
         }
         if (itemQuery.isNotEmpty) {
-          return _buildItemTemplateCard(name, response);
+          final card = _buildItemTemplateCard(name, response);
+          if (card != null) {
+            return card;
+          }
         }
         if (_isInvoiceStatus(status)) {
           return _buildInvoiceTemplateCard(name, response);
@@ -91,7 +97,7 @@ extension _LiveCashierOverlayTemplates on _LiveCashierOverlayState {
         if (_isReceiptStatus(status)) {
           return _buildReceiptTemplateCard(name, response);
         }
-        return null;
+        return _buildSalesTemplateCard(name, response);
       case 'forecast_sales':
         final scope = _templateText(response['forecast_scope']).toLowerCase();
         final status = _templateText(response['status_filter']).toLowerCase();
@@ -107,7 +113,7 @@ extension _LiveCashierOverlayTemplates on _LiveCashierOverlayState {
         if (_isReceiptStatus(status)) {
           return _buildReceiptTemplateCard(name, response);
         }
-        return null;
+        return _buildSalesTemplateCard(name, response);
       case 'search_item_sales':
       case 'get_fast_moving_items':
       case 'get_slow_moving_items':
