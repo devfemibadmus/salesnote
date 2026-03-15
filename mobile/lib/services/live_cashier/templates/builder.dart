@@ -23,6 +23,16 @@ extension _LiveCashierOverlayTemplates on _LiveCashierOverlayState {
     'confirm_submit_current_preview',
   };
 
+  bool _canUseReceiptDraftTemplate(String name) {
+    return _receiptDraftActions.contains(name) ||
+        _sharedDraftActions.contains(name);
+  }
+
+  bool _canUseInvoiceDraftTemplate(String name) {
+    return _invoiceDraftActions.contains(name) ||
+        _sharedDraftActions.contains(name);
+  }
+
   _TemplateCardData? _buildResponseTemplateCard(
     String name,
     Map<String, dynamic> response,

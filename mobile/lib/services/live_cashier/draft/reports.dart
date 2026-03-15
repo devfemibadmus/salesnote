@@ -614,6 +614,21 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       filteredSales,
       currencyCode: currencyCode,
     );
+    final itemBreakdown = <String, Map<String, dynamic>>{};
+    for (final sale in filteredSales) {
+      for (final item in sale.items) {
+        final entry = itemBreakdown.putIfAbsent(
+          item.productName,
+          () => {
+            'product_name': item.productName,
+            'quantity': 0.0,
+            'revenue': 0.0,
+          },
+        );
+        entry['quantity'] = (entry['quantity'] as double) + item.quantity;
+        entry['revenue'] = (entry['revenue'] as double) + item.lineTotal;
+      }
+    }
     final total = customers.fold<double>(
       0,
       (sum, customer) => sum + ((customer['total'] as num?)?.toDouble() ?? 0),
@@ -630,6 +645,21 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       'all_total': total,
       'all_total_display': _formatToolMoney(total, currencyCode: currencyCode),
       'customers': customers.take(limit).toList(growable: false),
+      'matches': filteredSales
+          .take(limit)
+          .map(_saleSummary)
+          .toList(growable: false),
+      'item_breakdown': itemBreakdown.values
+          .map(
+            (item) => {
+              ...item,
+              'revenue_display': _formatToolMoney(
+                item['revenue'] as double,
+                currencyCode: currencyCode,
+              ),
+            },
+          )
+          .toList(growable: false),
     };
   }
 

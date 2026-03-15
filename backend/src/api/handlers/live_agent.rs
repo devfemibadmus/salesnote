@@ -755,6 +755,7 @@ fn live_agent_system_instruction(currency_code: &str) -> String {
         "For dashboard, sales history, customer lists, item lists, receipt lists, invoice lists, saved drafts, shop forecast, customer forecast, item forecast, and report questions, call the relevant tool first and answer only from tool results.",
         "For any request to list, show, name, count, compare, inspect, summarize, or detail customers, items, receipts, invoices, drafts, or sales, call a tool first. Do not answer those from memory or conversation context alone.",
         "Use list_customers for customer lists, customer names, customer counts, customer details, and customer rankings.",
+        "When the user asks about one customer and their details, profile, spending, recent sales, or bought items, prefer list_customers over receipt or invoice search tools.",
         "Use list_items for item lists, item names, sold item lists, item counts, and top item summaries.",
         "Use search_receipts for receipt or sales lists and receipt details.",
         "Use search_invoices for invoice lists and invoice details.",

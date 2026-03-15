@@ -6,7 +6,8 @@ extension _LiveCashierOverlayInvoiceTemplates on _LiveCashierOverlayState {
     Map<String, dynamic> response,
   ) {
     final draftSummary = _templateMap(response['draft_summary']);
-    if (_templateText(draftSummary?['kind']).toLowerCase() == 'invoice') {
+    if (_canUseInvoiceDraftTemplate(name) &&
+        _templateText(draftSummary?['kind']).toLowerCase() == 'invoice') {
       return _buildInvoiceDraftTemplate(name, response, draftSummary!);
     }
 

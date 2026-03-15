@@ -8,6 +8,7 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
     final customerQuery = _templateText(response['customer_query']);
     final customers = _templateMapList(response['customers']);
     final matchedCustomers = _templateStringList(response['matched_customers']);
+    final itemBreakdown = _templateMapList(response['item_breakdown']);
     final drafts = _templateMapList(response['drafts'])
         .where((draft) {
           return _templateText(draft['customer_name']).isNotEmpty ||
@@ -140,6 +141,41 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
         final title = _templateText(customer['customer_name']).isEmpty
             ? 'Customer'
             : _templateText(customer['customer_name']);
+        final detailRows = itemBreakdown.isNotEmpty
+            ? itemBreakdown
+                  .take(4)
+                  .map((item) {
+                    return _TemplateRow(
+                      title: _templateText(item['product_name']).isEmpty
+                          ? 'Item'
+                          : _templateText(item['product_name']),
+                      subtitle: _templateText(item['quantity']).isEmpty
+                          ? null
+                          : '${_templateText(item['quantity'])} units',
+                      trailing: _templateText(item['revenue_display']),
+                    );
+                  })
+                  .toList(growable: false)
+            : matches
+                  .take(4)
+                  .map((match) {
+                    return _TemplateRow(
+                      title:
+                          _compactTemplateDate(
+                            match['created_at']?.toString(),
+                          ).isEmpty
+                          ? 'Sale'
+                          : _compactTemplateDate(
+                              match['created_at']?.toString(),
+                            ),
+                      subtitle: _joinTemplateParts(<String>[
+                        _templateText(match['id']),
+                        _templateText(match['status']),
+                      ]),
+                      trailing: _templateText(match['total_display']),
+                    );
+                  })
+                  .toList(growable: false);
         return _TemplateCardData(
           kind: _TemplateKind.saleReport,
           signature: _templateSignature(name, <Object?>[
@@ -147,6 +183,7 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
             title,
             customer['total_display'],
             customer['sales_count'],
+            detailRows.length,
           ]),
           eyebrow: 'Customer',
           title: title,
@@ -172,6 +209,10 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
               value: _templateMetricValue(customer['invoice_count']),
             ),
           ],
+          rows: detailRows,
+          footer: itemBreakdown.isNotEmpty
+              ? 'Top purchased items'
+              : (matches.isNotEmpty ? 'Recent sales' : null),
         );
       }
       return _TemplateCardData(
