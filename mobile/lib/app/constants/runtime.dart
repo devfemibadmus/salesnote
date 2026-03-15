@@ -17,6 +17,7 @@ class TimingConstants {
   static const liveCashierCueActionCooldown = Duration(milliseconds: 700);
   static const liveCashierCueReconnectingCooldown = Duration(seconds: 3);
   static const liveCashierCueReconnectedCooldown = Duration(milliseconds: 900);
+  static const liveCashierCueMicToggleCooldown = Duration(milliseconds: 200);
   static const liveCashierSocketPingInterval = Duration(seconds: 20);
   static const liveCashierSalesWindowCacheTtl = Duration(seconds: 12);
 }

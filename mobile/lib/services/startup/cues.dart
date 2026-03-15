@@ -10,7 +10,13 @@ import '../../app/constants/runtime.dart';
 import '../../app/config.dart';
 import '../cache/local.dart';
 
-enum LiveCashierCue { actionStarted, reconnecting, reconnected }
+enum LiveCashierCue {
+  actionStarted,
+  reconnecting,
+  reconnected,
+  micMuted,
+  micUnmuted,
+}
 
 class LiveCashierCueService {
   LiveCashierCueService._();
@@ -41,6 +47,10 @@ class LiveCashierCueService {
         return 'reconnecting';
       case LiveCashierCue.reconnected:
         return 'reconnected';
+      case LiveCashierCue.micMuted:
+        return 'mic_muted';
+      case LiveCashierCue.micUnmuted:
+        return 'mic_unmuted';
     }
   }
 
@@ -77,6 +87,19 @@ class LiveCashierCueService {
 
   static Future<void> playReconnected() =>
       _queuePlay(LiveCashierCue.reconnected, cooldown: _reconnectedCooldown);
+
+  static Future<void> playBootstrapReady() =>
+      _queuePlay(LiveCashierCue.reconnected, cooldown: _reconnectedCooldown);
+
+  static Future<void> playMicMuted() => _queuePlay(
+    LiveCashierCue.micMuted,
+    cooldown: TimingConstants.liveCashierCueMicToggleCooldown,
+  );
+
+  static Future<void> playMicUnmuted() => _queuePlay(
+    LiveCashierCue.micUnmuted,
+    cooldown: TimingConstants.liveCashierCueMicToggleCooldown,
+  );
 
   static Future<void> _queuePlay(
     LiveCashierCue cue, {

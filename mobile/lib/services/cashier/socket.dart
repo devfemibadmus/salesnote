@@ -911,6 +911,7 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
       }
       return;
     }
+    unawaited(LiveCashierCueService.playBootstrapReady());
     _sendOpeningGreeting();
   }
 
@@ -960,9 +961,20 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     if (!_isRecording) {
       await _startVoiceCapture();
       await _setMicMuted(false);
+      if (!_micMuted) {
+        unawaited(LiveCashierCueService.playMicUnmuted());
+      }
       return;
     }
-    await _setMicMuted(!_micMuted);
+    final nextMuted = !_micMuted;
+    await _setMicMuted(nextMuted);
+    if (_micMuted == nextMuted) {
+      unawaited(
+        nextMuted
+            ? LiveCashierCueService.playMicMuted()
+            : LiveCashierCueService.playMicUnmuted(),
+      );
+    }
   }
 
   Future<void> _ensureLiveMicReady() async {

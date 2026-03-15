@@ -12,6 +12,8 @@ class AppConfig {
     'action_started': 'https://soundcn.xyz/r/zap-two-tone.json',
     'reconnecting': 'https://soundcn.xyz/r/zap-three-tone-down.json',
     'reconnected': 'https://soundcn.xyz/r/zap-three-tone-up.json',
+    'mic_muted': 'https://soundcn.xyz/r/switch-off.json',
+    'mic_unmuted': 'https://soundcn.xyz/r/switch-on.json',
   };
 
   static Uri get apiBaseUri => Uri.parse(apiBaseUrl);
