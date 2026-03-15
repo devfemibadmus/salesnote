@@ -5,28 +5,28 @@ extension _LiveCashierOverlayDraftRequirements on _LiveCashierOverlayState {
     final currencyCode = _toolCurrencyCode();
     final currencySymbol = _toolCurrencySymbol(currencyCode);
     final items = _draftItems
-        .map((item) => {
-              'product_name': item.productName,
-              'quantity': item.quantity,
-              'unit_price': item.unitPrice,
-              'line_total': (item.unitPrice ?? 0) * item.quantity,
-              'unit_price_display': item.unitPrice == null
-                  ? null
-                  : _formatToolMoney(
-                      item.unitPrice!,
-                      currencyCode: currencyCode,
-                    ),
-              'line_total_display': _formatToolMoney(
-                (item.unitPrice ?? 0) * item.quantity,
-                currencyCode: currencyCode,
-              ),
-            })
+        .map(
+          (item) => {
+            'product_name': item.productName,
+            'quantity': item.quantity,
+            'unit_price': item.unitPrice,
+            'line_total': (item.unitPrice ?? 0) * item.quantity,
+            'unit_price_display': item.unitPrice == null
+                ? null
+                : _formatToolMoney(item.unitPrice!, currencyCode: currencyCode),
+            'line_total_display': _formatToolMoney(
+              (item.unitPrice ?? 0) * item.quantity,
+              currencyCode: currencyCode,
+            ),
+          },
+        )
         .toList(growable: false);
     final subtotal = _draftItems.fold<double>(
       0,
       (sum, item) => sum + ((item.unitPrice ?? 0) * item.quantity),
     );
-    final total = subtotal -
+    final total =
+        subtotal -
         _draftDiscountAmount +
         _draftVatAmount +
         _draftServiceFeeAmount +
@@ -51,7 +51,10 @@ extension _LiveCashierOverlayDraftRequirements on _LiveCashierOverlayState {
         'other_label': _draftOtherLabel,
       },
       'subtotal': subtotal,
-      'subtotal_display': _formatToolMoney(subtotal, currencyCode: currencyCode),
+      'subtotal_display': _formatToolMoney(
+        subtotal,
+        currencyCode: currencyCode,
+      ),
       'total': total,
       'total_display': _formatToolMoney(total, currencyCode: currencyCode),
       'signature_id': _draftSignatureId,
@@ -71,14 +74,26 @@ extension _LiveCashierOverlayDraftRequirements on _LiveCashierOverlayState {
     return parsed > max ? max : parsed;
   }
 
+  int? _toolOptionalLimit(dynamic raw, {int max = 2000}) {
+    final parsed = int.tryParse(raw?.toString() ?? '');
+    if (parsed == null || parsed <= 0) {
+      return null;
+    }
+    return parsed > max ? max : parsed;
+  }
+
   String? _toolCurrencyCode() {
-    final settingsCode =
-        CacheLoader.loadSettingsSummaryCache()?.shop.currencyCode.trim().toUpperCase();
+    final settingsCode = CacheLoader.loadSettingsSummaryCache()
+        ?.shop
+        .currencyCode
+        .trim()
+        .toUpperCase();
     if (settingsCode != null && settingsCode.isNotEmpty) {
       return settingsCode;
     }
-    final homeCode =
-        CacheLoader.loadHomeSummaryCache()?.shop.currencyCode.trim().toUpperCase();
+    final homeCode = CacheLoader.loadHomeSummaryCache()?.shop.currencyCode
+        .trim()
+        .toUpperCase();
     if (homeCode != null && homeCode.isNotEmpty) {
       return homeCode;
     }
@@ -87,19 +102,19 @@ extension _LiveCashierOverlayDraftRequirements on _LiveCashierOverlayState {
 
   String _formatToolMoney(num amount, {String? currencyCode}) {
     final normalized = amount.toDouble();
-    final code = (currencyCode ?? _toolCurrencyCode() ?? '').trim().toUpperCase();
+    final code = (currencyCode ?? _toolCurrencyCode() ?? '')
+        .trim()
+        .toUpperCase();
     if (code.isEmpty) {
       return normalized.toStringAsFixed(2);
     }
-    return CurrencyService.formatForCode(
-      code,
-      normalized,
-      decimalDigits: 2,
-    );
+    return CurrencyService.formatForCode(code, normalized, decimalDigits: 2);
   }
 
   String _toolCurrencySymbol(String? currencyCode) {
-    final code = (currencyCode ?? _toolCurrencyCode() ?? '').trim().toUpperCase();
+    final code = (currencyCode ?? _toolCurrencyCode() ?? '')
+        .trim()
+        .toUpperCase();
     if (code.isEmpty) {
       return '';
     }
@@ -193,7 +208,9 @@ extension _LiveCashierOverlayDraftRequirements on _LiveCashierOverlayState {
     final customerName = (_draftCustomerName ?? '').trim();
     final customerContact = (_draftCustomerContact ?? '').trim();
 
-    if (customerName.isEmpty || customerName.length < 3 || customerName.length > 40) {
+    if (customerName.isEmpty ||
+        customerName.length < 3 ||
+        customerName.length > 40) {
       missing.add('customer_name');
     }
     if (!_looksLikeCustomerContact(customerContact)) {
@@ -205,7 +222,9 @@ extension _LiveCashierOverlayDraftRequirements on _LiveCashierOverlayState {
       if (_draftItems.any((item) => item.quantity <= 0)) {
         missing.add('item_quantity');
       }
-      if (_draftItems.any((item) => item.unitPrice == null || item.unitPrice!.isNaN)) {
+      if (_draftItems.any(
+        (item) => item.unitPrice == null || item.unitPrice!.isNaN,
+      )) {
         missing.add('item_unit_price');
       }
     }
@@ -231,10 +250,7 @@ extension _LiveCashierOverlayDraftRequirements on _LiveCashierOverlayState {
       if (signatures.length == 1) {
         final selected = signatures.first;
         _draftSignatureId = selected.id;
-        autoSelected['signature'] = {
-          'id': selected.id,
-          'name': selected.name,
-        };
+        autoSelected['signature'] = {'id': selected.id, 'name': selected.name};
         missing = _currentDraftMissingFields(isInvoice: isInvoice);
       }
     }
@@ -286,7 +302,8 @@ extension _LiveCashierOverlayDraftRequirements on _LiveCashierOverlayState {
         )
         .toList(growable: false);
     final selectionFields = <String>[
-      if (missing.contains('signature_id') && signatures.length > 1) 'signature_id',
+      if (missing.contains('signature_id') && signatures.length > 1)
+        'signature_id',
       if (missing.contains('bank_account_id') && bankAccounts.length > 1)
         'bank_account_id',
     ];
@@ -302,23 +319,21 @@ extension _LiveCashierOverlayDraftRequirements on _LiveCashierOverlayState {
 
     if (missing.contains('signature_id')) {
       response['available_signatures'] = signatures
-          .map((item) => {
-                'id': item.id,
-                'name': item.name,
-              })
+          .map((item) => {'id': item.id, 'name': item.name})
           .toList(growable: false);
     }
 
     if (missing.contains('bank_account_id')) {
-      response['available_bank_accounts'] =
-          bankAccounts
-              .map((item) => {
-                    'id': item.id,
-                    'bank_name': item.bankName,
-                    'account_name': item.accountName,
-                    'account_number': item.accountNumber,
-                  })
-              .toList(growable: false);
+      response['available_bank_accounts'] = bankAccounts
+          .map(
+            (item) => {
+              'id': item.id,
+              'bank_name': item.bankName,
+              'account_name': item.accountName,
+              'account_number': item.accountNumber,
+            },
+          )
+          .toList(growable: false);
     }
 
     return response;

@@ -348,7 +348,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     Map<String, dynamic> args,
     SaleStatus status,
   ) async {
-    final limit = _toolLimit(args['limit'], fallback: 5, max: 25);
+    final limit = _toolOptionalLimit(args['limit']);
     final date = _toolDate(args['date']?.toString());
     final query =
         (args['customer_query']?.toString() ?? args['query']?.toString() ?? '')
@@ -362,7 +362,9 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       startDate: date,
       endDate: date,
     );
-    final matches = sales.take(limit).map(_saleSummary).toList(growable: false);
+    final matches = (limit == null ? sales : sales.take(limit))
+        .map(_saleSummary)
+        .toList(growable: false);
     final shouldOpen = args['open_first_match'] == true && sales.isNotEmpty;
     return {
       'matches': matches,
@@ -451,7 +453,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
   Future<Map<String, dynamic>> _salesMetricsTool(
     Map<String, dynamic> args,
   ) async {
-    final limit = _toolLimit(args['limit'], fallback: 10, max: 50);
+    final limit = _toolOptionalLimit(args['limit']);
     final startDate = _toolDate(
       args['start_date']?.toString() ?? args['date']?.toString(),
     );
@@ -561,8 +563,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
         allTotal,
         currencyCode: currencyCode,
       ),
-      'matches': filteredSales
-          .take(limit)
+      'matches': (limit == null ? filteredSales : filteredSales.take(limit))
           .map(_saleSummary)
           .toList(growable: false),
       'item_breakdown': itemBreakdown.values
@@ -582,7 +583,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
   Future<Map<String, dynamic>> _listCustomersTool(
     Map<String, dynamic> args,
   ) async {
-    final limit = _toolLimit(args['limit'], fallback: 10, max: 50);
+    final limit = _toolOptionalLimit(args['limit']);
     final startDate = _toolDate(
       args['start_date']?.toString() ?? args['date']?.toString(),
     );
@@ -644,9 +645,10 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       'currency_symbol': _toolCurrencySymbol(currencyCode),
       'all_total': total,
       'all_total_display': _formatToolMoney(total, currencyCode: currencyCode),
-      'customers': customers.take(limit).toList(growable: false),
-      'matches': filteredSales
-          .take(limit)
+      'customers': (limit == null ? customers : customers.take(limit)).toList(
+        growable: false,
+      ),
+      'matches': (limit == null ? filteredSales : filteredSales.take(limit))
           .map(_saleSummary)
           .toList(growable: false),
       'item_breakdown': itemBreakdown.values
@@ -664,7 +666,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
   }
 
   Future<Map<String, dynamic>> _listItemsTool(Map<String, dynamic> args) async {
-    final limit = _toolLimit(args['limit'], fallback: 10, max: 50);
+    final limit = _toolOptionalLimit(args['limit']);
     final startDate = _toolDate(
       args['start_date']?.toString() ?? args['date']?.toString(),
     );
@@ -714,7 +716,9 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
         currencyCode: currencyCode,
       ),
       'total_quantity': totalQuantity,
-      'items': items.take(limit).toList(growable: false),
+      'items': (limit == null ? items : items.take(limit)).toList(
+        growable: false,
+      ),
     };
   }
 

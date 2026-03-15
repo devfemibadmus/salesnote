@@ -85,10 +85,7 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
       final draftMaps = (index['drafts'] as List<dynamic>? ?? const <dynamic>[])
           .whereType<Map<dynamic, dynamic>>();
       for (final raw in draftMaps) {
-        addEntry(
-          (raw['id'] ?? '').toString(),
-          (raw['label'] ?? '').toString(),
-        );
+        addEntry((raw['id'] ?? '').toString(), (raw['label'] ?? '').toString());
       }
 
       final idsLegacy = (index['ids'] as List<dynamic>? ?? const <dynamic>[])
@@ -98,13 +95,18 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
       }
     }
 
-    for (final key in LocalCache.listDraftKeys(prefix: _newSaleDraftStoragePrefix)) {
+    for (final key in LocalCache.listDraftKeys(
+      prefix: _newSaleDraftStoragePrefix,
+    )) {
       final draftId = key.substring(_newSaleDraftStoragePrefix.length);
       addEntry(draftId, _newSaleDefaultDraftLabel);
     }
 
     if (entries.isEmpty) {
-      entries.add(const {'id': _newSaleDefaultDraftId, 'label': _newSaleDefaultDraftLabel});
+      entries.add(const {
+        'id': _newSaleDefaultDraftId,
+        'label': _newSaleDefaultDraftLabel,
+      });
     }
 
     return entries;
@@ -136,7 +138,9 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
       'payload': payload,
     });
     if (_lastPersistedDraftSnapshot == snapshot) {
-      _draftLog('persist:skipUnchanged ${_draftDebugSummary(draftId: draftId)}');
+      _draftLog(
+        'persist:skipUnchanged ${_draftDebugSummary(draftId: draftId)}',
+      );
       return;
     }
 
@@ -156,7 +160,9 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
     });
     await LocalCache.saveDraft(_newSaleDraftStorageKey(draftId), payload);
     _lastPersistedDraftSnapshot = snapshot;
-    _draftLog('persist:done label="$label" ${_draftDebugSummary(draftId: draftId)}');
+    _draftLog(
+      'persist:done label="$label" ${_draftDebugSummary(draftId: draftId)}',
+    );
   }
 
   Future<void> _deduplicateCurrentDraftByCustomer() async {
@@ -173,9 +179,7 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
       excludingDraftId: currentDraftId,
     );
     if (match == null) {
-      _draftLog(
-        'dedupe:miss ${_draftDebugSummary(draftId: currentDraftId)}',
-      );
+      _draftLog('dedupe:miss ${_draftDebugSummary(draftId: currentDraftId)}');
       return;
     }
     final mergedDraft = _mergeDraftPayloads(match.draft, _cachedDraftPayload());
@@ -203,7 +207,8 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
             {'id': _newSaleDefaultDraftId, 'label': _newSaleDefaultDraftLabel},
           ]
         : indexEntries;
-    final nextActiveId = nextEntries.first['id']?.toString() ?? _newSaleDefaultDraftId;
+    final nextActiveId =
+        nextEntries.first['id']?.toString() ?? _newSaleDefaultDraftId;
     await LocalCache.saveDraft(_newSaleDraftIndexKey, {
       'active_id': nextActiveId,
       'drafts': nextEntries,
@@ -222,7 +227,9 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
         'draft_summary': _draftSummary(),
       };
     }
-    _draftLog('discard:current draftId=$currentDraftId ${_draftDebugSummary()}');
+    _draftLog(
+      'discard:current draftId=$currentDraftId ${_draftDebugSummary()}',
+    );
     await _removeDraftFromLocalCache(currentDraftId);
     _clearDraftState(isInvoice: currentKind, clearDraftId: true);
     return {
@@ -262,11 +269,14 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
         otherAmount != 0;
   }
 
-  Future<Map<String, dynamic>> _savedDraftsTool(Map<String, dynamic> args) async {
-    final requestedKind = (args['kind']?.toString() ?? args['status']?.toString() ?? '')
-        .trim()
-        .toLowerCase();
-    final limit = _toolLimit(args['limit'], fallback: 10, max: 50);
+  Future<Map<String, dynamic>> _savedDraftsTool(
+    Map<String, dynamic> args,
+  ) async {
+    final requestedKind =
+        (args['kind']?.toString() ?? args['status']?.toString() ?? '')
+            .trim()
+            .toLowerCase();
+    final limit = _toolOptionalLimit(args['limit']);
     final index = LocalCache.loadDraft(_newSaleDraftIndexKey);
     final activeId = (index?['active_id'] ?? '').toString().trim();
     final entries = _loadDraftIndexEntries();
@@ -281,12 +291,16 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
       if (!_storedDraftHasMeaningfulData(draft)) {
         continue;
       }
-      final rawStatus = (draft?['status'] ?? '').toString().trim().toLowerCase();
+      final rawStatus = (draft?['status'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
       final kind = rawStatus == 'invoice' ? 'invoice' : 'receipt';
       if (requestedKind == 'invoice' && kind != 'invoice') {
         continue;
       }
-      if ((requestedKind == 'receipt' || requestedKind == 'paid') && kind != 'receipt') {
+      if ((requestedKind == 'receipt' || requestedKind == 'paid') &&
+          kind != 'receipt') {
         continue;
       }
       final rawItems = (draft?['items'] as List<dynamic>? ?? const <dynamic>[])
@@ -303,11 +317,13 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
       drafts.add({
         'id': draftId,
         'label': ((entry['label'] ?? '').toString().trim().isEmpty
-                ? _newSaleDefaultDraftLabel
-                : (entry['label'] ?? '').toString().trim()),
+            ? _newSaleDefaultDraftLabel
+            : (entry['label'] ?? '').toString().trim()),
         'kind': kind,
         'customer_name': (draft?['customer_name'] ?? '').toString().trim(),
-        'customer_contact': (draft?['customer_contact'] ?? '').toString().trim(),
+        'customer_contact': (draft?['customer_contact'] ?? '')
+            .toString()
+            .trim(),
         'item_names': itemNames,
         'items': rawItems
             .map(
@@ -329,7 +345,9 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
       'count': drafts.length,
       'kind': requestedKind.isEmpty ? 'all' : requestedKind,
       'active_draft_id': activeId.isEmpty ? _draftCacheId : activeId,
-      'drafts': drafts.take(limit).toList(growable: false),
+      'drafts': (limit == null ? drafts : drafts.take(limit)).toList(
+        growable: false,
+      ),
     };
   }
 }
