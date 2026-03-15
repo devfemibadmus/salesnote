@@ -2,6 +2,17 @@ part of '../live_cashier.dart';
 
 enum _TranscriptSpeaker { user, assistant }
 
+Future<void> _triggerStrongTapHaptic() async {
+  try {
+    await HapticFeedback.heavyImpact();
+  } catch (_) {}
+  if (Platform.isAndroid) {
+    try {
+      await HapticFeedback.vibrate();
+    } catch (_) {}
+  }
+}
+
 class _TranscriptMessage {
   const _TranscriptMessage({required this.speaker, required this.text});
 
@@ -282,7 +293,10 @@ class _LiveControlButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () async {
+        await _triggerStrongTapHaptic();
+        onTap();
+      },
       behavior: HitTestBehavior.opaque,
       child: Container(
         width: 82,

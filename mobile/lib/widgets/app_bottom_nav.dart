@@ -1,6 +1,11 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 enum AppBottomTab { none, home, sales, items, settings }
+
+enum _NavHapticStyle { subtle, action }
 
 class AppBottomNav extends StatelessWidget {
   const AppBottomNav({
@@ -55,6 +60,7 @@ class AppBottomNav extends StatelessWidget {
               onTap: onAdd,
               onLongPress: onAddLongPress,
               borderRadius: BorderRadius.circular(29),
+              hapticStyle: _NavHapticStyle.action,
               child: Container(
                 width: 58,
                 height: 58,
@@ -110,6 +116,7 @@ class _NavItem extends StatelessWidget {
     return _NavTap(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
+      hapticStyle: _NavHapticStyle.subtle,
       child: SizedBox(
         width: 64,
         child: Column(
@@ -137,6 +144,7 @@ class _NavTap extends StatelessWidget {
     required this.onTap,
     required this.child,
     required this.borderRadius,
+    required this.hapticStyle,
     this.onLongPress,
   });
 
@@ -144,6 +152,34 @@ class _NavTap extends StatelessWidget {
   final VoidCallback? onLongPress;
   final Widget child;
   final BorderRadius borderRadius;
+  final _NavHapticStyle hapticStyle;
+
+  Future<void> _triggerTapFeedback(BuildContext context) async {
+    if (hapticStyle == _NavHapticStyle.action) {
+      await _triggerActionHaptic();
+      return;
+    }
+    await HapticFeedback.selectionClick();
+  }
+
+  Future<void> _triggerLongPressFeedback(BuildContext context) async {
+    if (hapticStyle == _NavHapticStyle.action) {
+      await _triggerActionHaptic();
+      return;
+    }
+    await HapticFeedback.mediumImpact();
+  }
+
+  Future<void> _triggerActionHaptic() async {
+    try {
+      await HapticFeedback.heavyImpact();
+    } catch (_) {}
+    if (Platform.isAndroid) {
+      try {
+        await HapticFeedback.vibrate();
+      } catch (_) {}
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -151,8 +187,16 @@ class _NavTap extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: borderRadius,
-        onTap: onTap,
-        onLongPress: onLongPress,
+        onTap: () async {
+          await _triggerTapFeedback(context);
+          onTap();
+        },
+        onLongPress: onLongPress == null
+            ? null
+            : () async {
+                await _triggerLongPressFeedback(context);
+                onLongPress!();
+              },
         child: child,
       ),
     );
