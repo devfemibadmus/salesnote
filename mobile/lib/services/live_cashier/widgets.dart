@@ -402,7 +402,10 @@ class _ErrorBody extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         FilledButton(
-          onPressed: onRetry,
+          onPressed: () {
+            unawaited(HapticFeedback.lightImpact());
+            onRetry();
+          },
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFF007AFF),
             minimumSize: const Size(140, 48),
@@ -732,7 +735,10 @@ class _CloseButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
+        onTap: () {
+          unawaited(HapticFeedback.selectionClick());
+          onTap();
+        },
         child: const Padding(
           padding: EdgeInsets.all(12),
           child: Icon(Icons.close_rounded, color: Color(0xFF0F172A)),
