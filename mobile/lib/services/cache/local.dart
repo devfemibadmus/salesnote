@@ -6,31 +6,26 @@ import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app/constants/storage.dart';
 import '../../data/models.dart';
 
 class LocalCache {
-  static const _receiptsBox = 'receipts_cache';
-  static const _receiptDetailBox = 'receipt_detail_cache';
-  static const _salesDraftBox = 'sales_draft_cache';
-  static const _settingsBox = 'settings_cache';
-  static const _metaBox = 'meta_cache';
-  static const _pageBox = 'page_cache';
-  static const _onboardingKey = 'onboarding_complete';
-  static const _notificationPromptCooldownKey = 'notification_prompt_cooldown';
-  static const _notificationOptOutKey = 'notification_opt_out';
-  static const _preferredRegionCodeKey = 'preferred_region_code';
-  static const _preferredCurrencyCodeKey = 'preferred_currency_code';
-  static const _cacheSchemaVersionKey = 'cache_schema_version';
-  static const _cacheSchemaVersion = 3;
+  static const _receiptsBox = StorageBoxes.receipts;
+  static const _receiptDetailBox = StorageBoxes.receiptDetail;
+  static const _salesDraftBox = StorageBoxes.salesDraft;
+  static const _settingsBox = StorageBoxes.settings;
+  static const _metaBox = StorageBoxes.meta;
+  static const _pageBox = StorageBoxes.page;
+  static const _onboardingKey = StorageKeys.onboardingComplete;
+  static const _notificationPromptCooldownKey =
+      StorageKeys.notificationPromptCooldown;
+  static const _notificationOptOutKey = StorageKeys.notificationOptOut;
+  static const _preferredRegionCodeKey = StorageKeys.preferredRegionCode;
+  static const _preferredCurrencyCodeKey = StorageKeys.preferredCurrencyCode;
+  static const _cacheSchemaVersionKey = StorageKeys.cacheSchemaVersion;
+  static const _cacheSchemaVersion = StorageVersions.cacheSchema;
   static Future<void>? _initFuture;
-  static const _allBoxes = <String>[
-    _receiptsBox,
-    _receiptDetailBox,
-    _salesDraftBox,
-    _settingsBox,
-    _metaBox,
-    _pageBox,
-  ];
+  static const _allBoxes = StorageBoxes.all;
 
   static Future<void> init() async {
     _initFuture ??= _initializeWithRecovery().catchError((error) {
@@ -189,10 +184,12 @@ class LocalCache {
     final normalizedPrefix = prefix?.trim();
     return box.keys
         .map((key) => key.toString())
-        .where((key) =>
-            normalizedPrefix == null ||
-            normalizedPrefix.isEmpty ||
-            key.startsWith(normalizedPrefix))
+        .where(
+          (key) =>
+              normalizedPrefix == null ||
+              normalizedPrefix.isEmpty ||
+              key.startsWith(normalizedPrefix),
+        )
         .toList(growable: false);
   }
 
@@ -262,12 +259,12 @@ class LocalCache {
 
   static Future<void> saveHomeSummary(Map<String, dynamic> data) async {
     final box = Hive.box<String>(_pageBox);
-    await box.put('home_summary', jsonEncode(data));
+    await box.put(StorageKeys.homeSummary, jsonEncode(data));
   }
 
   static Map<String, dynamic>? loadHomeSummary() {
     final box = Hive.box<String>(_pageBox);
-    final raw = box.get('home_summary');
+    final raw = box.get(StorageKeys.homeSummary);
     if (raw == null) return null;
     return jsonDecode(raw) as Map<String, dynamic>;
   }
@@ -302,19 +299,19 @@ class LocalCache {
     required bool includeItems,
     SaleStatus? status,
   }) {
-    final prefix = includeItems ? 'items_page' : 'sales_page';
+    final prefix = StorageKeys.salesPagePrefix(includeItems: includeItems);
     final suffix = status == null ? 'all' : status.name;
     return '${prefix}_$suffix';
   }
 
   static Future<void> saveSettingsSummary(Map<String, dynamic> data) async {
     final box = Hive.box<String>(_pageBox);
-    await box.put('settings_summary', jsonEncode(data));
+    await box.put(StorageKeys.settingsSummary, jsonEncode(data));
   }
 
   static Map<String, dynamic>? loadSettingsSummary() {
     final box = Hive.box<String>(_pageBox);
-    final raw = box.get('settings_summary');
+    final raw = box.get(StorageKeys.settingsSummary);
     if (raw == null) return null;
     return jsonDecode(raw) as Map<String, dynamic>;
   }
@@ -323,12 +320,12 @@ class LocalCache {
     List<Map<String, dynamic>> signatures,
   ) async {
     final box = Hive.box<String>(_pageBox);
-    await box.put('signatures', jsonEncode(signatures));
+    await box.put(StorageKeys.signatures, jsonEncode(signatures));
   }
 
   static List<Map<String, dynamic>> loadSignatures() {
     final box = Hive.box<String>(_pageBox);
-    final raw = box.get('signatures');
+    final raw = box.get(StorageKeys.signatures);
     if (raw == null) return <Map<String, dynamic>>[];
     final data = jsonDecode(raw) as List<dynamic>;
     return data.cast<Map<String, dynamic>>();
@@ -338,12 +335,12 @@ class LocalCache {
     List<Map<String, dynamic>> notifications,
   ) async {
     final box = Hive.box<String>(_pageBox);
-    await box.put('notifications', jsonEncode(notifications));
+    await box.put(StorageKeys.notifications, jsonEncode(notifications));
   }
 
   static List<Map<String, dynamic>> loadNotifications() {
     final box = Hive.box<String>(_pageBox);
-    final raw = box.get('notifications');
+    final raw = box.get(StorageKeys.notifications);
     if (raw == null) return <Map<String, dynamic>>[];
     final data = jsonDecode(raw) as List<dynamic>;
     return data.cast<Map<String, dynamic>>();
@@ -354,12 +351,12 @@ class LocalCache {
     Map<String, dynamic> sale,
   ) async {
     final box = Hive.box<String>(_pageBox);
-    await box.put('sale_preview_$saleId', jsonEncode(sale));
+    await box.put(StorageKeys.salePreview(saleId), jsonEncode(sale));
   }
 
   static Map<String, dynamic>? loadSalePreview(String saleId) {
     final box = Hive.box<String>(_pageBox);
-    final raw = box.get('sale_preview_$saleId');
+    final raw = box.get(StorageKeys.salePreview(saleId));
     if (raw == null) return null;
     return jsonDecode(raw) as Map<String, dynamic>;
   }
@@ -369,12 +366,12 @@ class LocalCache {
     final normalized =
         names.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet().toList()
           ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    await box.put('item_suggestions', jsonEncode(normalized));
+    await box.put(StorageKeys.itemSuggestions, jsonEncode(normalized));
   }
 
   static List<String> loadItemSuggestions() {
     final box = Hive.box<String>(_pageBox);
-    final raw = box.get('item_suggestions');
+    final raw = box.get(StorageKeys.itemSuggestions);
     if (raw == null) return <String>[];
     final data = jsonDecode(raw) as List<dynamic>;
     return data
@@ -386,14 +383,14 @@ class LocalCache {
   static Future<void> saveCachedMedia(String url, Uint8List bytes) async {
     if (url.trim().isEmpty || bytes.isEmpty) return;
     final box = Hive.box<String>(_pageBox);
-    await box.put('media:${url.trim()}', base64Encode(bytes));
+    await box.put(StorageKeys.cachedMedia(url.trim()), base64Encode(bytes));
   }
 
   static Uint8List? loadCachedMedia(String url) {
     final normalized = url.trim();
     if (normalized.isEmpty) return null;
     final box = Hive.box<String>(_pageBox);
-    final raw = box.get('media:$normalized');
+    final raw = box.get(StorageKeys.cachedMedia(normalized));
     if (raw == null || raw.isEmpty) return null;
     try {
       return base64Decode(raw);
@@ -406,7 +403,7 @@ class LocalCache {
     final normalized = url.trim();
     if (normalized.isEmpty) return;
     final box = Hive.box<String>(_pageBox);
-    await box.delete('media:$normalized');
+    await box.delete(StorageKeys.cachedMedia(normalized));
   }
 
   static Future<void> clearAll() async {
@@ -414,10 +411,14 @@ class LocalCache {
     final onboardingComplete = settingsBox.get(_onboardingKey) ?? false;
     final notificationOptOut = settingsBox.get(_notificationOptOutKey) ?? false;
     final pageBox = Hive.box<String>(_pageBox);
-    final preferredRegionCode =
-        pageBox.get(_preferredRegionCodeKey)?.toString().trim();
-    final preferredCurrencyCode =
-        pageBox.get(_preferredCurrencyCodeKey)?.toString().trim();
+    final preferredRegionCode = pageBox
+        .get(_preferredRegionCodeKey)
+        ?.toString()
+        .trim();
+    final preferredCurrencyCode = pageBox
+        .get(_preferredCurrencyCodeKey)
+        ?.toString()
+        .trim();
 
     await Hive.box<String>(_receiptsBox).clear();
     await Hive.box<String>(_receiptDetailBox).clear();
@@ -439,5 +440,4 @@ class LocalCache {
       await pageBox.put(_preferredCurrencyCodeKey, preferredCurrencyCode!);
     }
   }
-
 }

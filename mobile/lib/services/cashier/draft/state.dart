@@ -1,4 +1,4 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
 extension _LiveCashierOverlayDraftState on _LiveCashierOverlayState {
   void _clearDraftState({
@@ -46,9 +46,6 @@ extension _LiveCashierOverlayDraftState on _LiveCashierOverlayState {
   }
 
   void _startFreshDraft({required bool isInvoice}) {
-    _clearDraftState(
-      isInvoice: isInvoice,
-      assignNewDraftId: true,
-    );
+    _clearDraftState(isInvoice: isInvoice, assignNewDraftId: true);
   }
 }

@@ -1,4 +1,4 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
 extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
   String _nextLiveDraftId() {

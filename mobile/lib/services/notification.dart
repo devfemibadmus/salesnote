@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../app/constants/runtime.dart';
 import '../app/navigator.dart';
 import '../app/routes.dart';
 import 'cache/local.dart';
@@ -68,10 +69,10 @@ Future<void> salesnoteFirebaseMessagingBackgroundHandler(
 class NotificationService {
   NotificationService._();
 
-  static const String _channelId = 'salesnote_alerts_v2';
-  static const String _channelName = 'Salesnote Notifications';
+  static const String _channelId = NotificationConstants.channelId;
+  static const String _channelName = NotificationConstants.channelName;
   static const String _channelDescription =
-      'Default channel for Salesnote notifications';
+      NotificationConstants.channelDescription;
 
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
@@ -127,7 +128,7 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
     await androidPlugin?.deleteNotificationChannel(
-      channelId: 'salesnote_alerts_v1',
+      channelId: NotificationConstants.legacyChannelId,
     );
     await androidPlugin?.createNotificationChannel(_channel);
   }
@@ -483,7 +484,9 @@ class NotificationService {
 
     final kind = data['type']?.toString().trim() ?? '';
     final saleId = data['sale_id']?.toString().trim() ?? '';
-    if ((kind == 'new_sale' || kind == 'new_invoice' || kind == 'invoice_paid') &&
+    if ((kind == 'new_sale' ||
+            kind == 'new_invoice' ||
+            kind == 'invoice_paid') &&
         saleId.isNotEmpty) {
       PreviewService.openById(saleId);
       return;
@@ -492,7 +495,9 @@ class NotificationService {
     navigator.pushNamed(AppRoutes.notification);
   }
 
-  static Future<void> openInboxNotification(InAppNotification notification) async {
+  static Future<void> openInboxNotification(
+    InAppNotification notification,
+  ) async {
     await markRead(notification.id);
     final data = <String, dynamic>{
       'id': notification.id,

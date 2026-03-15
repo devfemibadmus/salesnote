@@ -10,7 +10,7 @@ import '../../services/api_client.dart';
 import '../../services/cache/local.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
-import '../../services/live_cashier.dart';
+import '../../services/cashier/core.dart';
 import '../../services/media.dart';
 import '../../services/notice.dart';
 import '../../services/notification.dart';

@@ -1,4 +1,4 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
 extension _LiveCashierOverlayTemplateCommon on _LiveCashierOverlayState {
   Map<String, dynamic>? _templateMap(dynamic value) {

@@ -1,9 +1,11 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
-const String _newSaleDraftIndexKey = 'draft_new_sale_index';
-const String _newSaleDraftStoragePrefix = 'draft_new_sale_';
-const String _newSaleDefaultDraftId = 'draft_1';
-const String _newSaleDefaultDraftLabel = 'New Sale';
+const String _newSaleDraftIndexKey = DraftConstants.newSaleDraftIndexKey;
+const String _newSaleDraftStoragePrefix =
+    DraftConstants.newSaleDraftStoragePrefix;
+const String _newSaleDefaultDraftId = DraftConstants.newSaleDefaultDraftId;
+const String _newSaleDefaultDraftLabel =
+    DraftConstants.newSaleDefaultDraftLabel;
 
 extension _LiveCashierOverlayDraftDebug on _LiveCashierOverlayState {
   String _draftDebugSummary({
@@ -14,7 +16,8 @@ extension _LiveCashierOverlayDraftDebug on _LiveCashierOverlayState {
     bool? isInvoice,
   }) {
     final normalizedDraftId = (draftId ?? _draftCacheId ?? '').trim();
-    final normalizedCustomerName = (customerName ?? _draftCustomerName ?? '').trim();
+    final normalizedCustomerName = (customerName ?? _draftCustomerName ?? '')
+        .trim();
     final normalizedCustomerContact =
         (customerContact ?? _draftCustomerContact ?? '').trim();
     final normalizedItemCount = itemCount ?? _draftItems.length;

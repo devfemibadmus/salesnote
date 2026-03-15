@@ -1,4 +1,4 @@
-part of '../live_cashier.dart';
+part of 'core.dart';
 
 class _LoadingBody extends StatelessWidget {
   const _LoadingBody({required this.controller, required this.status});

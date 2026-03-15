@@ -1,4 +1,4 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
 extension _LiveCashierOverlayDraftRequirements on _LiveCashierOverlayState {
   Map<String, dynamic> _draftSummary() {

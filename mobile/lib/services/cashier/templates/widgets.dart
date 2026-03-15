@@ -1,4 +1,4 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
 class _ResponseTemplateBubble extends StatelessWidget {
   const _ResponseTemplateBubble({super.key, required this.card});

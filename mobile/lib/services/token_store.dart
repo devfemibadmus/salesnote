@@ -1,11 +1,14 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../app/constants/runtime.dart';
+import '../app/constants/storage.dart';
+
 class TokenStore {
-  static const _key = 'auth_token';
-  static const _sessionKey = 'has_auth_session';
+  static const _key = TokenStoreConstants.tokenKey;
+  static const _sessionKey = TokenStoreConstants.sessionKey;
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
-  static const Duration _storageTimeout = Duration(seconds: 3);
+  static const Duration _storageTimeout = TimingConstants.secureStorageTimeout;
 
   Future<void> saveToken(String token) async {
     await _secureStorage
@@ -70,7 +73,3 @@ class TokenStore {
     await prefs.remove(_key);
   }
 }
-
-
-
-

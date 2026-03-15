@@ -1,4 +1,4 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
 extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
   void _applyCustomer(
@@ -6,7 +6,10 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
     String? explicitName,
     String? explicitContact,
   }) {
-    final (name: resolvedName, contact: resolvedContact) = _resolvedCustomerParts(
+    final (
+      name: resolvedName,
+      contact: resolvedContact,
+    ) = _resolvedCustomerParts(
       raw,
       explicitName: explicitName,
       explicitContact: explicitContact,
@@ -26,12 +29,13 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
       customerName: requestedName,
       customerContact: requestedContact,
     );
-    final currentDraftHasCustomer = _normalizedCustomerName(_draftCustomerName).isNotEmpty ||
+    final currentDraftHasCustomer =
+        _normalizedCustomerName(_draftCustomerName).isNotEmpty ||
         _normalizedCustomerContact(_draftCustomerContact).isNotEmpty;
     final shouldReuseSavedDraft =
         !_hasMeaningfulDraftState() ||
-            !currentDraftHasCustomer ||
-            currentDraftMatchesRequested;
+        !currentDraftHasCustomer ||
+        currentDraftMatchesRequested;
     if (!shouldReuseSavedDraft) {
       _draftLog(
         'applyCustomer:skipReuse currentDraftBelongsToDifferentCustomer '
@@ -68,7 +72,8 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
       return (name: name, contact: contact);
     }
     final digits = value.replaceAll(RegExp(r'[^0-9+]'), '');
-    final looksLikePhone = digits.isNotEmpty &&
+    final looksLikePhone =
+        digits.isNotEmpty &&
         (digits.startsWith('+') || RegExp(r'^\d{7,}$').hasMatch(digits));
     if (looksLikePhone) {
       contact = value;
@@ -79,10 +84,7 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
   }
 
   String _normalizedCustomerName(String? value) {
-    return (value ?? '')
-        .trim()
-        .toLowerCase()
-        .replaceAll(RegExp(r'\s+'), ' ');
+    return (value ?? '').trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
   }
 
   String _normalizedCustomerContact(String? value) {
@@ -123,13 +125,21 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
     }
     final requestedName = _normalizedCustomerName(customerName);
     final requestedContact = _normalizedCustomerContact(customerContact);
-    final draftName = _normalizedCustomerName(draft['customer_name']?.toString());
-    final draftContact = _normalizedCustomerContact(draft['customer_contact']?.toString());
+    final draftName = _normalizedCustomerName(
+      draft['customer_name']?.toString(),
+    );
+    final draftContact = _normalizedCustomerContact(
+      draft['customer_contact']?.toString(),
+    );
 
-    final nameMatches = requestedName.isNotEmpty &&
+    final nameMatches =
+        requestedName.isNotEmpty &&
         draftName.isNotEmpty &&
         requestedName == draftName;
-    final contactMatches = _customerContactsMatch(requestedContact, draftContact);
+    final contactMatches = _customerContactsMatch(
+      requestedContact,
+      draftContact,
+    );
     if (contactMatches) {
       return true;
     }
@@ -156,13 +166,14 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
     _draftCacheId = draftId.trim();
     _draftIsInvoice =
         (draft['status'] ?? '').toString().trim().toLowerCase() == 'invoice';
-    _draftCustomerName = (draft['customer_name'] ?? '').toString().trim().isEmpty
+    _draftCustomerName =
+        (draft['customer_name'] ?? '').toString().trim().isEmpty
         ? null
         : (draft['customer_name'] ?? '').toString().trim();
     _draftCustomerContact =
         (draft['customer_contact'] ?? '').toString().trim().isEmpty
-            ? null
-            : (draft['customer_contact'] ?? '').toString().trim();
+        ? null
+        : (draft['customer_contact'] ?? '').toString().trim();
     _draftItems
       ..clear()
       ..addAll(
@@ -183,8 +194,8 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
         : (draft['signature_id'] ?? '').toString().trim();
     _draftBankAccountId =
         (draft['bank_account_id'] ?? '').toString().trim().isEmpty
-            ? null
-            : (draft['bank_account_id'] ?? '').toString().trim();
+        ? null
+        : (draft['bank_account_id'] ?? '').toString().trim();
     _draftDiscountAmount = (draft['discount_amount'] as num?)?.toDouble() ?? 0;
     _draftVatAmount =
         ((draft['vat_amount'] ?? draft['tax_amount']) as num?)?.toDouble() ?? 0;
@@ -207,7 +218,9 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
     final normalizedName = _normalizedCustomerName(customerName);
     final normalizedContact = _normalizedCustomerContact(customerContact);
     if (normalizedName.isEmpty && normalizedContact.isEmpty) {
-      _draftLog('reuseMatchingSavedDraft:skip noCustomerIdentity ${_draftDebugSummary()}');
+      _draftLog(
+        'reuseMatchingSavedDraft:skip noCustomerIdentity ${_draftDebugSummary()}',
+      );
       return false;
     }
 
@@ -373,9 +386,10 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
     merged['other_label'] = mergedTextField('other_label');
     merged['signature_id'] = mergedTextField('signature_id');
     merged['bank_account_id'] = mergedTextField('bank_account_id');
-    merged['status'] = (incomingDraft['status'] ?? baseDraft['status'] ?? 'paid')
-        .toString()
-        .trim();
+    merged['status'] =
+        (incomingDraft['status'] ?? baseDraft['status'] ?? 'paid')
+            .toString()
+            .trim();
     merged['items'] = mergedItems;
     merged['updated_at'] = DateTime.now().toIso8601String();
     return merged;

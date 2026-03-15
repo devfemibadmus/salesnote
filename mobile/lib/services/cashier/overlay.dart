@@ -1,4 +1,4 @@
-part of '../live_cashier.dart';
+part of 'core.dart';
 
 enum _TranscriptSpeaker { user, assistant }
 

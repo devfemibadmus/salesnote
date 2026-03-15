@@ -1,34 +1,34 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
-extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
-  _TemplateCardData? _buildReceiptTemplateCard(
+extension _LiveCashierOverlayInvoiceTemplates on _LiveCashierOverlayState {
+  _TemplateCardData? _buildInvoiceTemplateCard(
     String name,
     Map<String, dynamic> response,
   ) {
     final draftSummary = _templateMap(response['draft_summary']);
-    if (_canUseReceiptDraftTemplate(name) &&
-        _templateText(draftSummary?['kind']).toLowerCase() == 'receipt') {
-      return _buildReceiptDraftTemplate(name, response, draftSummary!);
+    if (_canUseInvoiceDraftTemplate(name) &&
+        _templateText(draftSummary?['kind']).toLowerCase() == 'invoice') {
+      return _buildInvoiceDraftTemplate(name, response, draftSummary!);
     }
 
-    final sale = _templateSingleSale(response, invoice: false);
+    final sale = _templateSingleSale(response, invoice: true);
     if (sale != null) {
-      return _buildSingleReceiptTemplate(name, sale);
+      return _buildSingleInvoiceTemplate(name, sale);
     }
 
-    final drafts = _templateDraftsByKind(response, invoice: false);
+    final drafts = _templateDraftsByKind(response, invoice: true);
     if (name == 'list_saved_drafts' && drafts.isNotEmpty) {
-      return _buildReceiptListTemplate(name, drafts, title: 'Receipt drafts');
+      return _buildInvoiceListTemplate(name, drafts, title: 'Invoice drafts');
     }
 
-    final matches = _templateSaleMatches(response, invoice: false);
-    if ((name == 'search_receipts' || name == 'query_sales_metrics') &&
+    final matches = _templateSaleMatches(response, invoice: true);
+    if ((name == 'search_invoices' || name == 'query_sales_metrics') &&
         matches.isNotEmpty) {
-      return _buildReceiptListTemplate(name, matches, title: 'Receipts');
+      return _buildInvoiceListTemplate(name, matches, title: 'Invoices');
     }
 
     if (name == 'forecast_sales' &&
-        _templateText(response['status_filter']).toLowerCase() == 'paid') {
+        _templateText(response['status_filter']).toLowerCase() == 'invoice') {
       final points = _templateMapList(response['forecast_points']);
       if (points.isEmpty) {
         return null;
@@ -36,13 +36,13 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
       return _TemplateCardData(
         kind: _TemplateKind.forecast,
         signature: _templateSignature(name, <Object?>[
-          'receipt',
+          'invoice',
           response['forecast_total_display'],
           response['forecast_orders_total'],
           points.length,
         ]),
-        eyebrow: 'Receipt',
-        title: 'Receipt forecast',
+        eyebrow: 'Invoice',
+        title: 'Invoice forecast',
         subtitle: _templateText(response['scope_label']).isEmpty
             ? null
             : _templateText(response['scope_label']),
@@ -83,17 +83,17 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
     }
 
     if (name == 'query_sales_metrics' &&
-        _templateText(response['status_filter']).toLowerCase() == 'paid') {
+        _templateText(response['status_filter']).toLowerCase() == 'invoice') {
       return _TemplateCardData(
         kind: _TemplateKind.saleReport,
         signature: _templateSignature(name, <Object?>[
-          'receipt-report',
-          response['paid_receipts_total_display'],
+          'invoice-report',
+          response['invoice_total_display'],
           response['count'],
           matches.length,
         ]),
-        eyebrow: 'Receipt',
-        title: 'Receipt report',
+        eyebrow: 'Invoice',
+        title: 'Invoice report',
         subtitle: _joinTemplateParts(<String>[
           if (_templateText(response['start_date']).isNotEmpty &&
               _templateText(response['end_date']).isNotEmpty)
@@ -102,13 +102,11 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
         metrics: <_TemplateMetric>[
           _TemplateMetric(
             label: 'Total',
-            value: _templateMetricValue(
-              response['paid_receipts_total_display'],
-            ),
+            value: _templateMetricValue(response['invoice_total_display']),
           ),
           _TemplateMetric(
-            label: 'Receipts',
-            value: _templateMetricValue(response['paid_receipts_count']),
+            label: 'Invoices',
+            value: _templateMetricValue(response['invoice_count']),
           ),
           _TemplateMetric(
             label: 'Customers',
@@ -132,7 +130,7 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
     return null;
   }
 
-  _TemplateCardData _buildReceiptDraftTemplate(
+  _TemplateCardData _buildInvoiceDraftTemplate(
     String name,
     Map<String, dynamic> response,
     Map<String, dynamic> summary,
@@ -144,16 +142,16 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
     return _TemplateCardData(
       kind: _TemplateKind.draft,
       signature: _templateSignature(name, <Object?>[
-        'receipt-draft',
+        'invoice-draft',
         summary['draft_id'],
         summary['total_display'],
         items.length,
         missingLabels.join('|'),
       ]),
-      eyebrow: 'Receipt',
+      eyebrow: 'Invoice',
       title: customerName.isEmpty
-          ? 'Receipt draft'
-          : 'Receipt draft for $customerName',
+          ? 'Invoice draft'
+          : 'Invoice draft for $customerName',
       subtitle: _joinTemplateParts(<String>[
         if (customerContact.isNotEmpty) customerContact,
         _templateText(response['message']),
@@ -171,28 +169,28 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
       ],
       rows: _templateSaleItemRows(items),
       footer: missingLabels.isEmpty
-          ? 'Receipt draft is ready for preview.'
+          ? 'Invoice draft is ready for preview.'
           : 'Still needed: ${missingLabels.join(', ')}',
     );
   }
 
-  _TemplateCardData _buildSingleReceiptTemplate(
+  _TemplateCardData _buildSingleInvoiceTemplate(
     String name,
     Map<String, dynamic> sale,
   ) {
     final items = _templateMapList(sale['items']);
     final title = _templateText(sale['id']).isEmpty
-        ? 'Receipt'
-        : 'Receipt ${_templateText(sale['id'])}';
+        ? 'Invoice'
+        : 'Invoice ${_templateText(sale['id'])}';
     return _TemplateCardData(
       kind: _TemplateKind.saleReport,
       signature: _templateSignature(name, <Object?>[
-        'receipt',
+        'invoice',
         sale['id'],
         sale['total_display'],
         items.length,
       ]),
-      eyebrow: 'Receipt',
+      eyebrow: 'Invoice',
       title: title,
       subtitle: _joinTemplateParts(<String>[
         _templateText(sale['customer_name']),
@@ -214,7 +212,7 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
     );
   }
 
-  _TemplateCardData _buildReceiptListTemplate(
+  _TemplateCardData _buildInvoiceListTemplate(
     String name,
     List<Map<String, dynamic>> entries, {
     required String title,
@@ -222,12 +220,12 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
     return _TemplateCardData(
       kind: _TemplateKind.list,
       signature: _templateSignature(name, <Object?>[
-        'receipt-list',
+        'invoice-list',
         title,
         entries.length,
         entries.map((entry) => _templateText(entry['id'])).join('|'),
       ]),
-      eyebrow: 'Receipt',
+      eyebrow: 'Invoice',
       title: title,
       subtitle: _templateListSubtitle(entries.length),
       rows: entries
@@ -235,7 +233,7 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
             final customerName = _templateText(entry['customer_name']);
             final label = customerName.isEmpty
                 ? (_templateText(entry['label']).isEmpty
-                      ? 'Receipt'
+                      ? 'Invoice'
                       : _templateText(entry['label']))
                 : customerName;
             return _TemplateRow(

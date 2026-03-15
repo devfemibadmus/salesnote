@@ -1,4 +1,4 @@
-part of '../live_cashier.dart';
+part of 'core.dart';
 
 extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
   Uri _backendLiveSocketUri() {
@@ -325,7 +325,7 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
       _socket = null;
       _setupReady = false;
       final socket = await WebSocket.connect(uri.toString(), headers: headers);
-      socket.pingInterval = const Duration(seconds: 20);
+      socket.pingInterval = TimingConstants.liveCashierSocketPingInterval;
       _socket = socket;
       socket.listen(
         _handleSocketMessage,
@@ -344,6 +344,9 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
             ? 'Reconnected. Restoring session...'
             : 'Starting live cashier...';
       });
+      if (backgroundReconnect) {
+        unawaited(LiveCashierCueService.playReconnected());
+      }
     } catch (e) {
       _log('socket:connect:error $e');
       if (!mounted) return;
@@ -365,6 +368,7 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     if (_reconnectTimer != null) {
       return;
     }
+    final shouldPlayCue = _reconnectAttempt == 0;
     _reconnecting = true;
     _reconnectAttempt += 1;
     final delaySeconds = _reconnectAttempt <= 1
@@ -385,6 +389,9 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
       _toolStatus = 'Disconnected. Reconnecting in ${delaySeconds}s.';
       _status = _currentStatus();
     });
+    if (shouldPlayCue) {
+      unawaited(LiveCashierCueService.playReconnecting());
+    }
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       _reconnectTimer = null;
       unawaited(_attemptReconnect());

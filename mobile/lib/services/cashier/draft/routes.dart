@@ -1,4 +1,4 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
 extension _LiveCashierOverlayDraftRoutes on _LiveCashierOverlayState {
   NewSaleRouteArgs _newSaleArgs() {

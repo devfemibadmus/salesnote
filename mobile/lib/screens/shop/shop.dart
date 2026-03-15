@@ -14,7 +14,7 @@ import '../../services/api_client.dart';
 import '../../services/bank_account.dart';
 import '../../services/cache/loader.dart';
 import '../../services/cache/local.dart';
-import '../../services/live_cashier.dart';
+import '../../services/cashier/core.dart';
 import '../../services/notice.dart';
 import '../../services/notification.dart';
 import '../../services/phone.dart';
@@ -426,9 +426,8 @@ class _ShopScreenState extends State<ShopScreen> {
       isNew: true,
     );
     if (created == null) return;
-    final next = [...shop.bankAccounts, created]..sort(
-      (a, b) => int.parse(a.id).compareTo(int.parse(b.id)),
-    );
+    final next = [...shop.bankAccounts, created]
+      ..sort((a, b) => int.parse(a.id).compareTo(int.parse(b.id)));
     await _updateShopField(
       input: ShopUpdateInput(bankAccounts: next),
       successMessage: 'Bank account added.',
@@ -444,14 +443,16 @@ class _ShopScreenState extends State<ShopScreen> {
       isNew: false,
     );
     if (updated == null) return;
-    final changed = updated.bankName != bankAccount.bankName ||
+    final changed =
+        updated.bankName != bankAccount.bankName ||
         updated.accountNumber != bankAccount.accountNumber ||
         updated.accountName != bankAccount.accountName;
     if (!changed) return;
-    final next = shop.bankAccounts
-        .map((item) => item.id == bankAccount.id ? updated : item)
-        .toList()
-      ..sort((a, b) => int.parse(a.id).compareTo(int.parse(b.id)));
+    final next =
+        shop.bankAccounts
+            .map((item) => item.id == bankAccount.id ? updated : item)
+            .toList()
+          ..sort((a, b) => int.parse(a.id).compareTo(int.parse(b.id)));
     await _updateShopField(
       input: ShopUpdateInput(bankAccounts: next),
       successMessage: 'Bank account updated.',
@@ -469,7 +470,9 @@ class _ShopScreenState extends State<ShopScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete Bank Account?'),
-        content: Text('Delete "${bankAccount.bankName}" from invoice payment options?'),
+        content: Text(
+          'Delete "${bankAccount.bankName}" from invoice payment options?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -486,10 +489,9 @@ class _ShopScreenState extends State<ShopScreen> {
       ),
     );
     if (confirmed != true) return;
-    final next = shop.bankAccounts
-        .where((item) => item.id != bankAccount.id)
-        .toList()
-      ..sort((a, b) => int.parse(a.id).compareTo(int.parse(b.id)));
+    final next =
+        shop.bankAccounts.where((item) => item.id != bankAccount.id).toList()
+          ..sort((a, b) => int.parse(a.id).compareTo(int.parse(b.id)));
     await _updateShopField(
       input: ShopUpdateInput(bankAccounts: next),
       successMessage: 'Bank account deleted.',
@@ -983,14 +985,14 @@ class _ShopScreenState extends State<ShopScreen> {
         ),
       ),
       bottomNavigationBar: AppBottomNav(
-          activeTab: AppBottomTab.settings,
-          onHome: () => _goTo(AppRoutes.home, reset: true),
-          onSales: () => _goTo(AppRoutes.sales, reset: true),
-          onAdd: () => _goTo(AppRoutes.newSale),
-          onAddLongPress: () => LiveCashierService.show(context),
-          onItems: () => _goTo(AppRoutes.invoices, reset: true),
-          onSettings: () {},
-        ),
+        activeTab: AppBottomTab.settings,
+        onHome: () => _goTo(AppRoutes.home, reset: true),
+        onSales: () => _goTo(AppRoutes.sales, reset: true),
+        onAdd: () => _goTo(AppRoutes.newSale),
+        onAddLongPress: () => LiveCashierService.show(context),
+        onItems: () => _goTo(AppRoutes.invoices, reset: true),
+        onSettings: () {},
+      ),
     );
   }
 }

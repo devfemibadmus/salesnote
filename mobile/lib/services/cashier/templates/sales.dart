@@ -1,4 +1,4 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
 extension _LiveCashierOverlaySalesTemplates on _LiveCashierOverlayState {
   _TemplateCardData? _buildSalesTemplateCard(

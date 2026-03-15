@@ -1,4 +1,4 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
 extension _LiveCashierOverlayDraftMutations on _LiveCashierOverlayState {
   double _inferredUnitPriceFloor({double? currentUnitPrice}) {

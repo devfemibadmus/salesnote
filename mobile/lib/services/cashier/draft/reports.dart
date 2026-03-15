@@ -1,7 +1,9 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
-const Duration _salesWindowCacheTtl = Duration(seconds: 12);
-const int _salesWindowCacheMaxEntries = 12;
+const Duration _salesWindowCacheTtl =
+    TimingConstants.liveCashierSalesWindowCacheTtl;
+const int _salesWindowCacheMaxEntries =
+    LimitConstants.liveCashierSalesWindowCacheMaxEntries;
 
 class _SalesWindowCacheEntry {
   const _SalesWindowCacheEntry({required this.createdAt, required this.sales});
@@ -380,8 +382,8 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     String? searchQuery,
     DateTime? startDate,
     DateTime? endDate,
-    int perPage = 100,
-    int maxPages = 15,
+    int perPage = PagingConstants.liveCashierSalesWindowPerPage,
+    int maxPages = PagingConstants.liveCashierSalesWindowMaxPages,
   }) async {
     final normalizedSearchQuery = (searchQuery ?? '').trim().toLowerCase();
     final cacheKey = [

@@ -1,4 +1,4 @@
-part of '../live_cashier.dart';
+part of 'core.dart';
 
 extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
   static const Set<String> _readOnlyToolNames = <String>{
@@ -143,6 +143,7 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
           .where((name) => name.trim().isNotEmpty)
           .join(',');
       _awaitingTurnCompletion = true;
+      unawaited(LiveCashierCueService.playActionStarted());
     }
     try {
       for (final call in pendingCalls) {

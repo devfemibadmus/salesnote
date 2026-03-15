@@ -3,12 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/constants/runtime.dart';
 import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../../services/api_client.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
-import '../../services/live_cashier.dart';
+import '../../services/cashier/core.dart';
 import '../../services/notice.dart';
 import '../../services/token_store.dart';
 import '../../widgets/app_bottom_nav.dart';
@@ -27,8 +28,8 @@ class ItemsScreen extends StatefulWidget {
 class _ItemsScreenState extends State<ItemsScreen> {
   final ApiClient _api = ApiClient(TokenStore());
   final TextEditingController _searchController = TextEditingController();
-  static const int _perPage = 20;
-  static const int _filteredPerPage = 200;
+  static const int _perPage = PagingConstants.listPerPage;
+  static const int _filteredPerPage = PagingConstants.filteredListPerPage;
 
   bool _loading = true;
   bool _loadingMore = false;
@@ -152,7 +153,9 @@ class _ItemsScreenState extends State<ItemsScreen> {
     if (picked != null) {
       setState(() {
         _startDate = picked.start;
-        _endDate = picked.end.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+        _endDate = picked.end.add(
+          const Duration(hours: 23, minutes: 59, seconds: 59),
+        );
       });
       unawaited(_refreshItemsInBackground());
     }
@@ -232,7 +235,10 @@ class _ItemsScreenState extends State<ItemsScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_loadingMore || !_hasMore || _loading || _hasActiveFiltersForQuery(_query.trim())) {
+    if (_loadingMore ||
+        !_hasMore ||
+        _loading ||
+        _hasActiveFiltersForQuery(_query.trim())) {
       return;
     }
     final activeQuery = _query.trim();
@@ -318,15 +324,15 @@ class _ItemsScreenState extends State<ItemsScreen> {
         final raw = item.productName.trim();
         final name = raw.isEmpty ? 'Unnamed item' : raw;
 
-        // If we are searching, we should also filter at the item level 
+        // If we are searching, we should also filter at the item level
         // to show only matching items if the sale matched via items
         if (hasSearch && !name.toLowerCase().contains(normalized)) {
           // Check if sale matched via customer/id instead
           final customer = (sale.customerName ?? '').toLowerCase();
           final idText = sale.id.toLowerCase();
-          final matchesCustomerOrId = 
+          final matchesCustomerOrId =
               customer.contains(normalized) || idText.contains(normalized);
-          
+
           if (!matchesCustomerOrId) continue;
         }
 
@@ -363,7 +369,11 @@ class _ItemsScreenState extends State<ItemsScreen> {
   }
 
   bool get _shouldShowFullEmptyState =>
-      _isDataEmpty && _query.trim().isEmpty && _startDate == null && _endDate == null && _baseDataKnownEmpty;
+      _isDataEmpty &&
+      _query.trim().isEmpty &&
+      _startDate == null &&
+      _endDate == null &&
+      _baseDataKnownEmpty;
 
   bool get _showBackButton => Navigator.of(context).canPop();
 
@@ -399,14 +409,14 @@ class _ItemsScreenState extends State<ItemsScreen> {
         child: RefreshIndicator(onRefresh: _refreshItems, child: body),
       ),
       bottomNavigationBar: AppBottomNav(
-          activeTab: AppBottomTab.none,
-          onHome: () => _goTo(AppRoutes.home, reset: true),
-          onSales: () => _goTo(AppRoutes.sales, reset: true),
-          onAdd: () => _goTo(AppRoutes.newSale),
-          onAddLongPress: () => LiveCashierService.show(context),
-          onItems: () => _goTo(AppRoutes.invoices, reset: true),
-          onSettings: () => _goTo(AppRoutes.shop, reset: true),
-        ),
+        activeTab: AppBottomTab.none,
+        onHome: () => _goTo(AppRoutes.home, reset: true),
+        onSales: () => _goTo(AppRoutes.sales, reset: true),
+        onAdd: () => _goTo(AppRoutes.newSale),
+        onAddLongPress: () => LiveCashierService.show(context),
+        onItems: () => _goTo(AppRoutes.invoices, reset: true),
+        onSettings: () => _goTo(AppRoutes.shop, reset: true),
+      ),
     );
   }
 }

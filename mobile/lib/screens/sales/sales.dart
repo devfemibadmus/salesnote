@@ -3,12 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/constants/runtime.dart';
 import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../../services/api_client.dart';
 import '../../services/cache/loader.dart';
 import '../../services/currency.dart';
-import '../../services/live_cashier.dart';
+import '../../services/cashier/core.dart';
 import '../../services/notice.dart';
 import '../../services/preview.dart';
 import '../../services/token_store.dart';
@@ -30,8 +31,8 @@ class SalesScreen extends StatefulWidget {
 class _SalesScreenState extends State<SalesScreen> {
   final ApiClient _api = ApiClient(TokenStore());
   final TextEditingController _searchController = TextEditingController();
-  static const int _perPage = 20;
-  static const int _filteredPerPage = 200;
+  static const int _perPage = PagingConstants.listPerPage;
+  static const int _filteredPerPage = PagingConstants.filteredListPerPage;
   late final String _salesCurrencySymbol;
   late final String _salesLocale;
 
@@ -231,11 +232,13 @@ class _SalesScreenState extends State<SalesScreen> {
     if (picked != null) {
       setState(() {
         _startDate = picked.start;
-        _endDate = picked.end.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+        _endDate = picked.end.add(
+          const Duration(hours: 23, minutes: 59, seconds: 59),
+        );
       });
       unawaited(_refreshSalesInBackground());
     } else if (_startDate != null || _endDate != null) {
-      // Clear filter if they cancel and a filter was active? 
+      // Clear filter if they cancel and a filter was active?
       // Actually, usually cancel means "don't change anything".
       // Let's provide a way to clear if needed, or if picked is null we just keep current.
     }
@@ -315,7 +318,10 @@ class _SalesScreenState extends State<SalesScreen> {
   }
 
   Future<void> _loadMoreSales() async {
-    if (_loadingMore || !_hasMore || _loading || _hasActiveFiltersForQuery(_query.trim())) {
+    if (_loadingMore ||
+        !_hasMore ||
+        _loading ||
+        _hasActiveFiltersForQuery(_query.trim())) {
       return;
     }
     final activeQuery = _query.trim();
@@ -398,7 +404,11 @@ class _SalesScreenState extends State<SalesScreen> {
   bool get _isDataEmpty => !_loading && _sales.isEmpty;
 
   bool get _shouldShowFullEmptyState =>
-      _isDataEmpty && _query.trim().isEmpty && _startDate == null && _endDate == null && _baseDataKnownEmpty;
+      _isDataEmpty &&
+      _query.trim().isEmpty &&
+      _startDate == null &&
+      _endDate == null &&
+      _baseDataKnownEmpty;
 
   Future<void> _openSalePreviewById(String saleId) async {
     if (_openingPreview) return;
@@ -443,14 +453,14 @@ class _SalesScreenState extends State<SalesScreen> {
         child: RefreshIndicator(onRefresh: _refreshSales, child: body),
       ),
       bottomNavigationBar: AppBottomNav(
-          activeTab: AppBottomTab.sales,
-          onHome: () => _goTo(AppRoutes.home, reset: true),
-          onSales: () {},
-          onAdd: () => _goTo(AppRoutes.newSale),
-          onAddLongPress: () => LiveCashierService.show(context),
-          onItems: () => _goTo(AppRoutes.invoices, reset: true),
-          onSettings: () => _goTo(AppRoutes.shop, reset: true),
-        ),
+        activeTab: AppBottomTab.sales,
+        onHome: () => _goTo(AppRoutes.home, reset: true),
+        onSales: () {},
+        onAdd: () => _goTo(AppRoutes.newSale),
+        onAddLongPress: () => LiveCashierService.show(context),
+        onItems: () => _goTo(AppRoutes.invoices, reset: true),
+        onSettings: () => _goTo(AppRoutes.shop, reset: true),
+      ),
     );
   }
 }

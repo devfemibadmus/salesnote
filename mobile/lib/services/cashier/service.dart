@@ -1,4 +1,4 @@
-part of '../live_cashier.dart';
+part of 'core.dart';
 
 class LiveCashierService {
   LiveCashierService._();
@@ -24,13 +24,9 @@ class LiveCashierService {
         ).animate(fade);
         return FadeTransition(
           opacity: fade,
-          child: SlideTransition(
-            position: slide,
-            child: child,
-          ),
+          child: SlideTransition(position: slide, child: child),
         );
       },
     );
   }
 }
-

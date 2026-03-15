@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/constants/runtime.dart';
+import '../../app/constants/storage.dart';
 import '../../app/routes.dart';
 import '../../data/models.dart';
 import '../preview/preview.dart';
@@ -50,13 +52,15 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   final ApiClient _api = ApiClient(TokenStore());
   final PageController _stepController = PageController();
 
-  static const String _legacyDraftKey = 'draft_new_sale';
-  static const String _draftIndexKey = 'draft_new_sale_index';
-  static const String _defaultDraftId = 'draft_1';
-  static const String _defaultDraftLabel = 'New Sale';
-  static const String _defaultOtherLabel = 'Others';
-  static const double _maxAmount = 9_999_999_999.99;
-  static const int _salesRefreshPerPage = 20;
+  static const String _legacyDraftKey = DraftConstants.legacyNewSaleDraftKey;
+  static const String _draftIndexKey = DraftConstants.newSaleDraftIndexKey;
+  static const String _defaultDraftId = DraftConstants.newSaleDefaultDraftId;
+  static const String _defaultDraftLabel =
+      DraftConstants.newSaleDefaultDraftLabel;
+  static const String _defaultOtherLabel =
+      DraftConstants.newSaleDefaultOtherLabel;
+  static const double _maxAmount = LimitConstants.newSaleMaxAmount;
+  static const int _salesRefreshPerPage = PagingConstants.newSaleRefreshPerPage;
 
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _customerContactController =
@@ -150,7 +154,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   Future<void> _initializeScreen() async {
     await _loadDraftBootstrap();
     await _loadSignatures();
-    if (widget.routeArgs?.openPreviewOnLoad == true && !_didAutoOpenAgentPreview) {
+    if (widget.routeArgs?.openPreviewOnLoad == true &&
+        !_didAutoOpenAgentPreview) {
       _didAutoOpenAgentPreview = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -165,7 +170,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
   void _syncStepController({bool animate = false}) {
     if (!_stepController.hasClients) return;
-    if ((_stepController.page?.round() ?? _stepController.initialPage) == _step) {
+    if ((_stepController.page?.round() ?? _stepController.initialPage) ==
+        _step) {
       return;
     }
     if (animate) {
@@ -222,7 +228,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   bool get _creatingInvoice => _saleStatus == SaleStatus.invoice;
 
   String? _resolveBankAccountId(String? candidate) {
-    final bankAccounts = _previewShop()?.bankAccounts ?? const <ShopBankAccount>[];
+    final bankAccounts =
+        _previewShop()?.bankAccounts ?? const <ShopBankAccount>[];
     if (candidate != null &&
         bankAccounts.any((bankAccount) => bankAccount.id == candidate)) {
       return candidate;
@@ -232,10 +239,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
 
   String get _documentTitle => _creatingInvoice ? 'New Invoice' : 'New Sale';
 
-  String get _successMessage =>
-      _creatingInvoice
-          ? 'Invoice created successfully.'
-          : 'Sale created successfully.';
+  String get _successMessage => _creatingInvoice
+      ? 'Invoice created successfully.'
+      : 'Sale created successfully.';
 
   Future<void> _loadSignatures() async {
     final inFlight = _signaturesRequest;
@@ -280,7 +286,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     }
   }
 
-  String _draftStorageKey(String draftId) => 'draft_new_sale_$draftId';
+  String _draftStorageKey(String draftId) =>
+      '${DraftConstants.newSaleDraftStoragePrefix}$draftId';
 
   Future<void> _loadDraftBootstrap() async {
     void applyRouteDraftId() {
@@ -290,9 +297,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       }
       final existingIndex = _drafts.indexWhere((d) => d.id == routedDraftId);
       if (existingIndex < 0) {
-        _drafts.add(
-          const _DraftSlot(id: '', label: _defaultDraftLabel),
-        );
+        _drafts.add(const _DraftSlot(id: '', label: _defaultDraftLabel));
         _drafts[_drafts.length - 1] = _DraftSlot(
           id: routedDraftId,
           label: _defaultDraftLabel,
@@ -432,7 +437,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   }
 
   Future<void> _loadDraft(String draftId) async {
-    final agentDraft = _routeAgentDraftHydrated ? null : widget.routeArgs?.agentDraft;
+    final agentDraft = _routeAgentDraftHydrated
+        ? null
+        : widget.routeArgs?.agentDraft;
     if (agentDraft != null) {
       _draftLog(
         'loadDraft:agentDraft routeDraftId=${widget.routeArgs?.draftId ?? "-"} '
@@ -452,16 +459,18 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _deliveryFeeAmount = agentDraft.deliveryFeeAmount;
         _roundingAmount = agentDraft.roundingAmount;
         _otherAmount = agentDraft.otherAmount;
-        _otherLabel =
-            (agentDraft.otherLabel?.trim().isNotEmpty ?? false)
-                ? agentDraft.otherLabel!.trim()
-                : _defaultOtherLabel;
+        _otherLabel = (agentDraft.otherLabel?.trim().isNotEmpty ?? false)
+            ? agentDraft.otherLabel!.trim()
+            : _defaultOtherLabel;
         _selectedSignatureId = agentDraft.signatureId;
-        _selectedBankAccountId = _resolveBankAccountId(agentDraft.bankAccountId);
+        _selectedBankAccountId = _resolveBankAccountId(
+          agentDraft.bankAccountId,
+        );
         _saleStatus = widget.routeArgs?.startAsInvoice == true
             ? SaleStatus.invoice
             : SaleStatus.paid;
-        _step = agentDraft.items.isNotEmpty ||
+        _step =
+            agentDraft.items.isNotEmpty ||
                 (agentDraft.customerName?.trim().isNotEmpty ?? false) ||
                 (agentDraft.customerContact?.trim().isNotEmpty ?? false)
             ? 1
@@ -676,7 +685,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     await _saveDraft();
     final now = DateTime.now().millisecondsSinceEpoch;
     final id = 'draft_$now';
-    _draftLog('create from=${_activeDraftId.isEmpty ? "-" : _activeDraftId} to=$id');
+    _draftLog(
+      'create from=${_activeDraftId.isEmpty ? "-" : _activeDraftId} to=$id',
+    );
     if (!mounted) return;
     setState(() {
       _drafts.add(const _DraftSlot(id: '', label: _defaultDraftLabel));
@@ -716,7 +727,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   Future<void> _switchDraft(String draftId) async {
     if (_activeDraftId == draftId || _switchingDraft) return;
     _phoneDebounce?.cancel();
-    _draftLog('switch from=${_activeDraftId.isEmpty ? "-" : _activeDraftId} to=$draftId');
+    _draftLog(
+      'switch from=${_activeDraftId.isEmpty ? "-" : _activeDraftId} to=$draftId',
+    );
     await _saveDraft();
     if (!mounted) return;
     setState(() {
@@ -861,7 +874,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _isCustomerContactValid(_customerContactController.text) &&
         (_creatingInvoice
             ? ((_selectedBankAccountId?.isNotEmpty == true) &&
-                (_selectedSignatureId?.isNotEmpty == true))
+                  (_selectedSignatureId?.isNotEmpty == true))
             : (_selectedSignatureId?.isNotEmpty == true));
   }
 
@@ -884,7 +897,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       return;
     }
     final contactInput = _customerContactController.text.trim();
-    final isEmail = contactInput.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(contactInput);
+    final isEmail =
+        contactInput.contains('@') ||
+        RegExp(r'[a-zA-Z]').hasMatch(contactInput);
     if (!isEmail) {
       final region = _country?.countryCode ?? _accountRegionCode;
       final valid = await PhoneService.isValid(
@@ -900,11 +915,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     }
     if (!_isCustomerContactValid(contactInput)) {
       setState(() => _customerContactTouched = true);
-      _showSnackBar(
-        isEmail
-            ? 'Enter a valid email.'
-            : _invalidPhoneMessage(),
-      );
+      _showSnackBar(isEmail ? 'Enter a valid email.' : _invalidPhoneMessage());
       return;
     }
     if (_creatingInvoice &&
@@ -937,11 +948,11 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _showSnackBar('Customer name must be between 3 and 40 characters.');
       } else if (!_isCustomerContactValid(_customerContactController.text)) {
         final contactInput = _customerContactController.text.trim();
-        final isEmail = contactInput.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(contactInput);
+        final isEmail =
+            contactInput.contains('@') ||
+            RegExp(r'[a-zA-Z]').hasMatch(contactInput);
         _showSnackBar(
-          isEmail
-              ? 'Enter a valid email.'
-              : _invalidPhoneMessage(),
+          isEmail ? 'Enter a valid email.' : _invalidPhoneMessage(),
         );
       } else if (_creatingInvoice &&
           (_selectedBankAccountId == null || _selectedBankAccountId!.isEmpty)) {
@@ -967,11 +978,11 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       final contact = await _normalizedCustomerContactForSubmit();
       if (contact == null) {
         final contactInput = _customerContactController.text.trim();
-        final isEmail = contactInput.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(contactInput);
+        final isEmail =
+            contactInput.contains('@') ||
+            RegExp(r'[a-zA-Z]').hasMatch(contactInput);
         _showSnackBar(
-          isEmail
-              ? 'Enter a valid email.'
-              : _invalidPhoneMessage(),
+          isEmail ? 'Enter a valid email.' : _invalidPhoneMessage(),
         );
         setState(() {
           _customerContactTouched = true;
@@ -1076,7 +1087,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     await CacheLoader.saveItemSuggestionsCache(merged.toList());
   }
 
-  Future<void> _refreshPostCreateCachesAfterSaleCreate(SaleStatus status) async {
+  Future<void> _refreshPostCreateCachesAfterSaleCreate(
+    SaleStatus status,
+  ) async {
     final bgApi = ApiClient(TokenStore());
     try {
       final tasks = <Future<void>>[
@@ -1122,11 +1135,11 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _showSnackBar('Customer name must be between 3 and 40 characters.');
       } else if (!_isCustomerContactValid(_customerContactController.text)) {
         final contactInput = _customerContactController.text.trim();
-        final isEmail = contactInput.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(contactInput);
+        final isEmail =
+            contactInput.contains('@') ||
+            RegExp(r'[a-zA-Z]').hasMatch(contactInput);
         _showSnackBar(
-          isEmail
-              ? 'Enter a valid email.'
-              : _invalidPhoneMessage(),
+          isEmail ? 'Enter a valid email.' : _invalidPhoneMessage(),
         );
       } else if (_creatingInvoice &&
           (_selectedBankAccountId == null || _selectedBankAccountId!.isEmpty)) {
@@ -1211,12 +1224,12 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     final raw = _customerContactController.text.trim();
     if (raw.isEmpty) return null;
     final isEmail = raw.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(raw);
-    
+
     if (isEmail) {
       if (!Validators.isValidEmail(raw)) return null;
       return raw.toLowerCase();
     }
-    
+
     final region = _country?.countryCode ?? _accountRegionCode;
     return PhoneService.normalizeE164(
       raw,
@@ -1229,14 +1242,14 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     _saveDraftDebounced();
     final input = value.trim();
     final isEmail = input.contains('@') || RegExp(r'[a-zA-Z]').hasMatch(input);
-    
+
     if (isEmail || input.isEmpty) {
       if (_phoneError != null && mounted) {
         setState(() => _phoneError = null);
       }
       return;
     }
-    
+
     _phoneDebounce?.cancel();
     _phoneDebounce = Timer(const Duration(milliseconds: 300), () async {
       final region = _country?.countryCode ?? _accountRegionCode;
@@ -1350,14 +1363,19 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       if (!mounted) return;
       setState(() {
         _selectedBankAccountId = updatedShop.bankAccounts
-            .firstWhere((e) => e.id == created.id, orElse: () => updatedShop.bankAccounts.first)
+            .firstWhere(
+              (e) => e.id == created.id,
+              orElse: () => updatedShop.bankAccounts.first,
+            )
             .id;
       });
       await _saveDraft();
       _showSnackBar('Bank account added.');
     } catch (e) {
       if (!mounted) return;
-      _showSnackBar(e is ApiException ? e.message : 'Unable to add bank account.');
+      _showSnackBar(
+        e is ApiException ? e.message : 'Unable to add bank account.',
+      );
     }
   }
 
@@ -1866,7 +1884,8 @@ class _NewSaleScreenState extends State<NewSaleScreen>
           loadingSignatures: _loadingSignatures,
           uploadingSignature: _uploadingSignature,
           selectedSignatureId: _selectedSignatureId,
-          bankAccounts: _previewShop()?.bankAccounts ?? const <ShopBankAccount>[],
+          bankAccounts:
+              _previewShop()?.bankAccounts ?? const <ShopBankAccount>[],
           selectedBankAccountId: _selectedBankAccountId,
           onSelectSignature: (id) {
             setState(() => _selectedSignatureId = id);
@@ -1890,7 +1909,9 @@ class _NewSaleScreenState extends State<NewSaleScreen>
           },
         ),
         _NewSaleItemsStep(
-          previewLabel: _creatingInvoice ? 'Preview Invoice  →' : 'Preview Receipt  →',
+          previewLabel: _creatingInvoice
+              ? 'Preview Invoice  →'
+              : 'Preview Receipt  →',
           items: _items,
           drafts: _drafts,
           activeDraftId: _activeDraftId,

@@ -1,4 +1,4 @@
-part of '../../live_cashier.dart';
+part of '../core.dart';
 
 extension _LiveCashierOverlayTemplates on _LiveCashierOverlayState {
   static const Set<String> _receiptDraftActions = <String>{
