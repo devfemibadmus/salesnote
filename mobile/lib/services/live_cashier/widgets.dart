@@ -64,36 +64,49 @@ class _ReadyBody extends StatelessWidget {
       for (final entry in transcriptEntries)
         switch (entry.type) {
           _TranscriptEntryType.message => _ChatBubble(
+            key: ValueKey<String>(entry.signature),
             speaker: entry.message!.speaker,
             text: entry.message!.text,
           ),
           _TranscriptEntryType.card => _ResponseTemplateBubble(
+            key: ValueKey<String>(entry.signature),
             card: entry.card!,
           ),
         },
-      if (toolStatus != null && toolStatus!.trim().isNotEmpty)
-        _ActionBubble(text: toolStatus!, busy: toolBusy),
-      if ((currentModelTranscript ?? '').trim().isNotEmpty)
-        _ChatBubble(
-          speaker: _TranscriptSpeaker.assistant,
-          text: currentModelTranscript!,
-          pending: true,
-        ),
       if ((currentUserTranscript ?? '').trim().isNotEmpty)
         _ChatBubble(
+          key: ValueKey<String>(
+            'user_pending:${currentUserTranscript!.trim()}',
+          ),
           speaker: _TranscriptSpeaker.user,
           text: currentUserTranscript!,
+          pending: true,
+        ),
+      if (toolStatus != null && toolStatus!.trim().isNotEmpty)
+        _ActionBubble(
+          key: ValueKey<String>('action:${toolStatus!.trim()}:$toolBusy'),
+          text: toolStatus!,
+          busy: toolBusy,
+          controller: controller,
+        ),
+      if ((currentModelTranscript ?? '').trim().isNotEmpty)
+        _ChatBubble(
+          key: ValueKey<String>(
+            'assistant_pending:${currentModelTranscript!.trim()}',
+          ),
+          speaker: _TranscriptSpeaker.assistant,
+          text: currentModelTranscript!,
           pending: true,
         ),
     ];
     final contentSignature = <String>[
       for (final entry in transcriptEntries) entry.signature,
+      if ((currentUserTranscript ?? '').trim().isNotEmpty)
+        'user_pending:${currentUserTranscript!.trim()}',
       if (toolStatus != null && toolStatus!.trim().isNotEmpty)
         'action:${toolStatus!.trim()}:$toolBusy',
       if ((currentModelTranscript ?? '').trim().isNotEmpty)
         'assistant_pending:${currentModelTranscript!.trim()}',
-      if ((currentUserTranscript ?? '').trim().isNotEmpty)
-        'user_pending:${currentUserTranscript!.trim()}',
     ].join('\n');
 
     return Column(
@@ -103,10 +116,30 @@ class _ReadyBody extends StatelessWidget {
           controller: controller,
           active: responding || (recording && !muted),
         ),
-        if (status.trim().isNotEmpty) ...[
-          const SizedBox(height: 14),
-          _StatusChip(text: status.trim()),
-        ],
+        const SizedBox(height: 14),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 280),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, -0.18),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            );
+          },
+          child: status.trim().isEmpty
+              ? const SizedBox.shrink(key: ValueKey<String>('status-empty'))
+              : _StatusChip(
+                  key: ValueKey<String>(status.trim()),
+                  text: status.trim(),
+                ),
+        ),
         const SizedBox(height: 22),
         Expanded(
           child: _TranscriptPanel(
@@ -121,7 +154,7 @@ class _ReadyBody extends StatelessWidget {
 }
 
 class _StatusChip extends StatelessWidget {
-  const _StatusChip({required this.text});
+  const _StatusChip({super.key, required this.text});
 
   final String text;
 
@@ -254,7 +287,15 @@ class _TranscriptPanelState extends State<_TranscriptPanel> {
                 controller: _scrollController,
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 26),
-                itemBuilder: (context, index) => widget.bubbles[index],
+                itemBuilder: (context, index) {
+                  final bubble = widget.bubbles[index];
+                  return _BubbleReveal(
+                    key: ValueKey<String>(
+                      'reveal:${bubble.key ?? 'bubble-$index'}',
+                    ),
+                    child: bubble,
+                  );
+                },
                 separatorBuilder: (context, index) =>
                     const SizedBox(height: 12),
                 itemCount: widget.bubbles.length,
@@ -301,6 +342,60 @@ class _TranscriptPanelState extends State<_TranscriptPanel> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _BubbleReveal extends StatefulWidget {
+  const _BubbleReveal({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<_BubbleReveal> createState() => _BubbleRevealState();
+}
+
+class _BubbleRevealState extends State<_BubbleReveal>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+  late final Animation<double> _scale;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+    final curved = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+    );
+    _opacity = Tween<double>(begin: 0, end: 1).animate(curved);
+    _scale = Tween<double>(begin: 0.97, end: 1).animate(curved);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(curved);
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _opacity,
+      child: SlideTransition(
+        position: _slide,
+        child: ScaleTransition(scale: _scale, child: widget.child),
       ),
     );
   }
@@ -433,6 +528,7 @@ class _VoiceOrb extends StatelessWidget {
 
 class _ChatBubble extends StatelessWidget {
   const _ChatBubble({
+    super.key,
     required this.speaker,
     required this.text,
     this.pending = false,
@@ -496,16 +592,7 @@ class _ChatBubble extends StatelessWidget {
               ),
               if (pending) ...[
                 const SizedBox(height: 10),
-                Text(
-                  'typing...',
-                  style: TextStyle(
-                    color: isUser
-                        ? const Color(0xCCFFFFFF)
-                        : const Color(0xFF94A3B8),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                _PendingDots(light: isUser),
               ],
             ],
           ),
@@ -516,49 +603,165 @@ class _ChatBubble extends StatelessWidget {
 }
 
 class _ActionBubble extends StatelessWidget {
-  const _ActionBubble({required this.text, required this.busy});
+  const _ActionBubble({
+    super.key,
+    required this.text,
+    required this.busy,
+    required this.controller,
+  });
 
   final String text;
   final bool busy;
+  final AnimationController controller;
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.center,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 260),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xE6F8FAFC),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: const Color(0xFFD6E0EA)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              busy
-                  ? Icons.hourglass_top_rounded
-                  : Icons.check_circle_outline_rounded,
-              size: 16,
-              color: const Color(0xFF475569),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                text.trim(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF334155),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  height: 1.35,
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        final pulse = busy ? (controller.value * 0.05) : 0.0;
+        return Transform.scale(scale: 1 + pulse, child: child);
+      },
+      child: Align(
+        alignment: Alignment.center,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 280),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xE6F8FAFC),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: const Color(0xFFD6E0EA)),
+            boxShadow: busy
+                ? const [
+                    BoxShadow(
+                      color: Color(0x1438BDF8),
+                      blurRadius: 18,
+                      offset: Offset(0, 10),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                busy
+                    ? Icons.hourglass_top_rounded
+                    : Icons.check_circle_outline_rounded,
+                size: 16,
+                color: const Color(0xFF475569),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  text.trim(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Color(0xFF334155),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.35,
+                  ),
                 ),
               ),
-            ),
-          ],
+              if (busy) ...[
+                const SizedBox(width: 10),
+                _BusyDots(controller: controller),
+              ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _PendingDots extends StatefulWidget {
+  const _PendingDots({required this.light});
+
+  final bool light;
+
+  @override
+  State<_PendingDots> createState() => _PendingDotsState();
+}
+
+class _PendingDotsState extends State<_PendingDots>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final baseColor = widget.light
+        ? const Color(0xCCFFFFFF)
+        : const Color(0xFF94A3B8);
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List<Widget>.generate(3, (index) {
+            final phase = (_controller.value + (index * 0.18)) % 1.0;
+            final emphasis = 1 - ((phase - 0.5).abs() * 2);
+            final opacity = 0.28 + (emphasis.clamp(0, 1) * 0.72);
+            return Container(
+              width: 6,
+              height: 6,
+              margin: EdgeInsets.only(right: index == 2 ? 0 : 5),
+              decoration: BoxDecoration(
+                color: baseColor.withValues(alpha: opacity),
+                shape: BoxShape.circle,
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
+
+class _BusyDots extends StatelessWidget {
+  const _BusyDots({required this.controller});
+
+  final AnimationController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List<Widget>.generate(3, (index) {
+            final phase = (controller.value + (index * 0.22)) % 1.0;
+            final emphasis = 1 - ((phase - 0.5).abs() * 2);
+            final opacity = 0.25 + (emphasis.clamp(0, 1) * 0.75);
+            return Container(
+              width: 5,
+              height: 5,
+              margin: EdgeInsets.only(right: index == 2 ? 0 : 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF38BDF8).withValues(alpha: opacity),
+                shape: BoxShape.circle,
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

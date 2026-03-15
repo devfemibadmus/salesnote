@@ -63,9 +63,9 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
           ),
         ],
         rows: <_TemplateRow>[
-          for (final customer in matchedCustomers.take(3))
+          for (final customer in matchedCustomers)
             _TemplateRow(title: customer, subtitle: 'Matched customer'),
-          for (final point in points.take(4))
+          for (final point in points)
             _TemplateRow(
               title: _templateText(point['period']),
               subtitle: _templateText(point['projected_orders']).isEmpty
@@ -117,7 +117,6 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
           ),
         ],
         rows: matches
-            .take(4)
             .map((match) {
               return _TemplateRow(
                 title: _templateText(match['customer_name']).isEmpty
@@ -143,7 +142,6 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
             : _templateText(customer['customer_name']);
         final detailRows = itemBreakdown.isNotEmpty
             ? itemBreakdown
-                  .take(4)
                   .map((item) {
                     return _TemplateRow(
                       title: _templateText(item['product_name']).isEmpty
@@ -157,7 +155,6 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
                   })
                   .toList(growable: false)
             : matches
-                  .take(4)
                   .map((match) {
                     return _TemplateRow(
                       title:
@@ -228,7 +225,7 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
         title: customerQuery.isEmpty
             ? 'Customers'
             : 'Customers for $customerQuery',
-        subtitle: '${customers.length} results',
+        subtitle: _templateListSubtitle(customers.length),
         metrics: <_TemplateMetric>[
           if (_templateText(response['all_total_display']).isNotEmpty)
             _TemplateMetric(
@@ -241,7 +238,6 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
           ),
         ],
         rows: customers
-            .take(5)
             .map((customer) {
               final title = _templateText(customer['customer_name']).isEmpty
                   ? 'Customer'
@@ -273,7 +269,6 @@ extension _LiveCashierOverlayCustomerTemplates on _LiveCashierOverlayState {
         title: 'Customers with drafts',
         subtitle: '${drafts.length} saved drafts',
         rows: drafts
-            .take(5)
             .map((draft) {
               final customerName = _templateText(draft['customer_name']);
               return _TemplateRow(

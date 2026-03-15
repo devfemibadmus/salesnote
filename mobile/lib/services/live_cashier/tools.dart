@@ -163,7 +163,7 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
         if (mounted) {
           _safeSetState(() {
             _toolStatus = _toolResultLabel(name, response);
-            _appendTemplateCard(templateCard);
+            _queueTemplateCard(templateCard);
           });
         }
         responses.add({'id': id, 'name': name, 'response': response});

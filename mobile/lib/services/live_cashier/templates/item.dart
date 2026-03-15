@@ -53,7 +53,6 @@ extension _LiveCashierOverlayItemTemplates on _LiveCashierOverlayState {
           ),
         ],
         rows: _templateMapList(response['forecast_points'])
-            .take(4)
             .map((point) {
               return _TemplateRow(
                 title: _templateText(point['period']),
@@ -80,7 +79,6 @@ extension _LiveCashierOverlayItemTemplates on _LiveCashierOverlayState {
         eyebrow: 'Item',
         title: title,
         rows: items
-            .take(5)
             .map((item) {
               return _TemplateRow(
                 title: _templateText(item['product_name']),
@@ -97,7 +95,6 @@ extension _LiveCashierOverlayItemTemplates on _LiveCashierOverlayState {
     if (name == 'search_item_sales' ||
         (name == 'query_sales_metrics' && itemQuery.isNotEmpty)) {
       final rows = (breakdown.isNotEmpty ? breakdown : matches)
-          .take(5)
           .map((item) {
             final revenueDisplay = _templateMoney(
               item['revenue_display'],
@@ -192,7 +189,7 @@ extension _LiveCashierOverlayItemTemplates on _LiveCashierOverlayState {
         ]),
         eyebrow: 'Item',
         title: itemQuery.isEmpty ? 'Items' : 'Items for $itemQuery',
-        subtitle: '${items.length} results',
+        subtitle: _templateListSubtitle(items.length),
         metrics: <_TemplateMetric>[
           if (_templateText(response['all_total_display']).isNotEmpty)
             _TemplateMetric(
@@ -210,7 +207,6 @@ extension _LiveCashierOverlayItemTemplates on _LiveCashierOverlayState {
           ),
         ],
         rows: items
-            .take(5)
             .map((item) {
               return _TemplateRow(
                 title: _templateText(item['product_name']).isEmpty

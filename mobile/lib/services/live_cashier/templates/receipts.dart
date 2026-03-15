@@ -69,7 +69,6 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
           ),
         ],
         rows: points
-            .take(4)
             .map((point) {
               return _TemplateRow(
                 title: _templateText(point['period']),
@@ -117,7 +116,6 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
           ),
         ],
         rows: matches
-            .take(4)
             .map((match) {
               return _TemplateRow(
                 title: _templateText(match['customer_name']).isEmpty
@@ -231,9 +229,8 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
       ]),
       eyebrow: 'Receipt',
       title: title,
-      subtitle: '${entries.length} results',
+      subtitle: _templateListSubtitle(entries.length),
       rows: entries
-          .take(5)
           .map((entry) {
             final customerName = _templateText(entry['customer_name']);
             final label = customerName.isEmpty

@@ -89,6 +89,7 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     _pendingToolIntent = null;
     _pendingToolIntentLabel = null;
     _pendingNonReplayableToolIntent = false;
+    _pendingTemplateCards.clear();
   }
 
   void _prepareInterruptedTurnForReplay({String? replayText}) {
@@ -215,6 +216,9 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
       await _flushPcmBuffer();
       await _audioQueue;
       if (!mounted) return;
+      final shouldSuppressQueuedCards = _shouldSuppressQueuedTemplateCards(
+        _currentModelTranscript,
+      );
       _safeSetState(() {
         _appendTranscriptMessage(
           _TranscriptSpeaker.user,
@@ -224,6 +228,11 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
           _TranscriptSpeaker.assistant,
           _currentModelTranscript,
         );
+        if (!shouldSuppressQueuedCards) {
+          for (final card in _pendingTemplateCards) {
+            _appendTemplateCard(card);
+          }
+        }
         _currentUserTranscript = null;
         _currentModelTranscript = null;
         _openingGreetingPendingUnmute = false;
@@ -238,6 +247,35 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     } finally {
       _turnFinalizing = false;
     }
+  }
+
+  bool _shouldSuppressQueuedTemplateCards(String? transcript) {
+    final normalized = (transcript ?? '').trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return false;
+    }
+    const suppressionPhrases = <String>[
+      "i didn't understand",
+      "i did not understand",
+      "i couldn't understand",
+      "i could not understand",
+      "i didn't catch",
+      "i did not catch",
+      "can you repeat",
+      "could you repeat",
+      "please repeat",
+      "say that again",
+      "come again",
+      "not sure i understood",
+      "i'm not sure i understood",
+      "i am not sure i understood",
+      "unclear",
+      "didn't hear you",
+      "did not hear you",
+      "couldn't hear you",
+      "could not hear you",
+    ];
+    return suppressionPhrases.any(normalized.contains);
   }
 
   Future<void> _bootstrap() async {

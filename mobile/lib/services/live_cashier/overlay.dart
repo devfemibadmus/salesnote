@@ -41,6 +41,7 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   String _status = 'Bootstrapping live session...';
   String? _toolStatus;
   final List<_TranscriptEntry> _transcriptEntries = <_TranscriptEntry>[];
+  final List<_TemplateCardData> _pendingTemplateCards = <_TemplateCardData>[];
   String? _currentUserTranscript;
   String? _currentModelTranscript;
   bool _draftIsInvoice = false;
@@ -137,6 +138,18 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
       return;
     }
     _transcriptEntries.add(_TranscriptEntry.card(card));
+  }
+
+  void _queueTemplateCard(_TemplateCardData? card) {
+    if (card == null) {
+      return;
+    }
+    if (_pendingTemplateCards.any(
+      (entry) => entry.signature == card.signature,
+    )) {
+      return;
+    }
+    _pendingTemplateCards.add(card);
   }
 
   @override

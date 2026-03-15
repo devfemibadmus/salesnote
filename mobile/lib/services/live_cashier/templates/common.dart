@@ -93,12 +93,19 @@ extension _LiveCashierOverlayTemplateCommon on _LiveCashierOverlayState {
     return buffer.toString();
   }
 
+  String _templateListSubtitle(int total) {
+    if (total <= 0) {
+      return '0 results';
+    }
+    return '$total ${total == 1 ? 'result' : 'results'}';
+  }
+
   List<_TemplateRow> _templateSaleItemRows(
     List<Map<String, dynamic>> items, {
-    int limit = 4,
+    int? limit,
   }) {
-    return items
-        .take(limit)
+    final source = limit == null ? items : items.take(limit);
+    return source
         .map((item) {
           return _TemplateRow(
             title: _templateText(item['product_name']).isEmpty
