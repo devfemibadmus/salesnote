@@ -100,12 +100,8 @@ extension _LiveCashierOverlayTemplateCommon on _LiveCashierOverlayState {
     return '$total ${total == 1 ? 'result' : 'results'}';
   }
 
-  List<_TemplateRow> _templateSaleItemRows(
-    List<Map<String, dynamic>> items, {
-    int? limit,
-  }) {
-    final source = limit == null ? items : items.take(limit);
-    return source
+  List<_TemplateRow> _templateSaleItemRows(List<Map<String, dynamic>> items) {
+    return items
         .map((item) {
           return _TemplateRow(
             title: _templateText(item['product_name']).isEmpty

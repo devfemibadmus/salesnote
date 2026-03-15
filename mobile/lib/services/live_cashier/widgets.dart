@@ -75,9 +75,7 @@ class _ReadyBody extends StatelessWidget {
         },
       if ((currentUserTranscript ?? '').trim().isNotEmpty)
         _ChatBubble(
-          key: ValueKey<String>(
-            'user_pending:${currentUserTranscript!.trim()}',
-          ),
+          key: const ValueKey<String>('user_pending'),
           speaker: _TranscriptSpeaker.user,
           text: currentUserTranscript!,
           pending: true,
@@ -91,15 +89,20 @@ class _ReadyBody extends StatelessWidget {
         ),
       if ((currentModelTranscript ?? '').trim().isNotEmpty)
         _ChatBubble(
-          key: ValueKey<String>(
-            'assistant_pending:${currentModelTranscript!.trim()}',
-          ),
+          key: const ValueKey<String>('assistant_pending'),
           speaker: _TranscriptSpeaker.assistant,
           text: currentModelTranscript!,
           pending: true,
         ),
     ];
-    final contentSignature = <String>[
+    final structureSignature = <String>[
+      for (final entry in transcriptEntries) entry.signature,
+      if ((currentUserTranscript ?? '').trim().isNotEmpty) 'user_pending',
+      if (toolStatus != null && toolStatus!.trim().isNotEmpty)
+        'action:${toolStatus!.trim()}:$toolBusy',
+      if ((currentModelTranscript ?? '').trim().isNotEmpty) 'assistant_pending',
+    ].join('\n');
+    final scrollSignature = <String>[
       for (final entry in transcriptEntries) entry.signature,
       if ((currentUserTranscript ?? '').trim().isNotEmpty)
         'user_pending:${currentUserTranscript!.trim()}',
@@ -144,7 +147,8 @@ class _ReadyBody extends StatelessWidget {
         Expanded(
           child: _TranscriptPanel(
             bubbles: bubbles,
-            contentSignature: contentSignature,
+            structureSignature: structureSignature,
+            scrollSignature: scrollSignature,
             emptyStateText: status,
           ),
         ),
@@ -191,12 +195,14 @@ class _StatusChip extends StatelessWidget {
 class _TranscriptPanel extends StatefulWidget {
   const _TranscriptPanel({
     required this.bubbles,
-    required this.contentSignature,
+    required this.structureSignature,
+    required this.scrollSignature,
     required this.emptyStateText,
   });
 
   final List<Widget> bubbles;
-  final String contentSignature;
+  final String structureSignature;
+  final String scrollSignature;
   final String emptyStateText;
 
   @override
@@ -215,8 +221,15 @@ class _TranscriptPanelState extends State<_TranscriptPanel> {
   @override
   void didUpdateWidget(covariant _TranscriptPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.contentSignature != widget.contentSignature) {
+    final structureChanged =
+        oldWidget.structureSignature != widget.structureSignature;
+    final scrollChanged = oldWidget.scrollSignature != widget.scrollSignature;
+    if (structureChanged) {
       _scheduleAutoScroll();
+      return;
+    }
+    if (scrollChanged) {
+      _scheduleAutoScroll(jump: true);
     }
   }
 
