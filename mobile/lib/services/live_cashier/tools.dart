@@ -462,6 +462,10 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
       };
     }
 
+    if (!_readOnlyToolNames.contains(name)) {
+      _clearSalesWindowCache();
+    }
+
     if (draftFlowAction) {
       _draftLog('tool:$name:beforePersist ${_draftDebugSummary()}');
       await _persistCurrentDraftToLocalCache();

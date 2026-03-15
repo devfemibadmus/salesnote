@@ -409,12 +409,15 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
           if (text != null && text.trim().isNotEmpty && mounted) {
             final replayText = _mergeTranscript(_pendingReplayUserText, text);
             _markTurnPending(replayText: replayText);
-            _safeSetState(() {
-              _currentUserTranscript = _mergeTranscript(
-                _currentUserTranscript,
-                text,
-              );
-            });
+            final mergedTranscript = _mergeTranscript(
+              _currentUserTranscript,
+              text,
+            );
+            if (mergedTranscript != (_currentUserTranscript ?? '').trim()) {
+              _safeSetState(() {
+                _currentUserTranscript = mergedTranscript;
+              });
+            }
           }
         }
 
@@ -426,14 +429,19 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
           final spoken = text?.trim();
           if (spoken != null && spoken.isNotEmpty && mounted) {
             unawaited(_muteMicForPlayback());
-            _safeSetState(() {
-              _currentModelTranscript = _mergeTranscript(
-                _currentModelTranscript,
-                spoken,
-              );
-              _modelResponding = true;
-              _status = _currentStatus();
-            });
+            final mergedTranscript = _mergeTranscript(
+              _currentModelTranscript,
+              spoken,
+            );
+            final transcriptChanged =
+                mergedTranscript != (_currentModelTranscript ?? '').trim();
+            if (transcriptChanged || !_modelResponding) {
+              _safeSetState(() {
+                _currentModelTranscript = mergedTranscript;
+                _modelResponding = true;
+                _status = _currentStatus();
+              });
+            }
           }
         }
 
@@ -452,7 +460,7 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
                       base64Data.isNotEmpty) {
                     unawaited(_muteMicForPlayback());
                     _enqueuePcmChunk(base64Data, mimeType);
-                    if (mounted) {
+                    if (mounted && !_modelResponding) {
                       _safeSetState(() {
                         _modelResponding = true;
                         _status = _currentStatus();
@@ -964,6 +972,7 @@ extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
     _log(reason);
     _socket = null;
     _setupReady = false;
+    _clearSalesWindowCache();
     _recordingSub?.cancel();
     _recordingSub = null;
     unawaited(_stopPlayerStream());

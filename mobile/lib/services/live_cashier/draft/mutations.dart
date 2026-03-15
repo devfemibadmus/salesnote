@@ -1,6 +1,58 @@
 part of '../../live_cashier.dart';
 
 extension _LiveCashierOverlayDraftMutations on _LiveCashierOverlayState {
+  double _inferredUnitPriceFloor({double? currentUnitPrice}) {
+    final observedUnitPrices =
+        _draftItems
+            .map((item) => item.unitPrice)
+            .whereType<double>()
+            .where((price) => price > 0)
+            .toList(growable: false)
+          ..sort();
+    final medianObservedPrice = observedUnitPrices.isEmpty
+        ? null
+        : observedUnitPrices[observedUnitPrices.length ~/ 2];
+    final currencyFloor = CurrencyService.heuristicUnitPriceFloorForCode(
+      _toolCurrencyCode(),
+    );
+
+    var inferredFloor = currencyFloor;
+    if (medianObservedPrice != null && medianObservedPrice > 0) {
+      inferredFloor = math.max(inferredFloor, medianObservedPrice * 0.25);
+    }
+    if (currentUnitPrice != null && currentUnitPrice > 0) {
+      inferredFloor = math.max(inferredFloor, currentUnitPrice * 0.35);
+    }
+    return inferredFloor;
+  }
+
+  bool _looksLikeUnitPriceUpdate(
+    double value, {
+    required double inferredPriceFloor,
+    double? currentUnitPrice,
+  }) {
+    if (value <= 0) {
+      return false;
+    }
+    if (value >= inferredPriceFloor) {
+      return true;
+    }
+
+    final hasFraction = value != value.roundToDouble();
+    if (hasFraction && value >= math.max(1, inferredPriceFloor * 0.5)) {
+      return true;
+    }
+
+    if (currentUnitPrice != null && currentUnitPrice > 0) {
+      final currentPriceFloor = math.max(1, currentUnitPrice * 0.35);
+      if (value >= currentPriceFloor) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   void _applyAddItem(String? name, String? quantityRaw, String? unitPriceRaw) {
     final productName = (name ?? '').trim();
     if (productName.isEmpty) return;
@@ -37,6 +89,9 @@ extension _LiveCashierOverlayDraftMutations on _LiveCashierOverlayState {
     final explicitUnitPrice = double.tryParse((unitPriceRaw ?? '').trim());
     final fallbackValue = double.tryParse((rawValue ?? '').trim());
     final normalizedField = (field ?? '').trim().toLowerCase();
+    final inferredPriceFloor = _inferredUnitPriceFloor(
+      currentUnitPrice: current.unitPrice,
+    );
 
     double quantity = current.quantity;
     double? unitPrice = current.unitPrice;
@@ -48,12 +103,19 @@ extension _LiveCashierOverlayDraftMutations on _LiveCashierOverlayState {
       unitPrice = explicitUnitPrice;
     }
 
-    if (explicitQuantity == null && explicitUnitPrice == null && fallbackValue != null) {
+    if (explicitQuantity == null &&
+        explicitUnitPrice == null &&
+        fallbackValue != null) {
       if (normalizedField == 'quantity') {
         quantity = fallbackValue > 0 ? fallbackValue : quantity;
-      } else if (normalizedField == 'unit_price' || normalizedField == 'price') {
+      } else if (normalizedField == 'unit_price' ||
+          normalizedField == 'price') {
         unitPrice = fallbackValue;
-      } else if (fallbackValue >= 100) {
+      } else if (_looksLikeUnitPriceUpdate(
+        fallbackValue,
+        inferredPriceFloor: inferredPriceFloor,
+        currentUnitPrice: current.unitPrice,
+      )) {
         unitPrice = fallbackValue;
       } else {
         quantity = fallbackValue > 0 ? fallbackValue : quantity;

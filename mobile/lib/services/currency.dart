@@ -44,8 +44,8 @@ class CurrencyService {
     final normalizedCode = code?.trim().toUpperCase();
     final locale =
         (normalizedCode == null ? null : _currencyToLocale[normalizedCode]) ??
-            fallbackLocale ??
-            _currentLocale();
+        fallbackLocale ??
+        _currentLocale();
     try {
       if (normalizedCode != null && normalizedCode.isNotEmpty) {
         return NumberFormat.currency(
@@ -88,6 +88,41 @@ class CurrencyService {
     return ' ';
   }
 
+  static double heuristicUnitPriceFloorForCode(String? code) {
+    final normalizedCode = code?.trim().toUpperCase();
+    switch (normalizedCode) {
+      case 'IDR':
+      case 'LAK':
+      case 'MMK':
+      case 'VND':
+        return 1000;
+      case 'BIF':
+      case 'CDF':
+      case 'CLP':
+      case 'DJF':
+      case 'GNF':
+      case 'GHS':
+      case 'ISK':
+      case 'JPY':
+      case 'KES':
+      case 'KMF':
+      case 'KRW':
+      case 'MGA':
+      case 'MWK':
+      case 'NGN':
+      case 'PYG':
+      case 'RWF':
+      case 'SLL':
+      case 'TZS':
+      case 'UGX':
+      case 'XAF':
+      case 'XOF':
+        return 100;
+      default:
+        return 10;
+    }
+  }
+
   static String? currencyCodeForRegion(String? regionCode) {
     final normalized = regionCode?.trim().toUpperCase();
     if (normalized == null || normalized.isEmpty) {
@@ -128,7 +163,8 @@ class CurrencyService {
 
   static String _currentLocale() {
     final code = _resolveCurrencyCode();
-    return (code == null ? null : _currencyToLocale[code]) ?? Intl.getCurrentLocale();
+    return (code == null ? null : _currencyToLocale[code]) ??
+        Intl.getCurrentLocale();
   }
 
   static ShopProfile? _loadShop() {
@@ -142,8 +178,10 @@ class CurrencyService {
   static String _currencySymbol(String code) {
     final locale = _currencyToLocale[code] ?? Intl.getCurrentLocale();
     try {
-      final symbol =
-          NumberFormat.simpleCurrency(locale: locale, name: code).currencySymbol;
+      final symbol = NumberFormat.simpleCurrency(
+        locale: locale,
+        name: code,
+      ).currencySymbol;
       if (symbol.isNotEmpty && symbol != code) {
         return symbol;
       }

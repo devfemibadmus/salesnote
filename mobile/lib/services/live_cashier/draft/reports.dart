@@ -1,5 +1,15 @@
 part of '../../live_cashier.dart';
 
+const Duration _salesWindowCacheTtl = Duration(seconds: 12);
+const int _salesWindowCacheMaxEntries = 12;
+
+class _SalesWindowCacheEntry {
+  const _SalesWindowCacheEntry({required this.createdAt, required this.sales});
+
+  final DateTime createdAt;
+  final List<Sale> sales;
+}
+
 extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
   DateTime _toolDayStart(DateTime value) {
     final local = value.toLocal();
@@ -369,6 +379,22 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     int perPage = 100,
     int maxPages = 15,
   }) async {
+    final normalizedSearchQuery = (searchQuery ?? '').trim().toLowerCase();
+    final cacheKey = [
+      status?.name ?? 'all',
+      normalizedSearchQuery,
+      startDate?.toIso8601String() ?? '',
+      endDate?.toIso8601String() ?? '',
+      perPage,
+      maxPages,
+    ].join('|');
+    final now = DateTime.now();
+    final cached = _salesWindowCache[cacheKey];
+    if (cached != null &&
+        now.difference(cached.createdAt) <= _salesWindowCacheTtl) {
+      return cached.sales;
+    }
+
     final results = <Sale>[];
     for (var page = 1; page <= maxPages; page++) {
       final batch = await _api.listSales(
@@ -385,7 +411,41 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
         break;
       }
     }
-    return results;
+    _salesWindowCache[cacheKey] = _SalesWindowCacheEntry(
+      createdAt: now,
+      sales: List<Sale>.unmodifiable(results),
+    );
+    _pruneSalesWindowCache(now);
+    return _salesWindowCache[cacheKey]!.sales;
+  }
+
+  void _pruneSalesWindowCache([DateTime? referenceTime]) {
+    final now = referenceTime ?? DateTime.now();
+    final expiredKeys = _salesWindowCache.entries
+        .where(
+          (entry) =>
+              now.difference(entry.value.createdAt) > _salesWindowCacheTtl,
+        )
+        .map((entry) => entry.key)
+        .toList(growable: false);
+    for (final key in expiredKeys) {
+      _salesWindowCache.remove(key);
+    }
+    if (_salesWindowCache.length <= _salesWindowCacheMaxEntries) {
+      return;
+    }
+    final sortedEntries = _salesWindowCache.entries.toList(growable: false)
+      ..sort(
+        (left, right) => left.value.createdAt.compareTo(right.value.createdAt),
+      );
+    final overflow = _salesWindowCache.length - _salesWindowCacheMaxEntries;
+    for (var index = 0; index < overflow; index++) {
+      _salesWindowCache.remove(sortedEntries[index].key);
+    }
+  }
+
+  void _clearSalesWindowCache() {
+    _salesWindowCache.clear();
   }
 
   Future<Map<String, dynamic>> _salesMetricsTool(
@@ -474,15 +534,6 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
 
     final currencyCode = _toolCurrencyCode();
     final currencySymbol = _toolCurrencySymbol(currencyCode);
-    final customers = _customerSummaries(
-      filteredSales,
-      currencyCode: currencyCode,
-    );
-    final items = _itemSummaries(
-      filteredSales,
-      currencyCode: currencyCode,
-      itemQuery: itemQuery,
-    );
     return {
       'status_filter': statusRaw.isEmpty ? 'all' : statusRaw,
       'start_date': startDate?.toIso8601String().split('T').first,
@@ -510,8 +561,6 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
         allTotal,
         currencyCode: currencyCode,
       ),
-      'customers': customers.take(limit).toList(growable: false),
-      'items': items.take(limit).toList(growable: false),
       'matches': filteredSales
           .take(limit)
           .map(_saleSummary)
