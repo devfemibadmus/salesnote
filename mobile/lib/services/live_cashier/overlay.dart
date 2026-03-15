@@ -3,10 +3,7 @@ part of '../live_cashier.dart';
 enum _TranscriptSpeaker { user, assistant }
 
 class _TranscriptMessage {
-  const _TranscriptMessage({
-    required this.speaker,
-    required this.text,
-  });
+  const _TranscriptMessage({required this.speaker, required this.text});
 
   final _TranscriptSpeaker speaker;
   final String text;
@@ -43,7 +40,7 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   int _audioChunkLogCount = 0;
   String _status = 'Bootstrapping live session...';
   String? _toolStatus;
-  final List<_TranscriptMessage> _transcriptMessages = <_TranscriptMessage>[];
+  final List<_TranscriptEntry> _transcriptEntries = <_TranscriptEntry>[];
   String? _currentUserTranscript;
   String? _currentModelTranscript;
   bool _draftIsInvoice = false;
@@ -99,18 +96,35 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
     if (normalized.isEmpty) {
       return;
     }
-    final previous = _transcriptMessages.isEmpty ? null : _transcriptMessages.last;
+    final previous = _transcriptEntries.isEmpty
+        ? null
+        : _transcriptEntries.last;
     if (previous != null &&
-        previous.speaker == speaker &&
-        previous.text.trim() == normalized) {
+        previous.type == _TranscriptEntryType.message &&
+        previous.message!.speaker == speaker &&
+        previous.message!.text.trim() == normalized) {
       return;
     }
-    _transcriptMessages.add(
-      _TranscriptMessage(
-        speaker: speaker,
-        text: normalized,
+    _transcriptEntries.add(
+      _TranscriptEntry.message(
+        _TranscriptMessage(speaker: speaker, text: normalized),
       ),
     );
+  }
+
+  void _appendTemplateCard(_TemplateCardData? card) {
+    if (card == null) {
+      return;
+    }
+    final previous = _transcriptEntries.isEmpty
+        ? null
+        : _transcriptEntries.last;
+    if (previous != null &&
+        previous.type == _TranscriptEntryType.card &&
+        previous.card!.signature == card.signature) {
+      return;
+    }
+    _transcriptEntries.add(_TranscriptEntry.card(card));
   }
 
   @override
@@ -184,9 +198,10 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
                             capturingPhoto: _capturingPhoto,
                             toolBusy: _toolBusy,
                             toolStatus: _toolStatus,
-                            transcriptMessages: List<_TranscriptMessage>.unmodifiable(
-                              _transcriptMessages,
-                            ),
+                            transcriptEntries:
+                                List<_TranscriptEntry>.unmodifiable(
+                                  _transcriptEntries,
+                                ),
                             currentUserTranscript: _currentUserTranscript,
                             currentModelTranscript: _currentModelTranscript,
                             onTakePhoto: _captureAndSendPhoto,

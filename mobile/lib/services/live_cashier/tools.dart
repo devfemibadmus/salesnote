@@ -99,9 +99,11 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
           });
         }
         final response = await _handleFunctionCall(name, args);
+        final templateCard = _buildResponseTemplateCard(name, response);
         if (mounted) {
           _safeSetState(() {
             _toolStatus = _toolResultLabel(name, response);
+            _appendTemplateCard(templateCard);
           });
         }
         responses.add({'id': id, 'name': name, 'response': response});

@@ -39,7 +39,7 @@ class _ReadyBody extends StatelessWidget {
     required this.capturingPhoto,
     required this.toolBusy,
     required this.toolStatus,
-    required this.transcriptMessages,
+    required this.transcriptEntries,
     required this.currentUserTranscript,
     required this.currentModelTranscript,
     required this.onTakePhoto,
@@ -53,7 +53,7 @@ class _ReadyBody extends StatelessWidget {
   final bool capturingPhoto;
   final bool toolBusy;
   final String? toolStatus;
-  final List<_TranscriptMessage> transcriptMessages;
+  final List<_TranscriptEntry> transcriptEntries;
   final String? currentUserTranscript;
   final String? currentModelTranscript;
   final Future<void> Function() onTakePhoto;
@@ -61,16 +61,18 @@ class _ReadyBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bubbles = <Widget>[
-      for (final message in transcriptMessages)
-        _ChatBubble(
-          speaker: message.speaker,
-          text: message.text,
-        ),
+      for (final entry in transcriptEntries)
+        switch (entry.type) {
+          _TranscriptEntryType.message => _ChatBubble(
+            speaker: entry.message!.speaker,
+            text: entry.message!.text,
+          ),
+          _TranscriptEntryType.card => _ResponseTemplateBubble(
+            card: entry.card!,
+          ),
+        },
       if (toolStatus != null && toolStatus!.trim().isNotEmpty)
-        _ActionBubble(
-          text: toolStatus!,
-          busy: toolBusy,
-        ),
+        _ActionBubble(text: toolStatus!, busy: toolBusy),
       if ((currentModelTranscript ?? '').trim().isNotEmpty)
         _ChatBubble(
           speaker: _TranscriptSpeaker.assistant,
@@ -85,8 +87,7 @@ class _ReadyBody extends StatelessWidget {
         ),
     ];
     final contentSignature = <String>[
-      for (final message in transcriptMessages)
-        '${message.speaker.index}:${message.text.trim()}',
+      for (final entry in transcriptEntries) entry.signature,
       if (toolStatus != null && toolStatus!.trim().isNotEmpty)
         'action:${toolStatus!.trim()}:$toolBusy',
       if ((currentModelTranscript ?? '').trim().isNotEmpty)
@@ -215,7 +216,8 @@ class _TranscriptPanelState extends State<_TranscriptPanel> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 26),
                 itemBuilder: (context, index) => widget.bubbles[index],
-                separatorBuilder: (context, index) => const SizedBox(height: 12),
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 12),
                 itemCount: widget.bubbles.length,
               ),
             Positioned(
@@ -333,56 +335,56 @@ class _VoiceOrb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-        animation: controller,
-        builder: (context, child) {
-          final scale = 1 + (controller.value * (active ? 0.12 : 0.08));
-          return Transform.scale(
-            scale: scale,
-            child: Container(
+      animation: controller,
+      builder: (context, child) {
+        final scale = 1 + (controller.value * (active ? 0.12 : 0.08));
+        return Transform.scale(
+          scale: scale,
+          child: Container(
             width: 170,
             height: 170,
             decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: active
-                      ? const [
-                          Color(0xFFFFFFFF),
-                          Color(0xFFFFD4D4),
-                          Color(0xFFF87171),
-                        ]
-                      : const [
-                          Color(0xFFFFFFFF),
-                          Color(0xFFBFD5FF),
-                          Color(0xFF6EA8FF),
-                        ],
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: active
+                    ? const [
+                        Color(0xFFFFFFFF),
+                        Color(0xFFFFD4D4),
+                        Color(0xFFF87171),
+                      ]
+                    : const [
+                        Color(0xFFFFFFFF),
+                        Color(0xFFBFD5FF),
+                        Color(0xFF6EA8FF),
+                      ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: active
+                      ? const Color(0x33EF4444)
+                      : const Color(0x33007AFF),
+                  blurRadius: 34 + (controller.value * (active ? 16 : 10)),
+                  spreadRadius: 6,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: active
-                        ? const Color(0x33EF4444)
-                        : const Color(0x33007AFF),
-                    blurRadius: 34 + (controller.value * (active ? 16 : 10)),
-                    spreadRadius: 6,
-                  ),
-                ],
+              ],
             ),
             child: Center(
               child: Container(
                 width: 108,
                 height: 108,
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0xDDFFFFFF),
-                  ),
-                  child: Icon(
-                    active ? Icons.mic_rounded : Icons.graphic_eq_rounded,
-                    size: 48,
-                    color: active
-                        ? const Color(0xFFDC2626)
-                        : const Color(0xFF2563EB),
-                  ),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0xDDFFFFFF),
+                ),
+                child: Icon(
+                  active ? Icons.mic_rounded : Icons.graphic_eq_rounded,
+                  size: 48,
+                  color: active
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFF2563EB),
                 ),
               ),
+            ),
           ),
         );
       },
@@ -419,9 +421,7 @@ class _ChatBubble extends StatelessWidget {
               bottomRight: Radius.circular(isUser ? 10 : 24),
             ),
             border: Border.all(
-              color: isUser
-                  ? const Color(0x332563EB)
-                  : const Color(0x66FFFFFF),
+              color: isUser ? const Color(0x332563EB) : const Color(0x66FFFFFF),
             ),
             boxShadow: const [
               BoxShadow(
@@ -477,10 +477,7 @@ class _ChatBubble extends StatelessWidget {
 }
 
 class _ActionBubble extends StatelessWidget {
-  const _ActionBubble({
-    required this.text,
-    required this.busy,
-  });
+  const _ActionBubble({required this.text, required this.busy});
 
   final String text;
   final bool busy;
@@ -501,7 +498,9 @@ class _ActionBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              busy ? Icons.hourglass_top_rounded : Icons.check_circle_outline_rounded,
+              busy
+                  ? Icons.hourglass_top_rounded
+                  : Icons.check_circle_outline_rounded,
               size: 16,
               color: const Color(0xFF475569),
             ),
@@ -540,13 +539,9 @@ class _CloseButton extends StatelessWidget {
         onTap: onTap,
         child: const Padding(
           padding: EdgeInsets.all(12),
-          child: Icon(
-            Icons.close_rounded,
-            color: Color(0xFF0F172A),
-          ),
+          child: Icon(Icons.close_rounded, color: Color(0xFF0F172A)),
         ),
       ),
     );
   }
 }
-

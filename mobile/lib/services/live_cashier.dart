@@ -32,5 +32,7 @@ part 'live_cashier/draft/storage.dart';
 part 'live_cashier/draft/requirements.dart';
 part 'live_cashier/draft/reports.dart';
 part 'live_cashier/draft/routes.dart';
+part 'live_cashier/templates/models.dart';
+part 'live_cashier/templates/builder.dart';
+part 'live_cashier/templates/widgets.dart';
 part 'live_cashier/widgets.dart';
-
