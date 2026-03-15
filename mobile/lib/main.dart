@@ -16,8 +16,8 @@ import 'screens/home/home.dart';
 import 'screens/splash.dart';
 import 'screens/onboarding/onboarding.dart';
 import 'services/cache/local.dart';
-import 'services/flag.dart';
 import 'services/notification.dart';
+import 'services/startup/startup.dart';
 import 'services/token_store.dart';
 
 Future<void> main() async {
@@ -26,12 +26,14 @@ Future<void> main() async {
     salesnoteFirebaseMessagingBackgroundHandler,
   );
 
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    systemNavigationBarColor: Colors.white,
-    systemNavigationBarIconBrightness: Brightness.dark,
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      systemNavigationBarColor: Colors.white,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
 
   runApp(const SalesNoteApp());
 }
@@ -102,7 +104,7 @@ class _AuthGateState extends State<AuthGate> {
       name: 'SalesnoteBootstrap',
     );
 
-    unawaited(FlagService.warmAllFlags());
+    StartupWarmupService.warmAll();
 
     developer.log('bootstrap:onboarding:read', name: 'SalesnoteBootstrap');
     final onboardingComplete = await LocalCache.isOnboardingComplete();
@@ -166,4 +168,3 @@ class _AuthGateBootstrap {
   final bool onboardingComplete;
   final bool hasSession;
 }
-

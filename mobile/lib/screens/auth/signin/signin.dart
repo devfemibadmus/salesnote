@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../services/api_client.dart';
 import '../../../services/cache/local.dart';
 import '../../../services/device_info.dart';
-import '../../../services/flag.dart';
+import '../../../services/startup/flag.dart';
 import '../../../services/media.dart';
 import '../../../services/notice.dart';
 import '../../../services/phone.dart';
@@ -48,7 +48,8 @@ class _SigninState extends State<Signin> {
     _countries = CountryService().getAll();
     _deviceRegionCode = RegionService.getDeviceRegionCode();
     final initCountry =
-        CountryParser.tryParseCountryCode(_deviceRegionCode) ?? _countries.first;
+        CountryParser.tryParseCountryCode(_deviceRegionCode) ??
+        _countries.first;
     _selectedCountry = ValueNotifier(initCountry);
     final initialIndex = _countries.indexWhere(
       (c) => c.countryCode == initCountry.countryCode,
@@ -226,7 +227,11 @@ class _SigninState extends State<Signin> {
 
         return Padding(
           padding: EdgeInsets.fromLTRB(
-              0, compact ? 8 : 12, 0, compact ? 14 : 20),
+            0,
+            compact ? 8 : 12,
+            0,
+            compact ? 14 : 20,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -280,87 +285,98 @@ class _SigninState extends State<Signin> {
                           _countries[_wrapCountryIndex(index)];
                     },
                     itemBuilder: (context, index) {
-                    final item = _countries[_wrapCountryIndex(index)];
-                    final flagProvider = MediaService.imageProvider(
-                      FlagService.iconUrl(item.countryCode),
-                      withCacheBust: false,
-                    );
-                    return AnimatedBuilder(
-                      animation: _countrySelectorController,
-                      builder: (context, _) {
-                        double page = index.toDouble();
-                        if (_countrySelectorController.position.haveDimensions) {
-                          page = _countrySelectorController.page ?? page;
-                        } else {
-                          page = _countrySelectorController.initialPage.toDouble();
-                        }
-                        final distance = (page - index).abs().clamp(0.0, 1.2);
-                        final scale =
-                            (1.12 - (distance * 0.28)).clamp(0.74, 1.12);
-                        final opacity = (1.0 - (distance * 0.45)).clamp(0.28, 1.0);
-                        final slideX = (page - index) * 10;
-                        return Transform.translate(
-                          offset: Offset(slideX, 0),
-                          child: Transform.scale(
-                            scale: scale,
-                            child: Opacity(
-                              opacity: opacity,
-                              child: ClipRect(
-                                child: Center(
-                                  child: SizedBox.expand(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        SizedBox(
-                                          width: flagWidth,
-                                          height: flagHeight,
-                                          child: flagProvider == null
-                                              ? const SizedBox.shrink()
-                                              : Image(
-                                                  image: flagProvider,
-                                                  fit: BoxFit.contain,
-                                                  filterQuality:
-                                                      FilterQuality.medium,
-                                                ),
-                                        ),
-                                        SizedBox(height: veryCompact ? 12 : 18),
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
+                      final item = _countries[_wrapCountryIndex(index)];
+                      final flagProvider = MediaService.imageProvider(
+                        FlagService.iconUrl(item.countryCode),
+                        withCacheBust: false,
+                      );
+                      return AnimatedBuilder(
+                        animation: _countrySelectorController,
+                        builder: (context, _) {
+                          double page = index.toDouble();
+                          if (_countrySelectorController
+                              .position
+                              .haveDimensions) {
+                            page = _countrySelectorController.page ?? page;
+                          } else {
+                            page = _countrySelectorController.initialPage
+                                .toDouble();
+                          }
+                          final distance = (page - index).abs().clamp(0.0, 1.2);
+                          final scale = (1.12 - (distance * 0.28)).clamp(
+                            0.74,
+                            1.12,
+                          );
+                          final opacity = (1.0 - (distance * 0.45)).clamp(
+                            0.28,
+                            1.0,
+                          );
+                          final slideX = (page - index) * 10;
+                          return Transform.translate(
+                            offset: Offset(slideX, 0),
+                            child: Transform.scale(
+                              scale: scale,
+                              child: Opacity(
+                                opacity: opacity,
+                                child: ClipRect(
+                                  child: Center(
+                                    child: SizedBox.expand(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: flagWidth,
+                                            height: flagHeight,
+                                            child: flagProvider == null
+                                                ? const SizedBox.shrink()
+                                                : Image(
+                                                    image: flagProvider,
+                                                    fit: BoxFit.contain,
+                                                    filterQuality:
+                                                        FilterQuality.medium,
+                                                  ),
                                           ),
-                                          child: Text(
-                                            item.name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              color: _textDark,
-                                              fontSize: countryNameSize,
-                                              fontWeight: FontWeight.w800,
+                                          SizedBox(
+                                            height: veryCompact ? 12 : 18,
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                            ),
+                                            child: Text(
+                                              item.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                color: _textDark,
+                                                fontSize: countryNameSize,
+                                                fontWeight: FontWeight.w800,
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          '+${item.phoneCode}',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            color: _textMuted,
-                                            fontSize: countryCodeSize,
-                                            fontWeight: FontWeight.w700,
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            '+${item.phoneCode}',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: _textMuted,
+                                              fontSize: countryCodeSize,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        );
-                      },
-                    );
-                  },
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
               ),
@@ -378,8 +394,10 @@ class _SigninState extends State<Signin> {
                     onPressed: _loading ? null : () => _goToPage(1),
                     child: const Text(
                       'Continue',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -458,9 +476,7 @@ class _SigninState extends State<Signin> {
                       onPressed: () =>
                           setState(() => _showPassword = !_showPassword),
                       icon: Icon(
-                        _showPassword
-                            ? Icons.visibility_off
-                            : Icons.visibility,
+                        _showPassword ? Icons.visibility_off : Icons.visibility,
                       ),
                     )
                   : null,
@@ -556,10 +572,7 @@ class _SigninState extends State<Signin> {
             absorbing: _loading,
             child: PageView(
               controller: _pageController,
-              children: [
-                _buildCountryPage(),
-                _buildCredentialsPage(),
-              ],
+              children: [_buildCountryPage(), _buildCredentialsPage()],
             ),
           ),
         ),

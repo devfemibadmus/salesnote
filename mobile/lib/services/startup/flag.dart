@@ -3,18 +3,22 @@ import 'dart:developer' as developer;
 import 'package:country_picker/country_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'media.dart';
+import '../../app/constants/runtime.dart';
+import '../../app/constants/storage.dart';
+import '../../app/config.dart';
+import '../media.dart';
 
 class FlagService {
   FlagService._();
 
-  static const _cacheVersionKey = 'flag_cache_version';
-  static const _cacheVersion = 1;
-  static const _iconSize = '72x54';
+  static const _cacheVersionKey = StorageKeys.flagCacheVersion;
+  static const _cacheVersion = StorageVersions.flagCache;
 
-  static String iconUrl(String countryCode, {String size = _iconSize}) {
-    final code = countryCode.trim().toLowerCase();
-    return 'https://flagpedia.net/data/flags/icon/$size/$code.png';
+  static String iconUrl(
+    String countryCode, {
+    String size = AppConfig.defaultFlagIconSize,
+  }) {
+    return AppConfig.flagIconUrl(countryCode, size: size);
   }
 
   static Future<void> warmAllFlags() async {
@@ -26,13 +30,12 @@ class FlagService {
     }
 
     final countries = CountryService().getAll();
-    final urls = countries.map((country) => iconUrl(country.countryCode)).toList();
-    developer.log(
-      'warming ${urls.length} flags',
-      name: 'SalesnoteBootstrap',
-    );
+    final urls = countries
+        .map((country) => iconUrl(country.countryCode))
+        .toList();
+    developer.log('warming ${urls.length} flags', name: 'SalesnoteBootstrap');
     final warmedCount = await MediaService.warmImages(urls).timeout(
-      const Duration(seconds: 20),
+      TimingConstants.startupFlagWarmTimeout,
       onTimeout: () {
         developer.log(
           'flag warm timed out',
