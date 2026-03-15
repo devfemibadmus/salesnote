@@ -566,6 +566,36 @@ fn tool_properties_for_action(action_name: &str) -> Value {
                 json!({"type": "STRING", "description": "Maximum matching sales to return."}),
             );
         }
+        "forecast_sales" => {
+            properties.insert(
+                "start_date".to_string(),
+                json!({"type": "STRING", "description": "Optional historical range start date in YYYY-MM-DD."}),
+            );
+            properties.insert(
+                "end_date".to_string(),
+                json!({"type": "STRING", "description": "Optional historical range end date in YYYY-MM-DD."}),
+            );
+            properties.insert(
+                "lookback_days".to_string(),
+                json!({"type": "STRING", "description": "Historical days to learn from when dates are not given."}),
+            );
+            properties.insert(
+                "horizon_days".to_string(),
+                json!({"type": "STRING", "description": "Future days to forecast."}),
+            );
+            properties.insert(
+                "status".to_string(),
+                json!({"type": "STRING", "description": "Optional filter: all, receipt, paid, or invoice."}),
+            );
+            properties.insert(
+                "customer_query".to_string(),
+                json!({"type": "STRING", "description": "Optional customer name, phone, or email to forecast only that customer's future sales."}),
+            );
+            properties.insert(
+                "item_query".to_string(),
+                json!({"type": "STRING", "description": "Optional product name or fragment to forecast only that item's future sales."}),
+            );
+        }
         "list_saved_drafts" => {
             properties.insert(
                 "kind".to_string(),
@@ -606,11 +636,47 @@ fn unsupported_live_model_message(model: &str) -> Option<&'static str> {
     }
 }
 
+fn spoken_currency_name(currency_code: &str) -> String {
+    let normalized_currency_code = currency_code.trim().to_uppercase();
+    let full_name = Currency::from_code(&normalized_currency_code)
+        .map(|currency| currency.name().to_string())
+        .unwrap_or_else(|| normalized_currency_code.clone());
+    shorten_currency_name(&full_name)
+}
+
+fn shorten_currency_name(full_name: &str) -> String {
+    let normalized = full_name.trim();
+    if normalized.is_empty() {
+        return String::new();
+    }
+
+    let tokens: Vec<&str> = normalized.split_whitespace().collect();
+    if tokens.len() <= 1 {
+        return normalized.to_lowercase();
+    }
+
+    let last = tokens[tokens.len() - 1];
+    if last.chars().all(|ch| ch.is_ascii_uppercase()) && tokens.len() >= 2 {
+        return tokens[tokens.len() - 2].to_lowercase();
+    }
+
+    if last.eq_ignore_ascii_case("sterling") && tokens.len() >= 2 {
+        return format!(
+            "{} {}",
+            tokens[tokens.len() - 2].to_lowercase(),
+            last.to_lowercase()
+        );
+    }
+
+    last.to_lowercase()
+}
+
 fn live_agent_system_instruction(currency_code: &str) -> String {
     let normalized_currency_code = currency_code.trim().to_uppercase();
     let currency_name = Currency::from_code(&normalized_currency_code)
         .map(|currency| currency.name().to_string())
         .unwrap_or_else(|| normalized_currency_code.clone());
+    let spoken_currency_name = spoken_currency_name(&normalized_currency_code);
     [
         "You are SalesNote live cashier.",
         "Speak only the final customer-facing words.",
@@ -619,18 +685,27 @@ fn live_agent_system_instruction(currency_code: &str) -> String {
         "Acknowledge greetings and thanks warmly.",
         &format!(
             "The shop currency is {} ({})",
-            currency_name, normalized_currency_code
+            spoken_currency_name, normalized_currency_code
         ),
         "Never say raw ISO currency codes aloud.",
         &format!(
             "Always pronounce the shop currency naturally as {}.",
-            currency_name
+            spoken_currency_name
+        ),
+        &format!(
+            "Never include a country adjective before the currency name. Say {} only, not {}.",
+            spoken_currency_name, currency_name
         ),
         "When *_display money fields exist, use them.",
         "If a currency symbol is present, pronounce the currency naturally from that symbol.",
         "Never invent products, prices, customers, totals, IDs, dates, signatures, bank accounts, or hidden app state.",
         "Use only client context and tool results.",
-        "For dashboard, sales history, item movement, saved drafts, and report questions, call the relevant tool first and answer only from tool results.",
+        "For dashboard, sales history, item movement, saved drafts, shop forecast, customer forecast, item forecast, and report questions, call the relevant tool first and answer only from tool results.",
+        "Use forecast_sales when the user asks for a forecast, projection, estimate, expected sales, likely future revenue, customer forecast, or item forecast.",
+        "Customer forecasts are supported. When the user names a customer, pass that value as customer_query and answer from the returned customer forecast fields.",
+        "Item forecasts are supported. When the user names an item, pass that value as item_query and answer from the returned item forecast fields.",
+        "Never claim forecasting is limited to overall sales when customer_query or item_query can answer the request.",
+        "Present forecasts as estimates, never guarantees or exact facts.",
         "Use start_receipt_draft or start_invoice_draft to begin or continue the current draft.",
         "When the user identifies the customer, call set_customer early before item edits or submit steps so the app can reuse the right saved draft.",
         "Keep updating the same draft until the user explicitly asks for a new one or a different draft type.",
@@ -809,6 +884,11 @@ fn live_agent_contract() -> LiveAgentContract {
             LiveAgentAction {
                 name: "query_sales_metrics",
                 description: "Fetch sales or invoice metrics for a date or range.",
+                required_fields: vec![],
+            },
+            LiveAgentAction {
+                name: "forecast_sales",
+                description: "Estimate future revenue and orders for the whole shop, one customer, or one item from historical sales trends.",
                 required_fields: vec![],
             },
             LiveAgentAction {

@@ -1,6 +1,115 @@
 part of '../../live_cashier.dart';
 
 extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
+  DateTime _toolDayStart(DateTime value) {
+    final local = value.toLocal();
+    return DateTime(local.year, local.month, local.day);
+  }
+
+  String _toolDayKey(DateTime value) {
+    final day = _toolDayStart(value);
+    final month = day.month.toString().padLeft(2, '0');
+    final date = day.day.toString().padLeft(2, '0');
+    return '${day.year}-$month-$date';
+  }
+
+  DateTime? _toolSaleDay(Sale sale) {
+    final parsed = DateTime.tryParse(sale.createdAt);
+    if (parsed == null) {
+      return null;
+    }
+    return _toolDayStart(parsed);
+  }
+
+  double _toolAverage(List<double> values) {
+    if (values.isEmpty) {
+      return 0;
+    }
+    return values.reduce((sum, value) => sum + value) / values.length;
+  }
+
+  double _toolSlope(List<double> values) {
+    final count = values.length;
+    if (count < 2) {
+      return 0;
+    }
+    final meanX = (count - 1) / 2;
+    final meanY = _toolAverage(values);
+    var numerator = 0.0;
+    var denominator = 0.0;
+    for (var index = 0; index < count; index++) {
+      final x = index.toDouble() - meanX;
+      final y = values[index] - meanY;
+      numerator += x * y;
+      denominator += x * x;
+    }
+    if (denominator == 0) {
+      return 0;
+    }
+    return numerator / denominator;
+  }
+
+  String _normalizedForecastCustomerText(String? value) {
+    final normalized = (value ?? '').trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return '';
+    }
+    if (normalized.contains('@')) {
+      return normalized;
+    }
+    final digits = normalized.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length >= 10) {
+      return digits.substring(digits.length - 10);
+    }
+    return digits.isNotEmpty ? digits : normalized;
+  }
+
+  bool _saleMatchesCustomerQuery(Sale sale, String customerQuery) {
+    final query = customerQuery.trim().toLowerCase();
+    if (query.isEmpty) {
+      return true;
+    }
+    final normalizedQuery = _normalizedForecastCustomerText(customerQuery);
+    final customerName = (sale.customerName ?? '').trim().toLowerCase();
+    final customerContact = _normalizedForecastCustomerText(sale.customerContact);
+
+    final nameMatches = customerName.isNotEmpty && customerName.contains(query);
+    final contactMatches = normalizedQuery.isNotEmpty &&
+        customerContact.isNotEmpty &&
+        (customerContact.contains(normalizedQuery) ||
+            customerContact.endsWith(normalizedQuery) ||
+            normalizedQuery.endsWith(customerContact));
+    return nameMatches || contactMatches;
+  }
+
+  String _toolTrendDirection(double slope, double baselineAverage) {
+    final threshold = baselineAverage == 0 ? 1 : baselineAverage.abs() * 0.03;
+    if (slope > threshold) {
+      return 'up';
+    }
+    if (slope < -threshold) {
+      return 'down';
+    }
+    return 'flat';
+  }
+
+  String _toolForecastConfidence({
+    required int lookbackDays,
+    required int nonZeroDays,
+    required int totalSalesCount,
+  }) {
+    if (totalSalesCount <= 0 || nonZeroDays < 4 || lookbackDays < 7) {
+      return 'low';
+    }
+    if (lookbackDays >= 60 && nonZeroDays >= 30) {
+      return 'high';
+    }
+    if (lookbackDays >= 30 && nonZeroDays >= 14) {
+      return 'medium';
+    }
+    return 'low';
+  }
+
   Map<String, dynamic> _saleSummary(Sale sale) {
     final currencyCode = _toolCurrencyCode();
     final currencySymbol = _toolCurrencySymbol(currencyCode);
@@ -204,6 +313,220 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
             },
           )
           .toList(growable: false),
+    };
+  }
+
+  Future<Map<String, dynamic>> _forecastSalesTool(Map<String, dynamic> args) async {
+    final now = _toolDayStart(DateTime.now());
+    final horizonDays = _toolLimit(
+      args['horizon_days'] ?? args['days'],
+      fallback: 7,
+      max: 31,
+    );
+    final lookbackDays = _toolLimit(args['lookback_days'], fallback: 30, max: 180);
+    final explicitStartDate = _toolDate(args['start_date']?.toString());
+    final explicitEndDate = _toolDate(args['end_date']?.toString());
+    var startDate = explicitStartDate == null
+        ? now.subtract(Duration(days: lookbackDays - 1))
+        : _toolDayStart(explicitStartDate);
+    var endDate = explicitEndDate == null ? now : _toolDayStart(explicitEndDate);
+    if (startDate.isAfter(endDate)) {
+      final swap = startDate;
+      startDate = endDate;
+      endDate = swap;
+    }
+
+    final customerQuery = (args['customer_query']?.toString() ??
+            args['query']?.toString() ??
+            '')
+        .trim();
+    final itemQuery = (args['item_query']?.toString() ?? '').trim();
+    final statusRaw = (args['status']?.toString() ?? '').trim().toLowerCase();
+    final status = switch (statusRaw) {
+      'receipt' || 'paid' => SaleStatus.paid,
+      'invoice' => SaleStatus.invoice,
+      _ => null,
+    };
+    final searchQuery = (customerQuery.isNotEmpty ? customerQuery : itemQuery).trim();
+    final sales = await _listSalesWindow(
+      status: status,
+      searchQuery: searchQuery.isEmpty ? null : searchQuery,
+      startDate: startDate,
+      endDate: endDate,
+    );
+    final loweredItemQuery = itemQuery.toLowerCase();
+    final customerFilteredSales = customerQuery.isEmpty
+        ? sales
+        : sales
+            .where((sale) => _saleMatchesCustomerQuery(sale, customerQuery))
+            .toList(growable: false);
+    final filteredSales = itemQuery.isEmpty
+        ? customerFilteredSales
+        : customerFilteredSales.where((sale) {
+            return sale.items.any(
+              (item) => item.productName.toLowerCase().contains(loweredItemQuery),
+            );
+          }).toList(growable: false);
+    final forecastScope = customerQuery.isNotEmpty
+        ? 'customer'
+        : itemQuery.isNotEmpty
+            ? 'item'
+            : 'shop';
+    final scopeLabel = customerQuery.isNotEmpty
+        ? 'customer "$customerQuery"'
+        : itemQuery.isNotEmpty
+            ? 'item "$itemQuery"'
+            : 'overall shop sales';
+    final matchedCustomerNames = filteredSales
+        .map((sale) => (sale.customerName ?? '').trim())
+        .where((name) => name.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    final totalDays = endDate.difference(startDate).inDays + 1;
+    final dayRange = List<DateTime>.generate(
+      totalDays,
+      (index) => startDate.add(Duration(days: index)),
+      growable: false,
+    );
+    final dailyRevenue = <String, double>{};
+    final dailyOrders = <String, int>{};
+
+    for (final sale in filteredSales) {
+      final saleDay = _toolSaleDay(sale);
+      if (saleDay == null) {
+        continue;
+      }
+      final key = _toolDayKey(saleDay);
+      dailyRevenue[key] = (dailyRevenue[key] ?? 0) + sale.total;
+      dailyOrders[key] = (dailyOrders[key] ?? 0) + 1;
+    }
+
+    final revenueSeries = dayRange
+        .map((day) => dailyRevenue[_toolDayKey(day)] ?? 0)
+        .toList(growable: false);
+    final orderSeries = dayRange
+        .map((day) => (dailyOrders[_toolDayKey(day)] ?? 0).toDouble())
+        .toList(growable: false);
+    final baselineRevenueAverage = _toolAverage(revenueSeries);
+    final recentRevenueSeries = revenueSeries.length <= 7
+        ? revenueSeries
+        : revenueSeries.sublist(revenueSeries.length - 7);
+    final recentOrderSeries = orderSeries.length <= 7
+        ? orderSeries
+        : orderSeries.sublist(orderSeries.length - 7);
+    final recentRevenueAverage = _toolAverage(recentRevenueSeries);
+    final recentOrderAverage = _toolAverage(recentOrderSeries);
+    final revenueSlope = _toolSlope(revenueSeries);
+    final orderSlope = _toolSlope(orderSeries);
+    final trendDirection = _toolTrendDirection(revenueSlope, baselineRevenueAverage);
+    final nonZeroDays = revenueSeries.where((value) => value > 0).length;
+    final confidence = _toolForecastConfidence(
+      lookbackDays: totalDays,
+      nonZeroDays: nonZeroDays,
+      totalSalesCount: filteredSales.length,
+    );
+    final forecastPoints = <Map<String, dynamic>>[];
+    var forecastRevenueTotal = 0.0;
+    var forecastOrdersTotal = 0.0;
+
+    for (var dayIndex = 1; dayIndex <= horizonDays; dayIndex++) {
+      final forecastDate = endDate.add(Duration(days: dayIndex));
+      final projectedRevenue =
+          (recentRevenueAverage + (revenueSlope * dayIndex)).clamp(0, double.infinity);
+      final projectedOrders =
+          (recentOrderAverage + (orderSlope * dayIndex)).clamp(0, double.infinity);
+      forecastRevenueTotal += projectedRevenue;
+      forecastOrdersTotal += projectedOrders;
+      forecastPoints.add({
+        'period': _toolDayKey(forecastDate),
+        'projected_total': projectedRevenue,
+        'projected_total_display': _formatToolMoney(
+          projectedRevenue,
+          currencyCode: _toolCurrencyCode(),
+        ),
+        'projected_orders': projectedOrders.round(),
+      });
+    }
+
+    final currencyCode = _toolCurrencyCode();
+    final currencySymbol = _toolCurrencySymbol(currencyCode);
+    if (filteredSales.isEmpty) {
+      final missingMessage = customerQuery.isNotEmpty
+          ? 'Not enough sales data to forecast this customer yet.'
+          : itemQuery.isNotEmpty
+              ? 'Not enough sales data to forecast this item yet.'
+              : 'Not enough sales data to forecast yet.';
+      return {
+        'result': 'insufficient_data',
+        'message': missingMessage,
+        'forecast_scope': forecastScope,
+        'scope_label': scopeLabel,
+        'status_filter': statusRaw.isEmpty ? 'all' : statusRaw,
+        'start_date': _toolDayKey(startDate),
+        'end_date': _toolDayKey(endDate),
+        'forecast_horizon_days': horizonDays,
+        'customer_query': customerQuery.isEmpty ? null : customerQuery,
+        'item_query': itemQuery.isEmpty ? null : itemQuery,
+        'currency_code': currencyCode,
+        'currency_symbol': currencySymbol,
+      };
+    }
+
+    return {
+      'result': 'ok',
+      'forecast_scope': forecastScope,
+      'scope_label': scopeLabel,
+      'status_filter': statusRaw.isEmpty ? 'all' : statusRaw,
+      'start_date': _toolDayKey(startDate),
+      'end_date': _toolDayKey(endDate),
+      'lookback_days': totalDays,
+      'forecast_horizon_days': horizonDays,
+      'customer_query': customerQuery.isEmpty ? null : customerQuery,
+      'item_query': itemQuery.isEmpty ? null : itemQuery,
+      'matched_customer_count': matchedCustomerNames.length,
+      'matched_customers': matchedCustomerNames.take(10).toList(growable: false),
+      'currency_code': currencyCode,
+      'currency_symbol': currencySymbol,
+      'historical_sales_count': filteredSales.length,
+      'historical_daily_average': baselineRevenueAverage,
+      'historical_daily_average_display': _formatToolMoney(
+        baselineRevenueAverage,
+        currencyCode: currencyCode,
+      ),
+      'recent_daily_average': recentRevenueAverage,
+      'recent_daily_average_display': _formatToolMoney(
+        recentRevenueAverage,
+        currencyCode: currencyCode,
+      ),
+      'forecast_total': forecastRevenueTotal,
+      'forecast_total_display': _formatToolMoney(
+        forecastRevenueTotal,
+        currencyCode: currencyCode,
+      ),
+      'forecast_average_per_day': horizonDays <= 0 ? 0 : forecastRevenueTotal / horizonDays,
+      'forecast_average_per_day_display': _formatToolMoney(
+        horizonDays <= 0 ? 0 : forecastRevenueTotal / horizonDays,
+        currencyCode: currencyCode,
+      ),
+      'forecast_orders_total': forecastOrdersTotal.round(),
+      'trend_direction': trendDirection,
+      'confidence': confidence,
+      'forecast_basis':
+          'Estimated for $scopeLabel from $totalDays days of historical sales using recent daily average and trend.',
+      'historical_daily_points': dayRange
+          .map((day) {
+            final key = _toolDayKey(day);
+            final total = dailyRevenue[key] ?? 0;
+            return {
+              'period': key,
+              'total': total,
+              'total_display': _formatToolMoney(total, currencyCode: currencyCode),
+              'orders': dailyOrders[key] ?? 0,
+            };
+          })
+          .toList(growable: false),
+      'forecast_points': forecastPoints,
     };
   }
 

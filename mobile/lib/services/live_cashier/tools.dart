@@ -47,6 +47,8 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
         return 'Checking dashboard data';
       case 'query_sales_metrics':
         return 'Checking sales metrics';
+      case 'forecast_sales':
+        return 'Forecasting sales';
       case 'search_item_sales':
         return 'Checking item sales';
       case 'get_fast_moving_items':
@@ -338,6 +340,9 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
           break;
         case 'query_sales_metrics':
           extra.addAll(await _salesMetricsTool(args));
+          break;
+        case 'forecast_sales':
+          extra.addAll(await _forecastSalesTool(args));
           break;
         case 'search_item_sales':
           extra.addAll(await _itemSalesTool(args));
