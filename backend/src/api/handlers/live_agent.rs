@@ -2,6 +2,7 @@ use actix_web::web::ReqData;
 use actix_web::{http::StatusCode, web, Error as ActixError, HttpRequest, HttpResponse, Responder};
 use actix_ws::Message;
 use futures_util::{SinkExt, StreamExt};
+use iso_currency::Currency;
 use serde::Serialize;
 use serde_json::{json, Map, Value};
 use std::sync::OnceLock;
@@ -607,21 +608,33 @@ fn unsupported_live_model_message(model: &str) -> Option<&'static str> {
 
 fn live_agent_system_instruction(currency_code: &str) -> String {
     let normalized_currency_code = currency_code.trim().to_uppercase();
+    let currency_name = Currency::from_code(&normalized_currency_code)
+        .map(|currency| currency.name().to_string())
+        .unwrap_or_else(|| normalized_currency_code.clone());
     [
         "You are SalesNote live cashier.",
         "Speak only the final customer-facing words.",
         "No reasoning, process talk, markdown, labels, bullets, or meta phrases.",
         "Keep replies short, natural, and conversational.",
         "Acknowledge greetings and thanks warmly.",
-        &format!("The shop currency code is {}.", normalized_currency_code),
+        &format!(
+            "The shop currency is {} ({})",
+            currency_name, normalized_currency_code
+        ),
         "Never say raw ISO currency codes aloud.",
+        &format!(
+            "Always pronounce the shop currency naturally as {}.",
+            currency_name
+        ),
         "When *_display money fields exist, use them.",
         "If a currency symbol is present, pronounce the currency naturally from that symbol.",
         "Never invent products, prices, customers, totals, IDs, dates, signatures, bank accounts, or hidden app state.",
         "Use only client context and tool results.",
         "For dashboard, sales history, item movement, saved drafts, and report questions, call the relevant tool first and answer only from tool results.",
         "Use start_receipt_draft or start_invoice_draft to begin or continue the current draft.",
+        "When the user identifies the customer, call set_customer early before item edits or submit steps so the app can reuse the right saved draft.",
         "Keep updating the same draft until the user explicitly asks for a new one or a different draft type.",
+        "Never create another draft for the same customer unless the user explicitly asks for a separate or fresh draft.",
         "Use start_new_draft only for an explicitly requested fresh draft.",
         "Use discard_current_draft only on explicit cancel, discard, or delete intent.",
         "After each draft tool call, inspect missing_fields.",
@@ -710,17 +723,17 @@ fn live_agent_contract() -> LiveAgentContract {
             },
             LiveAgentAction {
                 name: "start_receipt_draft",
-                description: "Start or continue the current receipt draft.",
+                description: "Start or continue the current receipt draft. Reuse the same customer draft whenever possible.",
                 required_fields: vec![],
             },
             LiveAgentAction {
                 name: "start_invoice_draft",
-                description: "Start or continue the current invoice draft.",
+                description: "Start or continue the current invoice draft. Reuse the same customer draft whenever possible.",
                 required_fields: vec![],
             },
             LiveAgentAction {
                 name: "start_new_draft",
-                description: "Start a fresh receipt or invoice draft.",
+                description: "Start a fresh receipt or invoice draft only when the user explicitly asks for another separate draft.",
                 required_fields: vec!["kind"],
             },
             LiveAgentAction {
@@ -730,7 +743,7 @@ fn live_agent_contract() -> LiveAgentContract {
             },
             LiveAgentAction {
                 name: "set_customer",
-                description: "Set customer details on the draft.",
+                description: "Set customer details on the draft as early as possible so matching saved drafts can be reused instead of duplicated.",
                 required_fields: vec!["customer_name_or_phone"],
             },
             LiveAgentAction {

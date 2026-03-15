@@ -166,13 +166,40 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
       return false;
     }
 
+    final match = _findMatchingSavedDraft(
+      isInvoice: isInvoice,
+      customerName: customerName,
+      customerContact: customerContact,
+      excludingDraftId: currentDraftId,
+    );
+    if (match == null) {
+      return false;
+    }
+
+    final mergedDraft = _mergeDraftPayloads(match.draft, currentDraft);
+    _loadDraftIntoState(match.draftId, mergedDraft);
+    return true;
+  }
+
+  ({String draftId, Map<String, dynamic> draft})? _findMatchingSavedDraft({
+    required bool isInvoice,
+    String? customerName,
+    String? customerContact,
+    String? excludingDraftId,
+  }) {
+    final normalizedName = _normalizedCustomerName(customerName);
+    final normalizedContact = _normalizedCustomerContact(customerContact);
+    if (normalizedName.isEmpty && normalizedContact.isEmpty) {
+      return null;
+    }
+
     String? bestDraftId;
     Map<String, dynamic>? bestDraft;
     DateTime? bestUpdatedAt;
 
     for (final entry in _loadDraftIndexEntries()) {
       final draftId = (entry['id'] ?? '').toString().trim();
-      if (draftId.isEmpty || draftId == currentDraftId) {
+      if (draftId.isEmpty || draftId == (excludingDraftId ?? '').trim()) {
         continue;
       }
       final draft = LocalCache.loadDraft(_newSaleDraftStorageKey(draftId));
@@ -202,10 +229,84 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
     }
 
     if (bestDraftId == null || bestDraft == null) {
-      return false;
+      return null;
+    }
+    return (draftId: bestDraftId, draft: bestDraft);
+  }
+
+  Map<String, dynamic> _mergeDraftPayloads(
+    Map<String, dynamic> baseDraft,
+    Map<String, dynamic> incomingDraft,
+  ) {
+    final merged = <String, dynamic>{...baseDraft};
+
+    String mergedTextField(String key) {
+      final incoming = (incomingDraft[key] ?? '').toString().trim();
+      if (incoming.isNotEmpty) {
+        return incoming;
+      }
+      return (baseDraft[key] ?? '').toString().trim();
     }
 
-    _loadDraftIntoState(bestDraftId, bestDraft);
-    return true;
+    double mergedAmountField(String key) {
+      final incoming = (incomingDraft[key] as num?)?.toDouble() ?? 0;
+      if (incoming != 0) {
+        return incoming;
+      }
+      return (baseDraft[key] as num?)?.toDouble() ?? 0;
+    }
+
+    final mergedItems = <Map<String, dynamic>>[];
+    final mergedItemIndex = <String, int>{};
+
+    void addOrReplaceItem(Map<dynamic, dynamic> rawItem) {
+      final item = <String, dynamic>{
+        'product_name': (rawItem['product_name'] ?? '').toString().trim(),
+        'quantity': (rawItem['quantity'] as num?)?.toDouble() ?? 0,
+        'unit_price': (rawItem['unit_price'] as num?)?.toDouble(),
+      };
+      final key = _normalizedCustomerName(item['product_name']?.toString());
+      if (key.isEmpty) {
+        return;
+      }
+      final existingIndex = mergedItemIndex[key];
+      if (existingIndex == null) {
+        mergedItemIndex[key] = mergedItems.length;
+        mergedItems.add(item);
+        return;
+      }
+      mergedItems[existingIndex] = item;
+    }
+
+    for (final rawItem
+        in (baseDraft['items'] as List<dynamic>? ?? const <dynamic>[])) {
+      if (rawItem is Map<dynamic, dynamic>) {
+        addOrReplaceItem(rawItem);
+      }
+    }
+    for (final rawItem
+        in (incomingDraft['items'] as List<dynamic>? ?? const <dynamic>[])) {
+      if (rawItem is Map<dynamic, dynamic>) {
+        addOrReplaceItem(rawItem);
+      }
+    }
+
+    merged['customer_name'] = mergedTextField('customer_name');
+    merged['customer_contact'] = mergedTextField('customer_contact');
+    merged['discount_amount'] = mergedAmountField('discount_amount');
+    merged['vat_amount'] = mergedAmountField('vat_amount');
+    merged['service_fee_amount'] = mergedAmountField('service_fee_amount');
+    merged['delivery_fee_amount'] = mergedAmountField('delivery_fee_amount');
+    merged['rounding_amount'] = mergedAmountField('rounding_amount');
+    merged['other_amount'] = mergedAmountField('other_amount');
+    merged['other_label'] = mergedTextField('other_label');
+    merged['signature_id'] = mergedTextField('signature_id');
+    merged['bank_account_id'] = mergedTextField('bank_account_id');
+    merged['status'] = (incomingDraft['status'] ?? baseDraft['status'] ?? 'paid')
+        .toString()
+        .trim();
+    merged['items'] = mergedItems;
+    merged['updated_at'] = DateTime.now().toIso8601String();
+    return merged;
   }
 }

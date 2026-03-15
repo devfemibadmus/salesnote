@@ -111,7 +111,7 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
   }
 
   Future<void> _persistCurrentDraftToLocalCache() async {
-    final draftId = (_draftCacheId ?? '').trim().isEmpty
+    var draftId = (_draftCacheId ?? '').trim().isEmpty
         ? _nextLiveDraftId()
         : _draftCacheId!.trim();
     _draftCacheId = draftId;
@@ -120,6 +120,11 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
       await _removeDraftFromLocalCache(draftId);
       return;
     }
+
+    await _deduplicateCurrentDraftByCustomer();
+    draftId = (_draftCacheId ?? '').trim().isEmpty
+        ? draftId
+        : _draftCacheId!.trim();
 
     final label = _currentDraftLabel();
     final payload = _cachedDraftPayload();
@@ -148,6 +153,27 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
     });
     await LocalCache.saveDraft(_newSaleDraftStorageKey(draftId), payload);
     _lastPersistedDraftSnapshot = snapshot;
+  }
+
+  Future<void> _deduplicateCurrentDraftByCustomer() async {
+    final currentDraftId = (_draftCacheId ?? '').trim();
+    if (currentDraftId.isEmpty) {
+      return;
+    }
+    final customerName = (_draftCustomerName ?? '').trim();
+    final customerContact = (_draftCustomerContact ?? '').trim();
+    final match = _findMatchingSavedDraft(
+      isInvoice: _draftIsInvoice,
+      customerName: customerName,
+      customerContact: customerContact,
+      excludingDraftId: currentDraftId,
+    );
+    if (match == null) {
+      return;
+    }
+    final mergedDraft = _mergeDraftPayloads(match.draft, _cachedDraftPayload());
+    _loadDraftIntoState(match.draftId, mergedDraft);
+    await _removeDraftFromLocalCache(currentDraftId);
   }
 
   Future<void> _removeDraftFromLocalCache(String draftId) async {
