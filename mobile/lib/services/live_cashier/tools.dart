@@ -87,7 +87,8 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
         final id = call['id']?.toString() ?? '';
         final name = call['name']?.toString() ?? '';
         final args =
-            (call['args'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
+            (call['args'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
         _log('tool:call name=$name args=$args');
         if (mounted) {
           _safeSetState(() {
@@ -101,18 +102,14 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
             _toolStatus = _toolResultLabel(name, response);
           });
         }
-        responses.add({
-          'id': id,
-          'name': name,
-          'response': response,
-        });
+        responses.add({'id': id, 'name': name, 'response': response});
       }
       if (responses.isNotEmpty) {
-        _socket?.add(jsonEncode({
-          'toolResponse': {
-            'functionResponses': responses,
-          }
-        }));
+        _socket?.add(
+          jsonEncode({
+            'toolResponse': {'functionResponses': responses},
+          }),
+        );
         if (_closeAfterToolResponse) {
           _closeAfterToolResponse = false;
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -129,7 +126,6 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
       }
     }
   }
-
 
   Future<Map<String, dynamic>> _handleFunctionCall(
     String name,
@@ -177,7 +173,9 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
           routeArgs = _newSaleArgs();
           break;
         case 'start_new_draft':
-          final normalizedKind = (args['kind']?.toString() ?? '').trim().toLowerCase();
+          final normalizedKind = (args['kind']?.toString() ?? '')
+              .trim()
+              .toLowerCase();
           if (normalizedKind != 'receipt' && normalizedKind != 'invoice') {
             return {
               'result': 'error',
@@ -304,7 +302,10 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
           final routeSaleId = extra['open_sale_id']?.toString();
           if (routeSaleId != null && routeSaleId.isNotEmpty) {
             route = AppRoutes.sales;
-            routeArgs = SalesRouteArgs(openSaleId: routeSaleId, refreshFirst: true);
+            routeArgs = SalesRouteArgs(
+              openSaleId: routeSaleId,
+              refreshFirst: true,
+            );
           }
           break;
         case 'search_invoices':
@@ -312,7 +313,10 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
           final routeSaleId = extra['open_sale_id']?.toString();
           if (routeSaleId != null && routeSaleId.isNotEmpty) {
             route = AppRoutes.invoices;
-            routeArgs = InvoicesRouteArgs(openSaleId: routeSaleId, refreshFirst: true);
+            routeArgs = InvoicesRouteArgs(
+              openSaleId: routeSaleId,
+              refreshFirst: true,
+            );
           }
           break;
         case 'list_saved_drafts':
@@ -339,10 +343,16 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
           extra.addAll(await _itemSalesTool(args));
           break;
         case 'get_fast_moving_items':
-          extra['items'] = await _movementItemsTool(fast: true, limit: args['limit']);
+          extra['items'] = await _movementItemsTool(
+            fast: true,
+            limit: args['limit'],
+          );
           break;
         case 'get_slow_moving_items':
-          extra['items'] = await _movementItemsTool(fast: false, limit: args['limit']);
+          extra['items'] = await _movementItemsTool(
+            fast: false,
+            limit: args['limit'],
+          );
           break;
         default:
           break;
@@ -351,11 +361,15 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
       _log('tool:error name=$name error=$e');
       return {
         'result': 'error',
-        'message': e is ApiException ? e.message : 'Unable to complete that action right now.',
+        'message': e is ApiException
+            ? e.message
+            : 'Unable to complete that action right now.',
       };
     }
 
     if (draftFlowAction) {
+      _draftLog('tool:$name:beforePersist ${_draftDebugSummary()}');
+      await _persistCurrentDraftToLocalCache();
       final requirements = await _draftRequirementsResponse(
         isInvoice: _draftIsInvoice,
       );
@@ -368,10 +382,20 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
           autoCreateOnPreviewLoad: routeArgs.autoCreateOnPreviewLoad,
         );
       }
-      await _persistCurrentDraftToLocalCache();
+      _draftLog(
+        'tool:$name:afterPersist ${_draftDebugSummary()} '
+        'requirements=${requirements["result"]}',
+      );
       if (route != null) {
         _pendingRoute = route;
         _pendingArgs = routeArgs;
+        if (routeArgs is NewSaleRouteArgs) {
+          _draftLog(
+            'tool:$name:pendingRoute route=$route '
+            'routeDraftId=${routeArgs.draftId ?? "-"} '
+            'routeItems=${routeArgs.agentDraft?.items.length ?? 0}',
+          );
+        }
       }
       if (requirements['result'] == 'needs_input') {
         return {
@@ -398,10 +422,7 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
         'start_as_invoice': routeArgs.startAsInvoice,
       if (routeArgs is NewSaleRouteArgs && routeArgs.agentDraft != null)
         'draft_items_count': routeArgs.agentDraft!.items.length,
-      if (routeArgs is InvoicesRouteArgs)
-        'sale_id': routeArgs.openSaleId,
+      if (routeArgs is InvoicesRouteArgs) 'sale_id': routeArgs.openSaleId,
     };
   }
 }
-
-

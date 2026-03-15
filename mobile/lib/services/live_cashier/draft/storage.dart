@@ -115,8 +115,10 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
         ? _nextLiveDraftId()
         : _draftCacheId!.trim();
     _draftCacheId = draftId;
+    _draftLog('persist:start ${_draftDebugSummary(draftId: draftId)}');
 
     if (!_hasMeaningfulDraftState()) {
+      _draftLog('persist:removeEmpty ${_draftDebugSummary(draftId: draftId)}');
       await _removeDraftFromLocalCache(draftId);
       return;
     }
@@ -134,6 +136,7 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
       'payload': payload,
     });
     if (_lastPersistedDraftSnapshot == snapshot) {
+      _draftLog('persist:skipUnchanged ${_draftDebugSummary(draftId: draftId)}');
       return;
     }
 
@@ -153,6 +156,7 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
     });
     await LocalCache.saveDraft(_newSaleDraftStorageKey(draftId), payload);
     _lastPersistedDraftSnapshot = snapshot;
+    _draftLog('persist:done label="$label" ${_draftDebugSummary(draftId: draftId)}');
   }
 
   Future<void> _deduplicateCurrentDraftByCustomer() async {
@@ -169,9 +173,16 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
       excludingDraftId: currentDraftId,
     );
     if (match == null) {
+      _draftLog(
+        'dedupe:miss ${_draftDebugSummary(draftId: currentDraftId)}',
+      );
       return;
     }
     final mergedDraft = _mergeDraftPayloads(match.draft, _cachedDraftPayload());
+    _draftLog(
+      'dedupe:merge from=$currentDraftId to=${match.draftId} '
+      'current=${_draftDebugSummary(draftId: currentDraftId)}',
+    );
     _loadDraftIntoState(match.draftId, mergedDraft);
     await _removeDraftFromLocalCache(currentDraftId);
   }
@@ -181,6 +192,7 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
     if (normalized.isEmpty) {
       return;
     }
+    _draftLog('removeLocal draftId=$normalized');
     final indexEntries = _loadDraftIndexEntries()
         .where((entry) => entry['id']?.toString() != normalized)
         .toList(growable: false);
@@ -202,6 +214,7 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
     final currentDraftId = (_draftCacheId ?? '').trim();
     final currentKind = _draftIsInvoice;
     if (currentDraftId.isEmpty) {
+      _draftLog('discard:noop noActiveDraft');
       _clearDraftState(isInvoice: currentKind, clearDraftId: true);
       return {
         'result': 'ok',
@@ -209,6 +222,7 @@ extension _LiveCashierOverlayDraftStorage on _LiveCashierOverlayState {
         'draft_summary': _draftSummary(),
       };
     }
+    _draftLog('discard:current draftId=$currentDraftId ${_draftDebugSummary()}');
     await _removeDraftFromLocalCache(currentDraftId);
     _clearDraftState(isInvoice: currentKind, clearDraftId: true);
     return {

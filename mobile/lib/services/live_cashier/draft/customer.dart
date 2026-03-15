@@ -13,11 +13,38 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
     );
     final name = resolvedName;
     final contact = resolvedContact;
-    _reuseMatchingSavedDraft(
-      isInvoice: _draftIsInvoice,
-      customerName: name.isEmpty ? null : name,
-      customerContact: contact.isEmpty ? null : contact,
+    _draftLog(
+      'applyCustomer raw="${(raw ?? '').trim()}" '
+      'resolvedName="${name.isEmpty ? "-" : name}" '
+      'resolvedContact="${contact.isEmpty ? "-" : contact}" '
+      '${_draftDebugSummary()}',
     );
+    final requestedName = name.isEmpty ? null : name;
+    final requestedContact = contact.isEmpty ? null : contact;
+    final currentDraftMatchesRequested = _customerMatchesDraft(
+      _cachedDraftPayload(),
+      customerName: requestedName,
+      customerContact: requestedContact,
+    );
+    final currentDraftHasCustomer = _normalizedCustomerName(_draftCustomerName).isNotEmpty ||
+        _normalizedCustomerContact(_draftCustomerContact).isNotEmpty;
+    final shouldReuseSavedDraft =
+        !_hasMeaningfulDraftState() ||
+            !currentDraftHasCustomer ||
+            currentDraftMatchesRequested;
+    if (!shouldReuseSavedDraft) {
+      _draftLog(
+        'applyCustomer:skipReuse currentDraftBelongsToDifferentCustomer '
+        '${_draftDebugSummary()}',
+      );
+    }
+    if (shouldReuseSavedDraft) {
+      _reuseMatchingSavedDraft(
+        isInvoice: _draftIsInvoice,
+        customerName: requestedName,
+        customerContact: requestedContact,
+      );
+    }
     if (name.isNotEmpty) {
       _draftCustomerName = name;
     }
@@ -63,7 +90,27 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
     if (normalized.contains('@')) {
       return normalized;
     }
-    return normalized.replaceAll(RegExp(r'[^0-9+]'), '');
+    final digits = normalized.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) {
+      return '';
+    }
+    if (digits.length > 10) {
+      return digits.substring(digits.length - 10);
+    }
+    return digits;
+  }
+
+  bool _customerContactsMatch(String? left, String? right) {
+    final normalizedLeft = _normalizedCustomerContact(left);
+    final normalizedRight = _normalizedCustomerContact(right);
+    if (normalizedLeft.isEmpty || normalizedRight.isEmpty) {
+      return false;
+    }
+    if (normalizedLeft == normalizedRight) {
+      return true;
+    }
+    return normalizedLeft.endsWith(normalizedRight) ||
+        normalizedRight.endsWith(normalizedLeft);
   }
 
   bool _customerMatchesDraft(
@@ -77,16 +124,19 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
     final requestedName = _normalizedCustomerName(customerName);
     final requestedContact = _normalizedCustomerContact(customerContact);
     final draftName = _normalizedCustomerName(draft['customer_name']?.toString());
-    final draftContact =
-        _normalizedCustomerContact(draft['customer_contact']?.toString());
+    final draftContact = _normalizedCustomerContact(draft['customer_contact']?.toString());
 
     final nameMatches = requestedName.isNotEmpty &&
         draftName.isNotEmpty &&
         requestedName == draftName;
-    final contactMatches = requestedContact.isNotEmpty &&
-        draftContact.isNotEmpty &&
-        requestedContact == draftContact;
-    return nameMatches || contactMatches;
+    final contactMatches = _customerContactsMatch(requestedContact, draftContact);
+    if (contactMatches) {
+      return true;
+    }
+    if (!nameMatches) {
+      return false;
+    }
+    return requestedContact.isEmpty && draftContact.isEmpty;
   }
 
   DateTime? _draftUpdatedAt(Map<String, dynamic>? draft) {
@@ -98,6 +148,11 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
   }
 
   void _loadDraftIntoState(String draftId, Map<String, dynamic> draft) {
+    _draftLog(
+      'loadDraftIntoState target=$draftId '
+      'customer="${(draft["customer_name"] ?? "").toString().trim().isEmpty ? "-" : (draft["customer_name"] ?? "").toString().trim()}" '
+      'contact="${(draft["customer_contact"] ?? "").toString().trim().isEmpty ? "-" : (draft["customer_contact"] ?? "").toString().trim()}"',
+    );
     _draftCacheId = draftId.trim();
     _draftIsInvoice =
         (draft['status'] ?? '').toString().trim().toLowerCase() == 'invoice';
@@ -152,6 +207,7 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
     final normalizedName = _normalizedCustomerName(customerName);
     final normalizedContact = _normalizedCustomerContact(customerContact);
     if (normalizedName.isEmpty && normalizedContact.isEmpty) {
+      _draftLog('reuseMatchingSavedDraft:skip noCustomerIdentity ${_draftDebugSummary()}');
       return false;
     }
 
@@ -163,6 +219,10 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
           customerName: customerName,
           customerContact: customerContact,
         )) {
+      _draftLog(
+        'reuseMatchingSavedDraft:skip currentDraftAlreadyMatches '
+        '${_draftDebugSummary()}',
+      );
       return false;
     }
 
@@ -173,10 +233,21 @@ extension _LiveCashierOverlayDraftCustomer on _LiveCashierOverlayState {
       excludingDraftId: currentDraftId,
     );
     if (match == null) {
+      _draftLog(
+        'reuseMatchingSavedDraft:miss requestedName="${customerName ?? "-"}" '
+        'requestedContact="${customerContact ?? "-"}" '
+        '${_draftDebugSummary()}',
+      );
       return false;
     }
 
     final mergedDraft = _mergeDraftPayloads(match.draft, currentDraft);
+    _draftLog(
+      'reuseMatchingSavedDraft:hit from=${currentDraftId.isEmpty ? "-" : currentDraftId} '
+      'to=${match.draftId} '
+      'requestedName="${customerName ?? "-"}" '
+      'requestedContact="${customerContact ?? "-"}"',
+    );
     _loadDraftIntoState(match.draftId, mergedDraft);
     return true;
   }

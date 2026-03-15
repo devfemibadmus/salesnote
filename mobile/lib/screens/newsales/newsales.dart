@@ -72,6 +72,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   bool _switchingDraft = false;
   bool _hydratingDraft = false;
   bool _didAutoOpenAgentPreview = false;
+  bool _routeAgentDraftHydrated = false;
   bool _customerNameTouched = false;
   bool _customerContactTouched = false;
   double _discountAmount = 0;
@@ -199,6 +200,18 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     try {
       await _saveDraft();
     } catch (_) {}
+  }
+
+  String _draftDebugSummary({String? draftId}) {
+    return 'draftId=${(draftId ?? _activeDraftId).trim()} '
+        'kind=${_saleStatus == SaleStatus.invoice ? "invoice" : "receipt"} '
+        'customer=${_customerNameController.text.trim().isEmpty ? "-" : _customerNameController.text.trim()} '
+        'contact=${_customerContactController.text.trim().isEmpty ? "-" : _customerContactController.text.trim()} '
+        'items=${_items.length}';
+  }
+
+  void _draftLog(String message) {
+    debugPrint('NEW SALE DRAFT: $message');
   }
 
   void _initCountry() {
@@ -364,6 +377,10 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     if ((widget.routeArgs?.draftId?.trim().isNotEmpty ?? false)) {
       _activeDraftId = widget.routeArgs!.draftId!.trim();
     }
+    _draftLog(
+      'bootstrap active=$active routed=${widget.routeArgs?.draftId ?? "-"} '
+      'resolved=${_activeDraftId.isEmpty ? "-" : _activeDraftId} drafts=${_drafts.length}',
+    );
     await _saveDraftIndex();
     await _loadDraft(_activeDraftId);
   }
@@ -415,8 +432,14 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   }
 
   Future<void> _loadDraft(String draftId) async {
-    final agentDraft = widget.routeArgs?.agentDraft;
+    final agentDraft = _routeAgentDraftHydrated ? null : widget.routeArgs?.agentDraft;
     if (agentDraft != null) {
+      _draftLog(
+        'loadDraft:agentDraft routeDraftId=${widget.routeArgs?.draftId ?? "-"} '
+        'target=$draftId items=${agentDraft.items.length} '
+        'customer=${agentDraft.customerName?.trim().isNotEmpty == true ? agentDraft.customerName!.trim() : "-"} '
+        'contact=${agentDraft.customerContact?.trim().isNotEmpty == true ? agentDraft.customerContact!.trim() : "-"}',
+      );
       if (!mounted) return;
       _hydratingDraft = true;
       setState(() {
@@ -463,12 +486,14 @@ class _NewSaleScreenState extends State<NewSaleScreen>
         _syncStepController();
       });
       _hydratingDraft = false;
+      _routeAgentDraftHydrated = true;
       await _saveDraft();
       return;
     }
 
     final draft = LocalCache.loadDraft(_draftStorageKey(draftId));
     if (draft == null) {
+      _draftLog('loadDraft:empty target=$draftId');
       if (!mounted) return;
       _hydratingDraft = true;
       setState(() {
@@ -502,6 +527,13 @@ class _NewSaleScreenState extends State<NewSaleScreen>
       _hydratingDraft = false;
       return;
     }
+
+    _draftLog(
+      'loadDraft:stored target=$draftId '
+      'customer=${(draft['customer_name'] ?? '').toString().trim().isEmpty ? "-" : (draft['customer_name'] ?? '').toString().trim()} '
+      'contact=${(draft['customer_contact'] ?? '').toString().trim().isEmpty ? "-" : (draft['customer_contact'] ?? '').toString().trim()} '
+      'items=${(draft['items'] as List<dynamic>? ?? const <dynamic>[]).length}',
+    );
 
     final rawItems = (draft['items'] as List<dynamic>? ?? <dynamic>[]);
     final parsedItems = rawItems
@@ -630,6 +662,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
           )
           .toList(),
     });
+    _draftLog('save ${_draftDebugSummary()}');
   }
 
   Future<void> _saveDraftIndex() async {
@@ -643,6 +676,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
     await _saveDraft();
     final now = DateTime.now().millisecondsSinceEpoch;
     final id = 'draft_$now';
+    _draftLog('create from=${_activeDraftId.isEmpty ? "-" : _activeDraftId} to=$id');
     if (!mounted) return;
     setState(() {
       _drafts.add(const _DraftSlot(id: '', label: _defaultDraftLabel));
@@ -682,6 +716,7 @@ class _NewSaleScreenState extends State<NewSaleScreen>
   Future<void> _switchDraft(String draftId) async {
     if (_activeDraftId == draftId || _switchingDraft) return;
     _phoneDebounce?.cancel();
+    _draftLog('switch from=${_activeDraftId.isEmpty ? "-" : _activeDraftId} to=$draftId');
     await _saveDraft();
     if (!mounted) return;
     setState(() {
