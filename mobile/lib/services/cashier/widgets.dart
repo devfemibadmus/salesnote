@@ -36,13 +36,11 @@ class _ReadyBody extends StatelessWidget {
     required this.muted,
     required this.responding,
     required this.status,
-    required this.capturingPhoto,
     required this.toolBusy,
     required this.toolStatus,
     required this.transcriptEntries,
     required this.currentUserTranscript,
     required this.currentModelTranscript,
-    required this.onTakePhoto,
   });
 
   final AnimationController controller;
@@ -50,13 +48,11 @@ class _ReadyBody extends StatelessWidget {
   final bool muted;
   final bool responding;
   final String status;
-  final bool capturingPhoto;
   final bool toolBusy;
   final String? toolStatus;
   final List<_TranscriptEntry> transcriptEntries;
   final String? currentUserTranscript;
   final String? currentModelTranscript;
-  final Future<void> Function() onTakePhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -438,10 +434,7 @@ class _ErrorBody extends StatelessWidget {
                       Text('Retrying...'),
                     ],
                   )
-                : const Text(
-                    'Retry',
-                    key: ValueKey<String>('retry'),
-                  ),
+                : const Text('Retry', key: ValueKey<String>('retry')),
           ),
         ),
       ],

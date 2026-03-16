@@ -9,7 +9,6 @@ import 'package:flutter_sound/flutter_sound.dart' as fs;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
 
 import '../../app/constants/runtime.dart';

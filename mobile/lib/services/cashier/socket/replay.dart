@@ -201,7 +201,6 @@ extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
     }
     _turnFinalizing = true;
     try {
-      final shouldRestoreMic = _autoMutedForPlayback;
       await _flushPcmBuffer();
       await _audioQueue;
       if (!mounted) return;
@@ -226,11 +225,10 @@ extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
         _currentModelTranscript = null;
         _openingGreetingPendingUnmute = false;
         _modelResponding = false;
-        _autoMutedForPlayback = false;
         _status = _currentStatus();
       });
       _clearPendingTurnState();
-      if (shouldUnmute || shouldRestoreMic) {
+      if (shouldUnmute) {
         await _ensureLiveMicReady();
       }
     } finally {

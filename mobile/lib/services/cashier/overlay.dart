@@ -32,7 +32,6 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   final _api = ApiClient(TokenStore());
   final _recorder = AudioRecorder();
   final _player = fs.FlutterSoundPlayer();
-  final _imagePicker = ImagePicker();
   late final AnimationController _pulseController;
   WebSocket? _socket;
   StreamSubscription<Uint8List>? _recordingSub;
@@ -42,11 +41,9 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   bool _isRecording = false;
   bool _micMuted = true;
   bool _modelResponding = false;
-  bool _autoMutedForPlayback = false;
   bool _setupReady = false;
   bool _openingGreetingSent = false;
   bool _openingGreetingPendingUnmute = false;
-  bool _capturingPhoto = false;
   bool _toolBusy = false;
   int _audioChunkLogCount = 0;
   String _status = 'Bootstrapping live session...';
@@ -240,7 +237,6 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
                             muted: _micMuted,
                             responding: _modelResponding,
                             status: _currentStatus(),
-                            capturingPhoto: _capturingPhoto,
                             toolBusy: _toolBusy,
                             toolStatus: _toolStatus,
                             transcriptEntries:
@@ -249,7 +245,6 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
                                 ),
                             currentUserTranscript: _currentUserTranscript,
                             currentModelTranscript: _currentModelTranscript,
-                            onTakePhoto: _captureAndSendPhoto,
                           ),
                   ),
                   const SizedBox(height: 18),
@@ -258,14 +253,6 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
                       : Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            _LiveControlButton(
-                              onTap: () => unawaited(_captureAndSendPhoto()),
-                              icon: _capturingPhoto
-                                  ? Icons.hourglass_top_rounded
-                                  : Icons.camera_alt_rounded,
-                              active: false,
-                            ),
-                            const SizedBox(width: 24),
                             _LiveControlButton(
                               onTap: () => unawaited(_toggleMute()),
                               icon: _micMuted

@@ -38,66 +38,6 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
     return prompts[math.Random().nextInt(prompts.length)];
   }
 
-  Future<void> _captureAndSendPhoto() async {
-    final socket = _socket;
-    if (!_connected ||
-        socket == null ||
-        socket.readyState != WebSocket.open ||
-        _capturingPhoto) {
-      return;
-    }
-
-    _safeSetState(() {
-      _capturingPhoto = true;
-      _status = 'Opening camera...';
-    });
-    try {
-      final file = await _imagePicker.pickImage(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.rear,
-        imageQuality: 65,
-        maxWidth: 1024,
-      );
-      if (file == null) {
-        if (!mounted) return;
-        _safeSetState(() {
-          _capturingPhoto = false;
-          _status = _currentStatus();
-        });
-        return;
-      }
-      final bytes = await file.readAsBytes();
-      _log('photo:send bytes=${bytes.length}');
-      socket.add(
-        jsonEncode({
-          'realtimeInput': {
-            'mediaChunks': [
-              {'mimeType': 'image/jpeg', 'data': base64Encode(bytes)},
-            ],
-          },
-        }),
-      );
-      if (!mounted) return;
-      _safeSetState(() {
-        _capturingPhoto = false;
-        _status = 'Photo sent. Ask about what Gemini sees.';
-      });
-    } catch (e) {
-      _log('photo:error $e');
-      if (!mounted) return;
-      _safeSetState(() {
-        _capturingPhoto = false;
-        _status = 'Unable to take photo right now.';
-      });
-    } finally {
-      if (mounted) {
-        _safeSetState(() {
-          _capturingPhoto = false;
-        });
-      }
-    }
-  }
-
   void _enqueuePcmChunk(String base64Data, String mimeType) {
     try {
       final pcmBytes = base64Decode(base64Data);
@@ -274,20 +214,7 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
     }
   }
 
-  Future<void> _muteMicForPlayback() async {
-    if (_micMuted || _playerDisposed) {
-      return;
-    }
-    _autoMutedForPlayback = true;
-    await _setMicMuted(true);
-    _log('mic:auto-muted for playback');
-  }
-
   Future<void> _toggleMute() async {
-    if (_modelResponding) {
-      _log('mic:toggle:ignored while model speaking');
-      return;
-    }
     if (!_isRecording) {
       await _startVoiceCapture();
       await _setMicMuted(false);

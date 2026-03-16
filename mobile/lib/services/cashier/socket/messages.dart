@@ -61,7 +61,6 @@ extension _LiveCashierOverlaySocketMessages on _LiveCashierOverlayState {
                   ?.toString();
           final spoken = text?.trim();
           if (spoken != null && spoken.isNotEmpty && mounted) {
-            unawaited(_muteMicForPlayback());
             final mergedTranscript = _mergeTranscript(
               _currentModelTranscript,
               spoken,
@@ -91,7 +90,6 @@ extension _LiveCashierOverlaySocketMessages on _LiveCashierOverlayState {
                   if (mimeType.startsWith('audio/pcm') &&
                       base64Data != null &&
                       base64Data.isNotEmpty) {
-                    unawaited(_muteMicForPlayback());
                     _enqueuePcmChunk(base64Data, mimeType);
                     if (mounted && !_modelResponding) {
                       _safeSetState(() {
