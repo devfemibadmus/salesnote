@@ -1,9 +1,6 @@
 part of '../core.dart';
 
 extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
-  static const int _bargeInSpeechAverageThreshold = 900;
-  static const int _bargeInSpeechPeakThreshold = 3200;
-
   String _openingGreetingPrompt() {
     const defaultGreeting =
         'Reply with exactly this and nothing else: Hello from SalesNote Live Cashier. How can I help with receipts, invoices, items, or reports?';
@@ -84,31 +81,6 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
     });
   }
 
-  bool _chunkLooksLikeSpeech(Uint8List chunk) {
-    if (chunk.length < 4) {
-      return false;
-    }
-    var sampleCount = 0;
-    var totalAmplitude = 0;
-    var peakAmplitude = 0;
-    for (var index = 0; index + 1 < chunk.length; index += 2) {
-      final sample = chunk[index] | (chunk[index + 1] << 8);
-      final signed = sample >= 0x8000 ? sample - 0x10000 : sample;
-      final amplitude = signed.abs();
-      totalAmplitude += amplitude;
-      if (amplitude > peakAmplitude) {
-        peakAmplitude = amplitude;
-      }
-      sampleCount += 1;
-    }
-    if (sampleCount == 0) {
-      return false;
-    }
-    final averageAmplitude = totalAmplitude ~/ sampleCount;
-    return averageAmplitude >= _bargeInSpeechAverageThreshold ||
-        peakAmplitude >= _bargeInSpeechPeakThreshold;
-  }
-
   Future<void> _startVoiceCapture() async {
     if (_loading || _error != null || !_connected || _isRecording) return;
 
@@ -131,6 +103,8 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
           echoCancel: true,
           noiseSuppress: true,
           androidConfig: AndroidRecordConfig(
+            audioSource: AndroidAudioSource.voiceCommunication,
+            audioManagerMode: AudioManagerMode.modeInCommunication,
             service: AndroidService(
               title: 'Sales Note Live Cashier',
               content: 'Live cashier microphone is active',
@@ -174,11 +148,6 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
         chunk.isEmpty ||
         _micMuted) {
       return;
-    }
-    if (_modelResponding &&
-        !_suppressCurrentModelOutput &&
-        _chunkLooksLikeSpeech(chunk)) {
-      unawaited(_interruptCurrentModelOutput(reason: 'speechEnergy'));
     }
     _markTurnPending();
 

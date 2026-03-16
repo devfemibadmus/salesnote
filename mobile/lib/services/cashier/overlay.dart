@@ -87,7 +87,6 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   bool _closingOverlay = false;
   bool _awaitingTurnCompletion = false;
   bool _retryingBootstrap = false;
-  bool _suppressCurrentModelOutput = false;
   String? _pendingReplayUserText;
   Map<String, dynamic>? _pendingToolResponsePayload;
   List<Map<String, dynamic>>? _pendingToolIntent;
