@@ -13,6 +13,7 @@ class TimingConstants {
 
   static const secureStorageTimeout = Duration(seconds: 3);
   static const startupFlagWarmTimeout = Duration(seconds: 20);
+  static const startupWarmRetryDelay = Duration(seconds: 2);
   static const liveCashierCueNetworkTimeout = Duration(seconds: 8);
   static const liveCashierCueActionCooldown = Duration(milliseconds: 700);
   static const liveCashierCueReconnectingCooldown = Duration(seconds: 3);

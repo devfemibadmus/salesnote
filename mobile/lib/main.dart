@@ -104,7 +104,12 @@ class _AuthGateState extends State<AuthGate> {
       name: 'SalesnoteBootstrap',
     );
 
-    StartupWarmupService.warmAll();
+    developer.log('bootstrap:warmup:start', name: 'SalesnoteBootstrap');
+    await StartupWarmupService.ensureReady();
+    developer.log(
+      'bootstrap:warmup:done ${stopwatch.elapsedMilliseconds}ms',
+      name: 'SalesnoteBootstrap',
+    );
 
     developer.log('bootstrap:onboarding:read', name: 'SalesnoteBootstrap');
     final onboardingComplete = await LocalCache.isOnboardingComplete();

@@ -57,16 +57,19 @@ class LiveCashierCueService {
   static String urlFor(LiveCashierCue cue) =>
       AppConfig.liveCashierCueUrls[_cueKey(cue)] ?? '';
 
-  static Future<void> warmAllCues() async {
-    await _warmCueUrls(AppConfig.liveCashierCueUrls.values);
+  static Future<bool> warmAllCues() async {
+    return _warmCueUrls(AppConfig.liveCashierCueUrls.values);
   }
 
-  static Future<void> _warmCueUrls(Iterable<String> urls) async {
+  static Future<bool> _warmCueUrls(Iterable<String> urls) async {
     final normalizedUrls = urls
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty)
         .toSet()
         .toList(growable: false);
+    if (normalizedUrls.isEmpty) {
+      return true;
+    }
     developer.log('warming live cashier cues', name: 'SalesnoteBootstrap');
     final results = await Future.wait<bool>(
       normalizedUrls.map(_cacheCueByUrl),
@@ -77,6 +80,7 @@ class LiveCashierCueService {
       'warmed $warmedCount/${normalizedUrls.length} live cashier cues',
       name: 'SalesnoteBootstrap',
     );
+    return warmedCount == normalizedUrls.length;
   }
 
   static Future<void> playActionStarted() =>

@@ -21,18 +21,21 @@ class FlagService {
     return AppConfig.flagIconUrl(countryCode, size: size);
   }
 
-  static Future<void> warmAllFlags() async {
+  static Future<bool> warmAllFlags() async {
     final prefs = await SharedPreferences.getInstance();
     final storedVersion = prefs.getInt(_cacheVersionKey) ?? 0;
     if (storedVersion == _cacheVersion) {
       developer.log('flag cache already warm', name: 'SalesnoteBootstrap');
-      return;
+      return true;
     }
 
     final countries = CountryService().getAll();
     final urls = countries
         .map((country) => iconUrl(country.countryCode))
         .toList();
+    if (urls.isEmpty) {
+      return true;
+    }
     developer.log('warming ${urls.length} flags', name: 'SalesnoteBootstrap');
     final warmedCount = await MediaService.warmImages(urls).timeout(
       TimingConstants.startupFlagWarmTimeout,
@@ -51,6 +54,8 @@ class FlagService {
     );
     if (warmedCount == urls.length) {
       await prefs.setInt(_cacheVersionKey, _cacheVersion);
+      return true;
     }
+    return false;
   }
 }
