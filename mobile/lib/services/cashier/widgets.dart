@@ -43,7 +43,6 @@ class _ReadyBody extends StatelessWidget {
   const _ReadyBody({
     required this.controller,
     required this.recording,
-    required this.muted,
     required this.responding,
     required this.status,
     required this.toolBusy,
@@ -55,7 +54,6 @@ class _ReadyBody extends StatelessWidget {
 
   final AnimationController controller;
   final bool recording;
-  final bool muted;
   final bool responding;
   final String status;
   final bool toolBusy;
@@ -119,23 +117,11 @@ class _ReadyBody extends StatelessWidget {
         'assistant_pending:${currentModelTranscript!.trim()}',
     ].join('\n');
 
-    return Column(
-      children: [
-        const SizedBox(height: 8),
-        _VoiceOrb(
-          controller: controller,
-          active: responding || (recording && !muted),
-        ),
-        const SizedBox(height: 22),
-        Expanded(
-          child: _TranscriptPanel(
-            bubbles: bubbles,
-            structureSignature: structureSignature,
-            scrollSignature: scrollSignature,
-            emptyStateText: status,
-          ),
-        ),
-      ],
+    return _TranscriptPanel(
+      bubbles: bubbles,
+      structureSignature: structureSignature,
+      scrollSignature: scrollSignature,
+      emptyStateText: status,
     );
   }
 }
@@ -209,101 +195,42 @@ class _TranscriptPanelState extends State<_TranscriptPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final panelRadius = BorderRadius.circular(30);
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xB8FFFFFF),
-        borderRadius: panelRadius,
-        border: Border.all(color: const Color(0x88FFFFFF)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x160F172A),
-            blurRadius: 26,
-            offset: Offset(0, 14),
+    return Stack(
+      children: [
+        if (widget.bubbles.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: Text(
+                widget.emptyStateText,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  height: 1.45,
+                ),
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 26),
+            itemBuilder: (context, index) {
+              final bubble = widget.bubbles[index];
+              return _BubbleReveal(
+                key: ValueKey<String>(
+                  'reveal:${bubble.key ?? 'bubble-$index'}',
+                ),
+                child: bubble,
+              );
+            },
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemCount: widget.bubbles.length,
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: panelRadius,
-        child: Stack(
-          children: [
-            if (widget.bubbles.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
-                  child: Text(
-                    widget.emptyStateText,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xFF64748B),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      height: 1.45,
-                    ),
-                  ),
-                ),
-              )
-            else
-              ListView.separated(
-                controller: _scrollController,
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(18, 18, 18, 26),
-                itemBuilder: (context, index) {
-                  final bubble = widget.bubbles[index];
-                  return _BubbleReveal(
-                    key: ValueKey<String>(
-                      'reveal:${bubble.key ?? 'bubble-$index'}',
-                    ),
-                    child: bubble,
-                  );
-                },
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 12),
-                itemCount: widget.bubbles.length,
-              ),
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 30,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        const Color(0xF7FFFFFF),
-                        Colors.white.withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 38,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        const Color(0xFFFFFFFF),
-                        Colors.white.withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
@@ -454,17 +381,16 @@ class _ErrorBody extends StatelessWidget {
 }
 
 class _VoiceOrb extends StatelessWidget {
-  const _VoiceOrb({required this.controller, this.active = false});
+  const _VoiceOrb({required this.controller});
 
   final AnimationController controller;
-  final bool active;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, child) {
-        final scale = 1 + (controller.value * (active ? 0.12 : 0.08));
+        final scale = 1 + (controller.value * 0.08);
         return Transform.scale(
           scale: scale,
           child: Container(
@@ -473,24 +399,16 @@ class _VoiceOrb extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
-                colors: active
-                    ? const [
-                        Color(0xFFFFFFFF),
-                        Color(0xFFFFD4D4),
-                        Color(0xFFF87171),
-                      ]
-                    : const [
-                        Color(0xFFFFFFFF),
-                        Color(0xFFBFD5FF),
-                        Color(0xFF6EA8FF),
-                      ],
+                colors: const [
+                  Color(0xFFFFFFFF),
+                  Color(0xFFBFD5FF),
+                  Color(0xFF6EA8FF),
+                ],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: active
-                      ? const Color(0x33EF4444)
-                      : const Color(0x33007AFF),
-                  blurRadius: 34 + (controller.value * (active ? 16 : 10)),
+                  color: const Color(0x33007AFF),
+                  blurRadius: 34 + (controller.value * 10),
                   spreadRadius: 6,
                 ),
               ],
@@ -503,12 +421,10 @@ class _VoiceOrb extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: Color(0xDDFFFFFF),
                 ),
-                child: Icon(
-                  active ? Icons.mic_rounded : Icons.graphic_eq_rounded,
+                child: const Icon(
+                  Icons.graphic_eq_rounded,
                   size: 48,
-                  color: active
-                      ? const Color(0xFFDC2626)
-                      : const Color(0xFF2563EB),
+                  color: Color(0xFF2563EB),
                 ),
               ),
             ),
@@ -759,27 +675,3 @@ class _BusyDots extends StatelessWidget {
   }
 }
 
-class _CloseButton extends StatelessWidget {
-  const _CloseButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0x99FFFFFF),
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          unawaited(HapticFeedback.selectionClick());
-          onTap();
-        },
-        child: const Padding(
-          padding: EdgeInsets.all(12),
-          child: Icon(Icons.close_rounded, color: Color(0xFF0F172A)),
-        ),
-      ),
-    );
-  }
-}

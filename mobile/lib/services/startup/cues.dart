@@ -14,6 +14,7 @@ enum LiveCashierCue {
   actionStarted,
   reconnecting,
   reconnected,
+  sessionClosed,
   micMuted,
   micUnmuted,
 }
@@ -56,6 +57,8 @@ class LiveCashierCueService {
         return 'reconnecting';
       case LiveCashierCue.reconnected:
         return 'reconnected';
+      case LiveCashierCue.sessionClosed:
+        return 'session_closed';
       case LiveCashierCue.micMuted:
         return 'mic_muted';
       case LiveCashierCue.micUnmuted:
@@ -108,6 +111,9 @@ class LiveCashierCueService {
 
   static Future<void> playBootstrapReady() =>
       _queuePlay(LiveCashierCue.reconnected, cooldown: _reconnectedCooldown);
+
+  static Future<void> playSessionClosed() =>
+      _queuePlay(LiveCashierCue.sessionClosed, cooldown: _reconnectingCooldown);
 
   static Future<void> playMicMuted() => _queuePlay(
     LiveCashierCue.micMuted,
@@ -231,6 +237,13 @@ class LiveCashierCueService {
           level: 900,
         );
         return null;
+      }
+      final contentType = response.headers['content-type']?.toLowerCase() ?? '';
+      if (contentType.startsWith('audio/') ||
+          url.toLowerCase().endsWith('.mp3') ||
+          url.toLowerCase().endsWith('.wav') ||
+          url.toLowerCase().endsWith('.m4a')) {
+        return Uint8List.fromList(response.bodyBytes);
       }
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) {

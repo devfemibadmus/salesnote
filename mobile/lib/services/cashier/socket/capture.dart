@@ -193,52 +193,19 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
     }
   }
 
-  Future<void> _setMicMuted(bool value) async {
-    if (_micMuted == value && _isRecording) {
-      if (mounted) {
-        _safeSetState(() => _status = _currentStatus());
-      }
-      return;
-    }
-    final wasMuted = _micMuted;
-    _micMuted = value;
-    if (mounted) {
-      _safeSetState(() => _status = _currentStatus());
-    }
-    if (wasMuted && !value) {
-      _log('mic:unmuted');
-    } else if (!wasMuted && value) {
-      _log('mic:muted');
-    }
-  }
-
-  Future<void> _toggleMute() async {
-    if (!_isRecording) {
-      await _startVoiceCapture();
-      await _setMicMuted(false);
-      if (!_micMuted) {
-        unawaited(LiveCashierCueService.playMicUnmuted());
-      }
-      return;
-    }
-    final nextMuted = !_micMuted;
-    await _setMicMuted(nextMuted);
-    if (_micMuted == nextMuted) {
-      unawaited(
-        nextMuted
-            ? LiveCashierCueService.playMicMuted()
-            : LiveCashierCueService.playMicUnmuted(),
-      );
-    }
-  }
-
   Future<void> _ensureLiveMicReady() async {
     if (!_isRecording) {
       await _startVoiceCapture();
     }
-    if (_micMuted) {
-      await _setMicMuted(false);
-      _log('mic:auto-unmute');
+  }
+
+  Future<void> _syncVoiceCaptureWithSessionState() async {
+    if (_setupReady && _connected) {
+      await _ensureLiveMicReady();
+      return;
+    }
+    if (_isRecording) {
+      await _stopVoiceCapture();
     }
   }
 
@@ -247,7 +214,6 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
     final socket = _socket;
     if (socket == null || socket.readyState != WebSocket.open) return;
     _openingGreetingSent = true;
-    _openingGreetingPendingUnmute = false;
     _log('greeting:send');
     if (mounted) {
       _safeSetState(() {

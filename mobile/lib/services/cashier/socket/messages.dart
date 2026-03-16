@@ -113,8 +113,7 @@ extension _LiveCashierOverlaySocketMessages on _LiveCashierOverlayState {
 
         final turnComplete = serverContent['turnComplete'] == true;
         if (turnComplete && mounted) {
-          final shouldUnmute = _openingGreetingPendingUnmute;
-          unawaited(_finalizeTurn(shouldUnmute: shouldUnmute));
+          unawaited(_finalizeTurn());
         }
       }
 

@@ -221,7 +221,12 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
           _closeAfterToolResponse = false;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted) return;
-            unawaited(_closeOverlay());
+            unawaited(_performPendingNavigationActions());
+          });
+        } else if (_pendingRoute != null || _pendingPostCloseAction != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            unawaited(_performPendingNavigationActions());
           });
         }
       }

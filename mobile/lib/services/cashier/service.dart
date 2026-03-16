@@ -3,30 +3,35 @@ part of 'core.dart';
 class LiveCashierService {
   LiveCashierService._();
 
-  static Future<void> show(BuildContext context) {
-    return showGeneralDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      barrierLabel: 'Live Cashier',
-      barrierColor: const Color(0x660A1220),
-      transitionDuration: const Duration(milliseconds: 240),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return const _LiveCashierOverlay();
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final fade = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        );
-        final slide = Tween<Offset>(
-          begin: const Offset(0, 0.04),
-          end: Offset.zero,
-        ).animate(fade);
-        return FadeTransition(
-          opacity: fade,
-          child: SlideTransition(position: slide, child: child),
-        );
-      },
+  static OverlayEntry? _entry;
+  static final GlobalKey<_LiveCashierOverlayState> _overlayKey =
+      GlobalKey<_LiveCashierOverlayState>();
+
+  static bool get isVisible => _entry != null;
+
+  static Future<void> show(BuildContext context) async {
+    if (_entry != null) {
+      _overlayKey.currentState?._expandPanel();
+      return;
+    }
+    final overlay =
+        AppNavigator.key.currentState?.overlay ??
+        Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) {
+      return;
+    }
+    _entry = OverlayEntry(
+      builder: (_) => _LiveCashierOverlay(key: _overlayKey),
     );
+    overlay.insert(_entry!);
+  }
+
+  static void hide() {
+    _entry?.remove();
+    _entry = null;
+  }
+
+  static void expand() {
+    _overlayKey.currentState?._expandPanel();
   }
 }

@@ -8,9 +8,14 @@ class AppConfig {
   static const flagIconBaseUrl = 'https://flagpedia.net/data/flags/icon';
   static const defaultFlagIconSize = '72x54';
   static const Map<String, String> liveCashierCueUrls = <String, String>{
-    'action_started': 'https://soundcn.xyz/r/zap-two-tone.json',
-    'reconnecting': 'https://soundcn.xyz/r/zap-three-tone-down.json',
-    'reconnected': 'https://soundcn.xyz/r/zap-three-tone-up.json',
+    'action_started':
+        'https://github.com/5a9awneh/ms-teams-sounds/raw/refs/heads/main/Notifications/Vibe.mp3',
+    'reconnecting':
+        'https://github.com/5a9awneh/ms-teams-sounds/raw/refs/heads/main/Notifications/Pluck.mp3',
+    'reconnected':
+        'https://github.com/5a9awneh/ms-teams-sounds/raw/refs/heads/main/Notifications/Nudge.mp3',
+    'session_closed':
+        'https://github.com/5a9awneh/ms-teams-sounds/raw/refs/heads/main/Notifications/Pluck.mp3',
     'mic_muted': 'https://soundcn.xyz/r/switch-off.json',
     'mic_unmuted': 'https://soundcn.xyz/r/switch-on.json',
   };

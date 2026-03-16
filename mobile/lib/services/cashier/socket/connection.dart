@@ -1,6 +1,26 @@
 part of '../core.dart';
 
 extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
+  Future<void> _performPendingNavigationActions() async {
+    final pendingRoute = _pendingRoute;
+    final pendingArgs = _pendingArgs;
+    final pendingPostCloseAction = _pendingPostCloseAction;
+    _pendingRoute = null;
+    _pendingArgs = null;
+    _pendingPostCloseAction = null;
+    if (pendingRoute != null) {
+      AppNavigator.key.currentState?.pushNamed(
+        pendingRoute,
+        arguments: pendingArgs,
+      );
+    }
+    if (pendingPostCloseAction != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(pendingPostCloseAction());
+      });
+    }
+  }
+
   Future<void> _retryBootstrap() async {
     if (_retryingBootstrap) {
       return;
@@ -203,14 +223,10 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
     }
     if (_openingGreetingSent) {
       await _restorePendingTurnIfNeeded();
-      if (!_micMuted) {
-        await _ensureLiveMicReady();
-      }
+      await _syncVoiceCaptureWithSessionState();
       return;
     }
-    if (!_micMuted) {
-      await _ensureLiveMicReady();
-    }
+    await _syncVoiceCaptureWithSessionState();
     unawaited(LiveCashierCueService.playBootstrapReady());
     _sendOpeningGreeting();
   }
@@ -224,9 +240,6 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
     }
     if (_modelResponding) {
       return '';
-    }
-    if (_micMuted) {
-      return 'Muted';
     }
     if (_isRecording) {
       return '';
@@ -275,24 +288,8 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
     await _stopPlayerStream(forceStop: true);
     await _socket?.close();
     _socket = null;
-    if (!mounted) return;
-    final pendingRoute = _pendingRoute;
-    final pendingArgs = _pendingArgs;
-    final pendingPostCloseAction = _pendingPostCloseAction;
-    _pendingRoute = null;
-    _pendingArgs = null;
-    _pendingPostCloseAction = null;
-    Navigator.of(context).pop();
-    if (pendingRoute != null) {
-      AppNavigator.key.currentState?.pushNamed(
-        pendingRoute,
-        arguments: pendingArgs,
-      );
-    }
-    if (pendingPostCloseAction != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(pendingPostCloseAction());
-      });
-    }
+    await _performPendingNavigationActions();
+    LiveCashierService.hide();
+    unawaited(LiveCashierCueService.playSessionClosed());
   }
 }

@@ -251,7 +251,7 @@ extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
     }
   }
 
-  Future<void> _finalizeTurn({required bool shouldUnmute}) async {
+  Future<void> _finalizeTurn() async {
     if (_turnFinalizing) {
       return;
     }
@@ -279,14 +279,10 @@ extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
         }
         _currentUserTranscript = null;
         _currentModelTranscript = null;
-        _openingGreetingPendingUnmute = false;
         _modelResponding = false;
         _status = _currentStatus();
       });
       _clearPendingTurnState();
-      if (shouldUnmute) {
-        await _ensureLiveMicReady();
-      }
     } finally {
       _turnFinalizing = false;
     }

@@ -57,27 +57,9 @@ class AppBottomNav extends StatelessWidget {
               active: activeTab == AppBottomTab.sales,
               onTap: onSales,
             ),
-            _NavTap(
+            _VoiceHoldAddButton(
               onTap: onAdd,
-              onLongPress: onAddLongPress,
-              borderRadius: BorderRadius.circular(29),
-              hapticStyle: _NavHapticStyle.action,
-              child: Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF007AFF),
-                  borderRadius: BorderRadius.circular(29),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x29007AFF),
-                      blurRadius: 12,
-                      offset: Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.add, color: Colors.white, size: 30),
-              ),
+              onVoiceLock: onAddLongPress,
             ),
             _NavItem(
               icon: Icons.receipt_long,
@@ -146,11 +128,9 @@ class _NavTap extends StatelessWidget {
     required this.child,
     required this.borderRadius,
     required this.hapticStyle,
-    this.onLongPress,
   });
 
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
   final Widget child;
   final BorderRadius borderRadius;
   final _NavHapticStyle hapticStyle;
@@ -161,14 +141,6 @@ class _NavTap extends StatelessWidget {
       return;
     }
     await HapticFeedback.selectionClick();
-  }
-
-  Future<void> _triggerLongPressFeedback(BuildContext context) async {
-    if (hapticStyle == _NavHapticStyle.action) {
-      await _triggerActionHaptic();
-      return;
-    }
-    await HapticFeedback.mediumImpact();
   }
 
   Future<void> _triggerActionHaptic() async {
@@ -192,13 +164,142 @@ class _NavTap extends StatelessWidget {
           unawaited(_triggerTapFeedback(context));
           onTap();
         },
-        onLongPress: onLongPress == null
-            ? null
-            : () {
-                unawaited(_triggerLongPressFeedback(context));
-                onLongPress!();
-              },
         child: child,
+      ),
+    );
+  }
+}
+
+class _VoiceHoldAddButton extends StatefulWidget {
+  const _VoiceHoldAddButton({required this.onTap, this.onVoiceLock});
+
+  final VoidCallback onTap;
+  final VoidCallback? onVoiceLock;
+
+  @override
+  State<_VoiceHoldAddButton> createState() => _VoiceHoldAddButtonState();
+}
+
+class _VoiceHoldAddButtonState extends State<_VoiceHoldAddButton> {
+  static const double _lockThreshold = 56;
+
+  bool _holding = false;
+  bool _locked = false;
+  double _dragOffset = 0;
+
+  Future<void> _triggerVoiceLock() async {
+    if (_locked || widget.onVoiceLock == null) {
+      return;
+    }
+    setState(() {
+      _locked = true;
+    });
+    try {
+      await HapticFeedback.heavyImpact();
+    } catch (_) {}
+    widget.onVoiceLock!();
+  }
+
+  void _resetState() {
+    if (!mounted) return;
+    setState(() {
+      _holding = false;
+      _locked = false;
+      _dragOffset = 0;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = _holding || _locked;
+    final progress = (_dragOffset / _lockThreshold).clamp(0.0, 1.0);
+    final label = _locked
+        ? 'Live'
+        : (_holding ? (progress >= 1 ? 'Release' : 'Drag up') : null);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onLongPressStart: widget.onVoiceLock == null
+          ? null
+          : (_) {
+              setState(() {
+                _holding = true;
+                _locked = false;
+                _dragOffset = 0;
+              });
+            },
+      onLongPressMoveUpdate: widget.onVoiceLock == null
+          ? null
+          : (details) {
+              if (_locked) return;
+              final dragOffset = (-details.offsetFromOrigin.dy).clamp(0.0, 96.0);
+              setState(() {
+                _dragOffset = dragOffset;
+              });
+              if (dragOffset >= _lockThreshold) {
+                unawaited(_triggerVoiceLock());
+              }
+            },
+      onLongPressEnd: widget.onVoiceLock == null
+          ? null
+          : (_) {
+              final shouldTrigger = !_locked && _dragOffset >= _lockThreshold;
+              if (shouldTrigger) {
+                unawaited(_triggerVoiceLock());
+              }
+              _resetState();
+            },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 58,
+        height: 58,
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFFDC2626) : const Color(0xFF007AFF),
+          borderRadius: BorderRadius.circular(29),
+          boxShadow: [
+            BoxShadow(
+              color: active
+                  ? const Color(0x29DC2626)
+                  : const Color(0x29007AFF),
+              blurRadius: 12 + (progress * 8),
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              active ? Icons.mic_rounded : Icons.add,
+              color: Colors.white,
+              size: 30,
+            ),
+            if (label != null)
+              Positioned(
+                top: -24,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
