@@ -38,6 +38,7 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _reconnectAttempt = 0;
+    _reconnectSecondsRemaining = 0;
     _reconnecting = false;
     try {
       final token = await TokenStore().getToken();
@@ -94,6 +95,7 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
         _error = null;
         _reconnecting = false;
         _reconnectAttempt = 0;
+        _reconnectSecondsRemaining = 0;
         _status = backgroundReconnect
             ? 'Reconnected. Restoring session...'
             : 'Starting live cashier...';
@@ -139,17 +141,40 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
       'delay=${delaySeconds}s reason=${reason ?? "-"}',
     );
     _safeSetState(() {
+      _reconnectSecondsRemaining = delaySeconds;
       _toolBusy = false;
-      _toolStatus = 'Disconnected. Reconnecting in ${delaySeconds}s.';
+      _toolStatus = _reconnectCountdownLabel();
       _status = _currentStatus();
     });
     if (shouldPlayCue) {
       unawaited(LiveCashierCueService.playReconnecting());
     }
-    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
-      _reconnectTimer = null;
-      unawaited(_attemptReconnect());
+    _reconnectTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_closingOverlay || !mounted) {
+        timer.cancel();
+        _reconnectTimer = null;
+        return;
+      }
+      if (_reconnectSecondsRemaining <= 1) {
+        timer.cancel();
+        _reconnectTimer = null;
+        _reconnectSecondsRemaining = 0;
+        unawaited(_attemptReconnect());
+        return;
+      }
+      _safeSetState(() {
+        _reconnectSecondsRemaining -= 1;
+        _toolStatus = _reconnectCountdownLabel();
+        _status = _currentStatus();
+      });
     });
+  }
+
+  String _reconnectCountdownLabel() {
+    if (_reconnectSecondsRemaining > 0) {
+      return 'Disconnected. Reconnecting in ${_reconnectSecondsRemaining}s.';
+    }
+    return 'Disconnected. Reconnecting...';
   }
 
   Future<void> _attemptReconnect() async {
@@ -189,7 +214,10 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
 
   String _currentStatus() {
     if (!_connected) {
-      return _reconnecting ? 'Disconnected. Reconnecting...' : 'Disconnected';
+      if (_reconnecting) {
+        return _reconnectCountdownLabel();
+      }
+      return 'Disconnected';
     }
     if (_modelResponding) {
       return '';
@@ -239,6 +267,7 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
     _closingOverlay = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _reconnectSecondsRemaining = 0;
     await _stopVoiceCapture();
     await _stopPlayerStream(forceStop: true);
     await _socket?.close();

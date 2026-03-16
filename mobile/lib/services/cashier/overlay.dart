@@ -82,6 +82,7 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   Future<void>? _playerInitFuture;
   Timer? _reconnectTimer;
   int _reconnectAttempt = 0;
+  int _reconnectSecondsRemaining = 0;
   bool _reconnecting = false;
   bool _closingOverlay = false;
   bool _awaitingTurnCompletion = false;
@@ -167,6 +168,7 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   void dispose() {
     _closingOverlay = true;
     _reconnectTimer?.cancel();
+    _reconnectSecondsRemaining = 0;
     _recordingSub?.cancel();
     _socket?.close();
     _playerDisposed = true;
