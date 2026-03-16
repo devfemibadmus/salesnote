@@ -1,5 +1,19 @@
 part of 'core.dart';
 
+String _wrapChatText(String text) {
+  final normalized = text.trim();
+  if (normalized.isEmpty) {
+    return normalized;
+  }
+  return normalized
+      .replaceAll('/', '/\u200B')
+      .replaceAll('-', '-\u200B')
+      .replaceAll('_', '_\u200B')
+      .replaceAll('.', '.\u200B')
+      .replaceAll(',', ',\u200B')
+      .replaceAll(':', ':\u200B');
+}
+
 String _actionBubbleSignature(String text, bool busy) {
   final normalized = text.trim();
   final reconnectPrefix = 'Disconnected. Reconnecting in ';
@@ -491,13 +505,14 @@ class _ChatBubble extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                text.trim(),
+                _wrapChatText(text),
                 style: TextStyle(
                   color: isUser ? Colors.white : const Color(0xFF0F172A),
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   height: 1.45,
                 ),
+                softWrap: true,
               ),
               if (pending) ...[
                 const SizedBox(height: 10),
@@ -563,7 +578,7 @@ class _ActionBubble extends StatelessWidget {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  text.trim(),
+                  _wrapChatText(text),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Color(0xFF334155),

@@ -377,100 +377,111 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(28),
-              child: _panelExpanded
-                  ? Column(
-                      children: [
-                        GestureDetector(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final showExpandedContent =
+                      _panelExpanded && constraints.maxHeight >= 140;
+                  return showExpandedContent
+                      ? Column(
+                          children: [
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onPanStart: (_) => _stopPanelSpring(),
+                              onPanUpdate: (details) => _dragPanel(
+                                details: details,
+                                screenSize: media.size,
+                                padding: media.padding,
+                                panelWidth: expandedPanelWidth,
+                                panelHeight: panelHeight,
+                              ),
+                              onPanEnd: (_) => _settlePanel(
+                                screenSize: media.size,
+                                padding: media.padding,
+                                panelWidth: expandedPanelWidth,
+                                panelHeight: panelHeight,
+                              ),
+                              child: _PersistentCashierHeader(
+                                title: _error != null
+                                    ? 'Live cashier unavailable'
+                                    : (_loading
+                                          ? 'Starting live cashier'
+                                          : 'Live cashier'),
+                                status: _currentStatus(),
+                                onCollapse: _togglePanel,
+                                onClose: _closeOverlay,
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  14,
+                                  10,
+                                  14,
+                                  10,
+                                ),
+                                child: _loading
+                                    ? _LoadingBody(
+                                        controller: _pulseController,
+                                        status: _status,
+                                      )
+                                    : _error != null
+                                    ? _ErrorBody(
+                                        message: _error!,
+                                        retrying: _retryingBootstrap,
+                                        onRetry: _retryBootstrap,
+                                      )
+                                    : _ReadyBody(
+                                        controller: _pulseController,
+                                        recording: _isRecording,
+                                        responding: _modelResponding,
+                                        status: _currentStatus(),
+                                        toolBusy: _toolBusy,
+                                        toolStatus: _toolStatus,
+                                        transcriptEntries:
+                                            List<_TranscriptEntry>.unmodifiable(
+                                              _transcriptEntries,
+                                            ),
+                                        currentUserTranscript:
+                                            _currentUserTranscript,
+                                        currentModelTranscript:
+                                            _currentModelTranscript,
+                                      ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onPanStart: (_) => _stopPanelSpring(),
                           onPanUpdate: (details) => _dragPanel(
                             details: details,
                             screenSize: media.size,
                             padding: media.padding,
-                            panelWidth: expandedPanelWidth,
+                            panelWidth: compactPanelWidth,
                             panelHeight: panelHeight,
                           ),
                           onPanEnd: (_) => _settlePanel(
                             screenSize: media.size,
                             padding: media.padding,
-                            panelWidth: expandedPanelWidth,
+                            panelWidth: compactPanelWidth,
                             panelHeight: panelHeight,
                           ),
-                          child: _PersistentCashierHeader(
-                            title: _error != null
-                                ? 'Live cashier unavailable'
-                                : (_loading
-                                      ? 'Starting live cashier'
-                                      : 'Live cashier'),
+                          child: _PersistentCashierCompact(
+                            loading: _loading,
+                            error: _error,
+                            responding: _modelResponding,
+                            toolBusy: _toolBusy,
                             status: _currentStatus(),
-                            onCollapse: _togglePanel,
+                            toolStatus: _toolStatus,
+                            onExpand: _expandPanel,
                             onClose: _closeOverlay,
+                            dockFraction: dockFraction,
+                            dockSide: panelDockSide,
                           ),
-                        ),
-                        const Divider(height: 1),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-                            child: _loading
-                                ? _LoadingBody(
-                                    controller: _pulseController,
-                                    status: _status,
-                                  )
-                                : _error != null
-                                ? _ErrorBody(
-                                    message: _error!,
-                                    retrying: _retryingBootstrap,
-                                    onRetry: _retryBootstrap,
-                                  )
-                                : _ReadyBody(
-                                    controller: _pulseController,
-                                    recording: _isRecording,
-                                    responding: _modelResponding,
-                                    status: _currentStatus(),
-                                    toolBusy: _toolBusy,
-                                    toolStatus: _toolStatus,
-                                    transcriptEntries:
-                                        List<_TranscriptEntry>.unmodifiable(
-                                          _transcriptEntries,
-                                        ),
-                                    currentUserTranscript:
-                                        _currentUserTranscript,
-                                    currentModelTranscript:
-                                        _currentModelTranscript,
-                                  ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onPanStart: (_) => _stopPanelSpring(),
-                      onPanUpdate: (details) => _dragPanel(
-                        details: details,
-                        screenSize: media.size,
-                        padding: media.padding,
-                        panelWidth: compactPanelWidth,
-                        panelHeight: panelHeight,
-                      ),
-                      onPanEnd: (_) => _settlePanel(
-                        screenSize: media.size,
-                        padding: media.padding,
-                        panelWidth: compactPanelWidth,
-                        panelHeight: panelHeight,
-                      ),
-                      child: _PersistentCashierCompact(
-                        loading: _loading,
-                        error: _error,
-                        responding: _modelResponding,
-                        toolBusy: _toolBusy,
-                        status: _currentStatus(),
-                        toolStatus: _toolStatus,
-                        onExpand: _expandPanel,
-                        onClose: _closeOverlay,
-                        dockFraction: dockFraction,
-                        dockSide: panelDockSide,
-                      ),
-                    ),
+                        );
+                },
+              ),
             ),
           ),
         ),
@@ -587,7 +598,7 @@ class _PersistentCashierCompact extends StatelessWidget {
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: horizontalPadding,
-            vertical: 10,
+            vertical: 8,
           ),
           child: Row(
             mainAxisAlignment: dockFraction > 0.92
@@ -599,8 +610,8 @@ class _PersistentCashierCompact extends StatelessWidget {
                   left: dockSide == _PanelDockSide.right ? iconLeftPadding : 0,
                 ),
                 child: Container(
-                  width: 44,
-                  height: 44,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
                     color: badgeColor.withValues(alpha: 0.12),
                     shape: BoxShape.circle,
@@ -621,15 +632,19 @@ class _PersistentCashierCompact extends StatelessWidget {
                   child: Opacity(
                     opacity: textOpacity,
                     child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
                           'Live cashier running',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Color(0xFF0F172A),
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
+                            height: 1.05,
                           ),
                         ),
                         Text(
@@ -640,8 +655,9 @@ class _PersistentCashierCompact extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Color(0xFF64748B),
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.w600,
+                            height: 1.05,
                           ),
                         ),
                       ],
@@ -663,6 +679,12 @@ class _PersistentCashierCompact extends StatelessWidget {
                     opacity: closeOpacity,
                     child: IconButton(
                       onPressed: onClose,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 36,
+                        height: 36,
+                      ),
+                      visualDensity: VisualDensity.compact,
                       icon: const Icon(Icons.close_rounded),
                       color: const Color(0xFF64748B),
                     ),
