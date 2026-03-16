@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_sound/flutter_sound.dart' as fs;
 import 'package:http/http.dart' as http;
 
@@ -39,6 +39,15 @@ class LiveCashierCueService {
   static const Duration _reconnectedCooldown =
       TimingConstants.liveCashierCueReconnectedCooldown;
 
+  static void _log(
+    String message, {
+    int level = 0,
+    String name = 'SalesnoteBootstrap',
+  }) {
+    developer.log(message, name: name, level: level);
+    debugPrint('$name: $message');
+  }
+
   static String _cueKey(LiveCashierCue cue) {
     switch (cue) {
       case LiveCashierCue.actionStarted:
@@ -68,18 +77,23 @@ class LiveCashierCueService {
         .toSet()
         .toList(growable: false);
     if (normalizedUrls.isEmpty) {
+      _log('cue warm skipped: no cue URLs');
       return true;
     }
-    developer.log('warming live cashier cues', name: 'SalesnoteBootstrap');
+    _log('warming ${normalizedUrls.length} live cashier cues');
     final results = await Future.wait<bool>(
       normalizedUrls.map(_cacheCueByUrl),
       eagerError: false,
     );
     final warmedCount = results.where((item) => item).length;
-    developer.log(
-      'warmed $warmedCount/${normalizedUrls.length} live cashier cues',
-      name: 'SalesnoteBootstrap',
-    );
+    _log('warmed $warmedCount/${normalizedUrls.length} live cashier cues');
+    if (warmedCount != normalizedUrls.length) {
+      final failedUrls = <String>[
+        for (var index = 0; index < normalizedUrls.length; index++)
+          if (!results[index]) normalizedUrls[index],
+      ];
+      _log('cue warm failedUrls=${failedUrls.join(', ')}', level: 900);
+    }
     return warmedCount == normalizedUrls.length;
   }
 
@@ -193,13 +207,16 @@ class LiveCashierCueService {
   static Future<bool> _cacheCueByUrl(String url) async {
     final cached = LocalCache.loadCachedMedia(url);
     if (cached != null && cached.isNotEmpty) {
+      _log('cue cache hit url=$url');
       return true;
     }
     final bytes = await _fetchCueBytes(url);
     if (bytes == null || bytes.isEmpty) {
+      _log('cue cache miss/fetch failed url=$url', level: 900);
       return false;
     }
     await LocalCache.saveCachedMedia(url, bytes);
+    _log('cue cached url=$url bytes=${bytes.length}');
     return true;
   }
 
@@ -209,10 +226,15 @@ class LiveCashierCueService {
           .get(Uri.parse(url))
           .timeout(_networkTimeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
+        _log(
+          'cue fetch bad status url=$url status=${response.statusCode}',
+          level: 900,
+        );
         return null;
       }
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) {
+        _log('cue fetch invalid json payload url=$url', level: 900);
         return null;
       }
       final files = (decoded['files'] as List<dynamic>? ?? const <dynamic>[])
@@ -239,8 +261,9 @@ class LiveCashierCueService {
         }
         return base64Decode(dataUri.substring(commaIndex + 1));
       }
+      _log('cue fetch found no usable audio file url=$url', level: 900);
     } catch (error) {
-      developer.log(
+      _log(
         'failed to fetch live cashier cue from $url: $error',
         name: 'LiveCashierCueService',
         level: 900,

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
+
 import '../../app/constants/runtime.dart';
 import 'flag.dart';
 import 'cues.dart';
@@ -8,28 +10,36 @@ import 'cues.dart';
 class StartupWarmupService {
   StartupWarmupService._();
 
+  static void _log(String message, {int level = 0}) {
+    developer.log(message, name: 'SalesnoteBootstrap', level: level);
+    debugPrint('SalesnoteBootstrap: $message');
+  }
+
   static Future<void> ensureReady() async {
     var attempt = 0;
     while (true) {
       attempt += 1;
-      developer.log(
-        'startup:warmup:attempt $attempt',
-        name: 'SalesnoteBootstrap',
-      );
+      final stopwatch = Stopwatch()..start();
+      _log('startup:warmup:attempt $attempt');
       final results = await Future.wait<bool>([
         FlagService.warmAllFlags(),
         LiveCashierCueService.warmAllCues(),
       ]);
-      if (results.every((item) => item)) {
-        developer.log(
-          'startup:warmup:ready on attempt $attempt',
-          name: 'SalesnoteBootstrap',
-        );
+      final flagsReady = results[0];
+      final cuesReady = results[1];
+      _log(
+        'startup:warmup:result attempt=$attempt '
+        'flagsReady=$flagsReady cuesReady=$cuesReady '
+        'elapsed=${stopwatch.elapsedMilliseconds}ms',
+      );
+      if (flagsReady && cuesReady) {
+        _log('startup:warmup:ready on attempt $attempt');
         return;
       }
-      developer.log(
-        'startup:warmup:retrying after failed attempt $attempt',
-        name: 'SalesnoteBootstrap',
+      _log(
+        'startup:warmup:retrying after failed attempt $attempt '
+        '(flagsReady=$flagsReady cuesReady=$cuesReady) '
+        'in ${TimingConstants.startupWarmRetryDelay.inSeconds}s',
         level: 900,
       );
       await Future<void>.delayed(TimingConstants.startupWarmRetryDelay);

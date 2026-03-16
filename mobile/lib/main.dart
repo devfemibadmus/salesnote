@@ -79,56 +79,42 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   late final Future<_AuthGateBootstrap> _bootstrapFuture = _loadBootstrap();
 
+  void _logBootstrap(String message, {int level = 0}) {
+    developer.log(message, name: 'SalesnoteBootstrap', level: level);
+    debugPrint('SalesnoteBootstrap: $message');
+  }
+
   Future<_AuthGateBootstrap> _loadBootstrap() async {
     final stopwatch = Stopwatch()..start();
-    developer.log('bootstrap:start', name: 'SalesnoteBootstrap');
+    _logBootstrap('bootstrap:start');
 
-    developer.log('bootstrap:firebase:init', name: 'SalesnoteBootstrap');
+    _logBootstrap('bootstrap:firebase:init');
     await Firebase.initializeApp();
-    developer.log(
-      'bootstrap:firebase:done ${stopwatch.elapsedMilliseconds}ms',
-      name: 'SalesnoteBootstrap',
-    );
+    _logBootstrap('bootstrap:firebase:done ${stopwatch.elapsedMilliseconds}ms');
 
-    developer.log('bootstrap:hive:init', name: 'SalesnoteBootstrap');
+    _logBootstrap('bootstrap:hive:init');
     await Hive.initFlutter();
-    developer.log(
-      'bootstrap:hive:done ${stopwatch.elapsedMilliseconds}ms',
-      name: 'SalesnoteBootstrap',
-    );
+    _logBootstrap('bootstrap:hive:done ${stopwatch.elapsedMilliseconds}ms');
 
-    developer.log('bootstrap:cache:init', name: 'SalesnoteBootstrap');
+    _logBootstrap('bootstrap:cache:init');
     await LocalCache.init();
-    developer.log(
-      'bootstrap:cache:done ${stopwatch.elapsedMilliseconds}ms',
-      name: 'SalesnoteBootstrap',
-    );
+    _logBootstrap('bootstrap:cache:done ${stopwatch.elapsedMilliseconds}ms');
 
-    developer.log('bootstrap:warmup:start', name: 'SalesnoteBootstrap');
+    _logBootstrap('bootstrap:warmup:start');
     await StartupWarmupService.ensureReady();
-    developer.log(
-      'bootstrap:warmup:done ${stopwatch.elapsedMilliseconds}ms',
-      name: 'SalesnoteBootstrap',
-    );
+    _logBootstrap('bootstrap:warmup:done ${stopwatch.elapsedMilliseconds}ms');
 
-    developer.log('bootstrap:onboarding:read', name: 'SalesnoteBootstrap');
+    _logBootstrap('bootstrap:onboarding:read');
     final onboardingComplete = await LocalCache.isOnboardingComplete();
-    developer.log(
+    _logBootstrap(
       'bootstrap:onboarding:done ${stopwatch.elapsedMilliseconds}ms',
-      name: 'SalesnoteBootstrap',
     );
 
-    developer.log('bootstrap:session:read', name: 'SalesnoteBootstrap');
+    _logBootstrap('bootstrap:session:read');
     final hasSession = await TokenStore().hasSessionHint();
-    developer.log(
-      'bootstrap:session:done ${stopwatch.elapsedMilliseconds}ms',
-      name: 'SalesnoteBootstrap',
-    );
+    _logBootstrap('bootstrap:session:done ${stopwatch.elapsedMilliseconds}ms');
 
-    developer.log(
-      'bootstrap:done ${stopwatch.elapsedMilliseconds}ms',
-      name: 'SalesnoteBootstrap',
-    );
+    _logBootstrap('bootstrap:done ${stopwatch.elapsedMilliseconds}ms');
     return _AuthGateBootstrap(
       onboardingComplete: onboardingComplete,
       hasSession: hasSession,
