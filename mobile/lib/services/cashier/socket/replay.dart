@@ -1,6 +1,44 @@
 part of '../core.dart';
 
 extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
+  Future<void> _configureLiveAudioSession() async {
+    if (_liveAudioSessionConfigured) {
+      return;
+    }
+    final existing = _liveAudioSessionFuture;
+    if (existing != null) {
+      await existing;
+      return;
+    }
+    final future = () async {
+      final session = await AudioSession.instance;
+      await session.configure(
+        const AudioSessionConfiguration(
+          avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
+          avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions(0x0C),
+          avAudioSessionMode: AVAudioSessionMode.voiceChat,
+          androidAudioAttributes: AndroidAudioAttributes(
+            contentType: AndroidAudioContentType.speech,
+            usage: AndroidAudioUsage.voiceCommunication,
+          ),
+          androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
+          androidWillPauseWhenDucked: false,
+        ),
+      );
+      await session.setActive(true);
+      _liveAudioSessionConfigured = true;
+      _log('audio:session configured');
+    }();
+    _liveAudioSessionFuture = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_liveAudioSessionFuture, future)) {
+        _liveAudioSessionFuture = null;
+      }
+    }
+  }
+
   Future<void> _configurePlayer() async {
     if (_playerDisposed || _playerReady) {
       return;
@@ -11,6 +49,7 @@ extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
       return;
     }
     final future = () async {
+      await _configureLiveAudioSession();
       await _player.openPlayer();
       _playerReady = true;
     }();

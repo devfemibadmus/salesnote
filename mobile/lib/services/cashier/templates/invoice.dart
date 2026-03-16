@@ -7,6 +7,7 @@ extension _LiveCashierOverlayInvoiceTemplates on _LiveCashierOverlayState {
   ) {
     final draftSummary = _templateMap(response['draft_summary']);
     if (_canUseInvoiceDraftTemplate(name) &&
+        _isReadyDraftTemplateResponse(response) &&
         _templateText(draftSummary?['kind']).toLowerCase() == 'invoice') {
       return _buildInvoiceDraftTemplate(name, response, draftSummary!);
     }

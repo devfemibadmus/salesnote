@@ -95,6 +95,8 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   Future<void> _actionHistoryQueue = Future<void>.value();
   final Map<String, _SalesWindowCacheEntry> _salesWindowCache =
       <String, _SalesWindowCacheEntry>{};
+  bool _liveAudioSessionConfigured = false;
+  Future<void>? _liveAudioSessionFuture;
 
   @override
   void initState() {

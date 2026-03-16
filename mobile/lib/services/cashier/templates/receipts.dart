@@ -7,6 +7,7 @@ extension _LiveCashierOverlayReceiptTemplates on _LiveCashierOverlayState {
   ) {
     final draftSummary = _templateMap(response['draft_summary']);
     if (_canUseReceiptDraftTemplate(name) &&
+        _isReadyDraftTemplateResponse(response) &&
         _templateText(draftSummary?['kind']).toLowerCase() == 'receipt') {
       return _buildReceiptDraftTemplate(name, response, draftSummary!);
     }

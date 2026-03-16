@@ -35,6 +35,7 @@ dependencies:
     saver_gallery: ^4.1.0
     url_launcher: ^6.3.2
     flutter_secure_storage: ^10.0.0
+    audio_session: ^0.2.1
     record: ^6.2.0
     flutter_sound: ^9.30.0
 

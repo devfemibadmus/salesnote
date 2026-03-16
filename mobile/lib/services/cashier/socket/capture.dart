@@ -85,6 +85,7 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
     if (_loading || _error != null || !_connected || _isRecording) return;
 
     try {
+      await _configureLiveAudioSession();
       final granted = await _recorder.hasPermission();
       if (!granted) {
         if (!mounted) return;

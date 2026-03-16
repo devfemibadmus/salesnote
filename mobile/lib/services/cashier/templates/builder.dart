@@ -38,7 +38,7 @@ extension _LiveCashierOverlayTemplates on _LiveCashierOverlayState {
     Map<String, dynamic> response,
   ) {
     final result = _templateText(response['result']).toLowerCase();
-    if (result == 'error') {
+    if (result.isNotEmpty && result != 'ok') {
       return null;
     }
 
@@ -140,6 +140,15 @@ extension _LiveCashierOverlayTemplates on _LiveCashierOverlayState {
   bool _isReceiptDraftResponse(Map<String, dynamic> response) {
     final summary = _templateMap(response['draft_summary']);
     return _templateText(summary?['kind']).toLowerCase() == 'receipt';
+  }
+
+  bool _isReadyDraftTemplateResponse(Map<String, dynamic> response) {
+    final result = _templateText(response['result']).toLowerCase();
+    if (result == 'needs_input') {
+      return false;
+    }
+    return _templateStringList(response['missing_labels']).isEmpty &&
+        _templateStringList(response['missing_fields']).isEmpty;
   }
 
   String _responseSaleStatus(Map<String, dynamic> response) {
