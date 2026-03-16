@@ -69,23 +69,19 @@ jobs:
             - name: Write API env file
               uses: appleboy/ssh-action@master
               env:
-                  API_ENV_FILE: ${{ secrets.API_ENV_FILE }}
-                  API_ENV_FILE_B64: ${{ secrets.API_ENV_FILE_B64 }}
+                  API_ENV_CONTENT: ${{ secrets.API_ENV_CONTENT }}
               with:
                   host: ${{ secrets.API_SSH_HOST }}
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
-                  envs: API_ENV_FILE,API_ENV_FILE_B64
+                  envs: API_ENV_CONTENT
                   script: |
                       mkdir -p "${{ env.API_DIR }}"
-                      if [ -n "$API_ENV_FILE_B64" ]; then
-                        printf '%s' "$API_ENV_FILE_B64" | base64 -d > "${{ env.API_DIR }}/.env"
-                      elif [ -n "$API_ENV_FILE" ]; then
-                        printf '%s' "$API_ENV_FILE" > "${{ env.API_DIR }}/.env"
-                      else
-                        echo "Missing API env secret. Set API_ENV_FILE or API_ENV_FILE_B64."
+                      if [ -z "$API_ENV_CONTENT" ]; then
+                        echo "Missing API env secret. Set API_ENV_CONTENT."
                         exit 1
                       fi
+                      printf '%s' "$API_ENV_CONTENT" | sed 's/\r$//' > "${{ env.API_DIR }}/.env"
 
             - name: Upload binary
               uses: appleboy/scp-action@master

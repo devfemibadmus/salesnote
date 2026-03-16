@@ -9,19 +9,19 @@
 - `API_SSH_HOST`
 - `API_SSH_USER`
 - `API_SSH_KEY`
-- `API_ENV_FILE_B64`
+- `API_ENV_CONTENT`
 - `API_FIREBASE_ADMINSDK_JSON_B64`
 - `SSL_CERT_B64`
 - `SSL_KEY_B64`
 
-### Generate Base64 Secrets on Windows
-
-```powershell
-[Convert]::ToBase64String([System.IO.File]::ReadAllBytes("C:\Users\Femi.Badmus\Desktop\Sales Note\backend\.env.production")) | Set-Clipboard
-```
-
 ```powershell
 [Convert]::ToBase64String([System.IO.File]::ReadAllBytes("C:\Users\Femi.Badmus\Desktop\Sales Note\backend\firebase-adminsdk.json")) | Set-Clipboard
+```
+
+### Copy `.env` content on Windows
+
+```powershell
+Get-Content "C:\Users\Femi.Badmus\Desktop\Sales Note\backend\.env.production" -Raw | Set-Clipboard
 ```
 
 ### Generate Deploy SSH Key on Windows

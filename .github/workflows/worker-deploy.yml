@@ -16,7 +16,7 @@ on:
 
 jobs:
     build-and-deploy:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-22.04
         steps:
             - name: Checkout code
               uses: actions/checkout@v3
@@ -98,23 +98,19 @@ jobs:
             - name: Write worker env file
               uses: appleboy/ssh-action@master
               env:
-                  API_ENV_FILE: ${{ secrets.API_ENV_FILE }}
-                  API_ENV_FILE_B64: ${{ secrets.API_ENV_FILE_B64 }}
+                  WORKER_ENV_CONTENT: ${{ secrets.WORKER_ENV_CONTENT }}
               with:
                   host: ${{ secrets.API_SSH_HOST }}
                   username: ${{ secrets.API_SSH_USER }}
                   key: ${{ secrets.API_SSH_KEY }}
-                  envs: API_ENV_FILE,API_ENV_FILE_B64
+                  envs: WORKER_ENV_CONTENT
                   script: |
                       set -e
-                      if [ -n "$API_ENV_FILE_B64" ]; then
-                        printf '%s' "$API_ENV_FILE_B64" | base64 -d > /home/salesnote/worker/.env
-                      elif [ -n "$API_ENV_FILE" ]; then
-                        printf '%s' "$API_ENV_FILE" > /home/salesnote/worker/.env
-                      else
-                        echo "Missing API env secret. Set API_ENV_FILE or API_ENV_FILE_B64."
+                      if [ -z "$WORKER_ENV_CONTENT" ]; then
+                        echo "Missing worker env secret. Set WORKER_ENV_CONTENT."
                         exit 1
                       fi
+                      printf '%s' "$WORKER_ENV_CONTENT" | sed 's/\r$//' > /home/salesnote/worker/.env
 
             - name: Write worker Firebase admin SDK file
               uses: appleboy/ssh-action@master
