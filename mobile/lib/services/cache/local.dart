@@ -24,6 +24,7 @@ class LocalCache {
   static const _preferredCurrencyCodeKey = StorageKeys.preferredCurrencyCode;
   static const _cacheSchemaVersionKey = StorageKeys.cacheSchemaVersion;
   static const _cacheSchemaVersion = StorageVersions.cacheSchema;
+  static const _liveCashierActionHistoryLimit = 10;
   static Future<void>? _initFuture;
   static const _allBoxes = StorageBoxes.all;
 
@@ -378,6 +379,31 @@ class LocalCache {
         .map((e) => e.toString().trim())
         .where((e) => e.isNotEmpty)
         .toList();
+  }
+
+  static Future<void> saveLiveCashierActionHistory(List<String> actions) async {
+    final box = Hive.box<String>(_pageBox);
+    final normalized = actions
+        .map((entry) => entry.trim())
+        .where((entry) => entry.isNotEmpty)
+        .toList(growable: false);
+    final capped = normalized.length <= _liveCashierActionHistoryLimit
+        ? normalized
+        : normalized
+              .sublist(normalized.length - _liveCashierActionHistoryLimit)
+              .toList(growable: false);
+    await box.put(StorageKeys.liveCashierActionHistory, jsonEncode(capped));
+  }
+
+  static List<String> getLiveCashierActionHistory() {
+    final box = Hive.box<String>(_pageBox);
+    final raw = box.get(StorageKeys.liveCashierActionHistory);
+    if (raw == null) return <String>[];
+    final data = jsonDecode(raw) as List<dynamic>;
+    return data
+        .map((entry) => entry.toString().trim())
+        .where((entry) => entry.isNotEmpty)
+        .toList(growable: false);
   }
 
   static Future<void> saveCachedMedia(String url, Uint8List bytes) async {

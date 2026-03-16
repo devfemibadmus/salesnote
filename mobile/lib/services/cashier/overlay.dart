@@ -94,6 +94,7 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   List<Map<String, dynamic>>? _pendingToolIntent;
   String? _pendingToolIntentLabel;
   bool _pendingNonReplayableToolIntent = false;
+  Future<void> _actionHistoryQueue = Future<void>.value();
   final Map<String, _SalesWindowCacheEntry> _salesWindowCache =
       <String, _SalesWindowCacheEntry>{};
 

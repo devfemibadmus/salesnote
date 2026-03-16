@@ -1,6 +1,43 @@
 part of '../core.dart';
 
 extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
+  String _openingGreetingPrompt() {
+    const defaultGreeting =
+        'Reply with exactly this and nothing else: Hello from SalesNote Live Cashier. How can I help with receipts, invoices, items, or reports?';
+
+    final history = LocalCache.getLiveCashierActionHistory();
+    if (history.isEmpty) {
+      return defaultGreeting;
+    }
+
+    final recentActions = <String>[];
+    for (final action in history.reversed) {
+      final normalized = action.trim();
+      if (normalized.isEmpty) {
+        continue;
+      }
+      if (recentActions.contains(normalized)) {
+        continue;
+      }
+      recentActions.add(normalized);
+      if (recentActions.length == 3) {
+        break;
+      }
+    }
+
+    if (recentActions.isEmpty) {
+      return defaultGreeting;
+    }
+
+    final actionText = recentActions.join(', ');
+    final prompts = <String>[
+      'Reply with one short natural greeting and ask what the user wants next. You may naturally reference one or two recent actions if helpful: $actionText. Do not list everything.',
+      'Reply with a brief friendly welcome back and ask what they want to do now. If it sounds natural, mention a recent action such as: $actionText.',
+      'Reply with one short conversational sentence asking how you can help next. You may lightly reference recent tasks like: $actionText.',
+    ];
+    return prompts[math.Random().nextInt(prompts.length)];
+  }
+
   Future<void> _captureAndSendPhoto() async {
     final socket = _socket;
     if (!_connected ||
@@ -294,10 +331,6 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
         _status = _currentStatus();
       });
     }
-    unawaited(
-      _sendClientContentTurn(
-        'Reply with exactly this and nothing else: Hello from SalesNote Live Cashier. How can I help with receipts, invoices, items, or reports?',
-      ),
-    );
+    unawaited(_sendClientContentTurn(_openingGreetingPrompt()));
   }
 }

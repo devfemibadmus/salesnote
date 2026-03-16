@@ -32,6 +32,7 @@ class StorageKeys {
   static const signatures = 'signatures';
   static const notifications = 'notifications';
   static const itemSuggestions = 'item_suggestions';
+  static const liveCashierActionHistory = 'live_cashier_action_history';
   static const flagCacheVersion = 'flag_cache_version';
 
   static String salesPagePrefix({required bool includeItems}) =>

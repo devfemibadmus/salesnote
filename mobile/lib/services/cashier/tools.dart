@@ -120,6 +120,22 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
     return 'Unable to complete that action right now.';
   }
 
+  void _saveToolActionHistory(String label) {
+    final normalizedLabel = label.trim();
+    if (normalizedLabel.isEmpty) {
+      return;
+    }
+    _actionHistoryQueue = _actionHistoryQueue
+        .then((_) async {
+          final existing = LocalCache.getLiveCashierActionHistory();
+          await LocalCache.saveLiveCashierActionHistory(<String>[
+            ...existing,
+            normalizedLabel,
+          ]);
+        })
+        .catchError((_) {});
+  }
+
   Future<void> _handleToolCalls(List functionCalls) async {
     final responses = <Map<String, dynamic>>[];
     final pendingCalls = functionCalls
@@ -155,6 +171,7 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
             (call['args'] as Map?)?.cast<String, dynamic>() ??
             const <String, dynamic>{};
         _log('tool:call name=$name args=$args');
+        _saveToolActionHistory(_toolActionLabel(name));
         if (mounted) {
           _safeSetState(() {
             _toolBusy = true;
