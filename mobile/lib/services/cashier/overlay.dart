@@ -39,7 +39,7 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   bool _loading = true;
   bool _connected = false;
   bool _isRecording = false;
-  bool _micMuted = true;
+  bool _micMuted = false;
   bool _modelResponding = false;
   bool _setupReady = false;
   bool _openingGreetingSent = false;

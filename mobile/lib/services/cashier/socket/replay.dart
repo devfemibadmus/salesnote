@@ -1,6 +1,22 @@
 part of '../core.dart';
 
 extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
+  Future<void> _forcePreferredOutputRoute() async {
+    if (!Platform.isAndroid) {
+      return;
+    }
+    try {
+      final audioManager = AndroidAudioManager();
+      await audioManager.setMode(AndroidAudioHardwareMode.inCommunication);
+      await audioManager.stopBluetoothSco();
+      await audioManager.setBluetoothScoOn(false);
+      await audioManager.setSpeakerphoneOn(true);
+      _log('audio:route speakerphone=on');
+    } catch (e) {
+      _log('audio:route:error $e');
+    }
+  }
+
   Future<void> _configureLiveAudioSession() async {
     if (_liveAudioSessionConfigured) {
       return;
@@ -15,7 +31,7 @@ extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
       await session.configure(
         const AudioSessionConfiguration(
           avAudioSessionCategory: AVAudioSessionCategory.playAndRecord,
-          avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions(0x0C),
+          avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions(0x2C),
           avAudioSessionMode: AVAudioSessionMode.voiceChat,
           androidAudioAttributes: AndroidAudioAttributes(
             contentType: AndroidAudioContentType.speech,
@@ -26,6 +42,7 @@ extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
         ),
       );
       await session.setActive(true);
+      await _forcePreferredOutputRoute();
       _liveAudioSessionConfigured = true;
       _log('audio:session configured');
     }();

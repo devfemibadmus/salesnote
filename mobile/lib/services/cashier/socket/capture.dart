@@ -146,8 +146,7 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
     final socket = _socket;
     if (socket == null ||
         socket.readyState != WebSocket.open ||
-        chunk.isEmpty ||
-        _micMuted) {
+        chunk.isEmpty) {
       return;
     }
     _markTurnPending();
@@ -194,7 +193,7 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
     }
   }
 
-  Future<void> _setMicMuted(bool value, {bool sendAudioEnd = true}) async {
+  Future<void> _setMicMuted(bool value) async {
     if (_micMuted == value && _isRecording) {
       if (mounted) {
         _safeSetState(() => _status = _currentStatus());
@@ -206,20 +205,10 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
     if (mounted) {
       _safeSetState(() => _status = _currentStatus());
     }
-    final socket = _socket;
-    if (socket == null || socket.readyState != WebSocket.open) {
-      return;
-    }
     if (wasMuted && !value) {
       _log('mic:unmuted');
-      return;
-    }
-    if (!wasMuted && value && sendAudioEnd) {
-      socket.add(
-        jsonEncode({
-          'realtimeInput': {'audioStreamEnd': true},
-        }),
-      );
+    } else if (!wasMuted && value) {
+      _log('mic:muted');
     }
   }
 
@@ -248,7 +237,7 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
       await _startVoiceCapture();
     }
     if (_micMuted) {
-      await _setMicMuted(false, sendAudioEnd: false);
+      await _setMicMuted(false);
       _log('mic:auto-unmute');
     }
   }
@@ -258,7 +247,7 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
     final socket = _socket;
     if (socket == null || socket.readyState != WebSocket.open) return;
     _openingGreetingSent = true;
-    _openingGreetingPendingUnmute = true;
+    _openingGreetingPendingUnmute = false;
     _log('greeting:send');
     if (mounted) {
       _safeSetState(() {

@@ -208,6 +208,9 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
       }
       return;
     }
+    if (!_micMuted) {
+      await _ensureLiveMicReady();
+    }
     unawaited(LiveCashierCueService.playBootstrapReady());
     _sendOpeningGreeting();
   }
