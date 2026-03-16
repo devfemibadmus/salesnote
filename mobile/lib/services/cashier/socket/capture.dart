@@ -102,6 +102,12 @@ extension _LiveCashierOverlaySocketCapture on _LiveCashierOverlayState {
           autoGain: true,
           echoCancel: true,
           noiseSuppress: true,
+          androidConfig: AndroidRecordConfig(
+            service: AndroidService(
+              title: 'Sales Note Live Cashier',
+              content: 'Live cashier microphone is active',
+            ),
+          ),
           streamBufferSize: 4096,
         ),
       );
