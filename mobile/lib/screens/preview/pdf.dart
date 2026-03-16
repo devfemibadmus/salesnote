@@ -13,11 +13,9 @@ extension _PreviewPdf on _SalePreviewScreenState {
               boldItalic: pdfFonts.bold,
             ),
     );
-    final timestamp = widget.createdAt ?? DateTime.now();
+    final timestamp = _documentTimestamp;
     final dateText = DateFormat('MMM d, yyyy | HH:mm').format(timestamp);
-    final receiptNo =
-        widget.receiptNumber ??
-        '#${widget.status == SaleStatus.invoice ? 'INV' : 'REC'}-${timestamp.millisecondsSinceEpoch % 1000000}';
+    final receiptNo = _documentNumber;
 
     final shopLogoBytes = await _loadNetworkImageBytes(widget.shop?.logoUrl);
     final signatureBytes = await _loadNetworkImageBytes(
@@ -511,7 +509,10 @@ extension _PreviewPdf on _SalePreviewScreenState {
   String _receiptFileName(String extension) {
     final now = DateTime.now();
     final name = widget.customerName.trim().isNotEmpty
-        ? widget.customerName.trim().replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), '').replaceAll(' ', '_')
+        ? widget.customerName
+              .trim()
+              .replaceAll(RegExp(r'[^a-zA-Z0-9 ]'), '')
+              .replaceAll(' ', '_')
         : 'Customer';
     final total = widget.total.toStringAsFixed(2);
     final stamp = DateFormat('yyyyMMdd_HHmmss').format(now);

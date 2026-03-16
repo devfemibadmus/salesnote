@@ -14,7 +14,10 @@ class PreviewService {
   static bool _opening = false;
   static final ValueNotifier<int> cacheRevision = ValueNotifier<int>(0);
 
-  static Future<void> openById(String saleId) async {
+  static Future<void> openById(
+    String saleId, {
+    bool printOnOpen = false,
+  }) async {
     final navigator = AppNavigator.key.currentState;
     if (navigator == null || _opening) {
       return;
@@ -70,6 +73,7 @@ class PreviewService {
       final previewRoute = MaterialPageRoute<void>(
         builder: (_) => SalePreviewScreen(
           isCreatedSale: true,
+          autoPrintOnLoad: printOnOpen,
           status: saleDetail.status,
           shop: shop,
           signature: signature,
@@ -89,19 +93,19 @@ class PreviewService {
           createdAt: createdAt,
           onMarkAsPaid: saleDetail.isInvoice
               ? () => _markAsPaid(
-                    api: api,
-                    navigator: navigator,
-                    saleId: saleId,
-                    shop: shop,
-                    signature: signature,
-                  )
+                  api: api,
+                  navigator: navigator,
+                  saleId: saleId,
+                  shop: shop,
+                  signature: signature,
+                )
               : null,
           onDelete: saleDetail.isInvoice
               ? () => _deleteInvoice(
-                    api: api,
-                    navigator: navigator,
-                    saleId: saleId,
-                  )
+                  api: api,
+                  navigator: navigator,
+                  saleId: saleId,
+                )
               : null,
         ),
       );
@@ -137,6 +141,7 @@ class PreviewService {
         MaterialPageRoute<void>(
           builder: (_) => SalePreviewScreen(
             isCreatedSale: true,
+            autoPrintOnLoad: false,
             status: updatedSale.status,
             shop: shop,
             signature: signature,

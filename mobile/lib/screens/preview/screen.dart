@@ -1,10 +1,20 @@
 part of 'preview.dart';
 
+enum _PreviewMenuAction {
+  downloadPdf,
+  downloadImage,
+  share,
+  print,
+  markAsPaid,
+  deleteInvoice,
+}
+
 class SalePreviewScreen extends StatefulWidget {
   const SalePreviewScreen({
     super.key,
     required this.isCreatedSale,
     this.autoCreateOnLoad = false,
+    this.autoPrintOnLoad = false,
     required this.status,
     required this.shop,
     required this.signature,
@@ -31,6 +41,7 @@ class SalePreviewScreen extends StatefulWidget {
 
   final bool isCreatedSale;
   final bool autoCreateOnLoad;
+  final bool autoPrintOnLoad;
   final SaleStatus status;
   final ShopProfile? shop;
   final SignatureItem? signature;
@@ -64,11 +75,14 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
   bool _deleteBusy = false;
   bool _fitsSinglePage = false;
   String? _selectedBankAccountId;
+  String? _createdSaleId;
+  DateTime? _createdSaleAt;
   late final String _currencySymbol;
   late final String _currencyLocale;
   final ScrollController _receiptScrollController = ScrollController();
   final GlobalKey _receiptBoundaryKey = GlobalKey();
   bool _didAutoCreate = false;
+  bool _didAutoPrint = false;
 
   @override
   void initState() {
@@ -82,11 +96,20 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
             ? widget.shop!.bankAccounts.first.id
             : null);
     _syncSinglePageFlagWithRetry();
-    if (widget.autoCreateOnLoad && !widget.isCreatedSale && widget.onCreate != null) {
+    if (widget.autoCreateOnLoad &&
+        !widget.isCreatedSale &&
+        widget.onCreate != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _didAutoCreate) return;
         _didAutoCreate = true;
         unawaited(_handleCreate());
+      });
+    }
+    if (widget.autoPrintOnLoad && widget.isCreatedSale) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _didAutoPrint) return;
+        _didAutoPrint = true;
+        unawaited(_handlePrintPdf());
       });
     }
   }
@@ -123,6 +146,25 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     return '+${_formatAmount(amount)}';
   }
 
+  DateTime get _documentTimestamp =>
+      widget.createdAt ?? _createdSaleAt ?? DateTime.now();
+
+  String get _documentNumber {
+    final explicitNumber = (widget.receiptNumber ?? '').trim();
+    if (explicitNumber.isNotEmpty) {
+      return explicitNumber;
+    }
+    final createdSaleId = (_createdSaleId ?? '').trim();
+    if (createdSaleId.isNotEmpty) {
+      return '#${widget.status == SaleStatus.invoice ? 'INV' : 'REC'}-$createdSaleId';
+    }
+    final timestamp = _documentTimestamp;
+    return '#${widget.status == SaleStatus.invoice ? 'INV' : 'REC'}-${timestamp.millisecondsSinceEpoch % 1000000}';
+  }
+
+  String get _documentLabel =>
+      widget.status == SaleStatus.invoice ? 'Invoice' : 'Receipt';
+
   Future<void> _handleCreate() async {
     if (_isAnyBusy || widget.onCreate == null) return;
     setState(() => _statusBusy = true);
@@ -130,6 +172,10 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     if (!mounted) return;
     setState(() => _statusBusy = false);
     if (createdSaleId != null && createdSaleId.isNotEmpty) {
+      setState(() {
+        _createdSaleId = createdSaleId.trim();
+        _createdSaleAt = DateTime.now();
+      });
       Navigator.of(context).pop(createdSaleId);
     }
   }
@@ -207,9 +253,12 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     try {
       final bytes = await _buildReceiptPdfBytes();
       final fileName = _receiptFileName('pdf');
-      await Share.shareXFiles([
-        XFile.fromData(bytes, mimeType: 'application/pdf', name: fileName),
-      ], text: widget.status == SaleStatus.invoice ? 'Salesnote invoice' : 'Salesnote receipt');
+      await Share.shareXFiles(
+        [XFile.fromData(bytes, mimeType: 'application/pdf', name: fileName)],
+        text: widget.status == SaleStatus.invoice
+            ? 'Salesnote invoice'
+            : 'Salesnote receipt',
+      );
     } catch (e) {
       if (!mounted) return;
       AppNotice.show(context, 'Failed to share receipt: $e');
@@ -220,152 +269,144 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
     }
   }
 
-  bool get _isAnyBusy => _documentBusy || _statusBusy || _deleteBusy;
-
-  Widget _buildReceiptActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback? onPressed,
-  }) {
-    return SizedBox(
-      height: 52,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFF1C2D44),
-          side: const BorderSide(color: Color(0xFFD8E2EF)),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-        ),
-        icon: Icon(icon, size: 18),
-        label: Text(
-          label,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-        ),
-      ),
-    );
+  Future<void> _handlePrintPdf() async {
+    if (_isAnyBusy) return;
+    setState(() => _documentBusy = true);
+    try {
+      final bytes = await _buildReceiptPdfBytes();
+      await Printing.layoutPdf(
+        name: _receiptFileName('pdf'),
+        onLayout: (_) async => bytes,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppNotice.show(context, 'Failed to print $_documentLabel: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _documentBusy = false);
+      }
+    }
   }
 
-  Widget _buildCreatedSaleActions() {
+  bool get _isAnyBusy => _documentBusy || _statusBusy || _deleteBusy;
+
+  Future<void> _handleMenuAction(_PreviewMenuAction action) async {
+    switch (action) {
+      case _PreviewMenuAction.downloadPdf:
+        await _handleDownloadPdf();
+        return;
+      case _PreviewMenuAction.downloadImage:
+        await _handleDownloadImage();
+        return;
+      case _PreviewMenuAction.share:
+        await _handleShare();
+        return;
+      case _PreviewMenuAction.print:
+        await _handlePrintPdf();
+        return;
+      case _PreviewMenuAction.markAsPaid:
+        await _handleMarkAsPaid();
+        return;
+      case _PreviewMenuAction.deleteInvoice:
+        await _handleDelete();
+        return;
+    }
+  }
+
+  Widget _buildOverflowMenu() {
+    final showCreatedActions = widget.isCreatedSale;
     final showMarkAsPaid =
         widget.status == SaleStatus.invoice && widget.onMarkAsPaid != null;
     final showDelete =
         widget.status == SaleStatus.invoice && widget.onDelete != null;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildReceiptActionButton(
-                icon: Icons.picture_as_pdf_outlined,
-                label: 'PDF',
-                onPressed: _isAnyBusy ? null : _handleDownloadPdf,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildReceiptActionButton(
-                icon: Icons.image_outlined,
-                label: 'Image',
-                onPressed: (_isAnyBusy || !_fitsSinglePage)
-                    ? null
-                    : _handleDownloadImage,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildReceiptActionButton(
-                icon: Icons.share_outlined,
-                label: 'Share',
-                onPressed: _isAnyBusy ? null : _handleShare,
-              ),
-            ),
-          ],
+
+    if (!showCreatedActions) {
+      return const SizedBox(width: 44);
+    }
+
+    return PopupMenuButton<_PreviewMenuAction>(
+      enabled: !_isAnyBusy,
+      tooltip: 'More actions',
+      onSelected: (value) => unawaited(_handleMenuAction(value)),
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: _PreviewMenuAction.print,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.print_outlined),
+            title: Text('Print'),
+          ),
         ),
-        if (!_fitsSinglePage) ...[
-          const SizedBox(height: 8),
-          const Text(
-            'Image download is available only for single-page documents.',
-            style: TextStyle(
-              color: Color(0xFF8A9AB3),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
+        const PopupMenuItem(
+          value: _PreviewMenuAction.downloadPdf,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.picture_as_pdf_outlined),
+            title: Text('Download PDF'),
           ),
-        ],
-        if (showMarkAsPaid) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton.icon(
-              onPressed: _isAnyBusy ? null : _handleMarkAsPaid,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1677E6),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              icon: _statusBusy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.check_circle_outline_rounded),
-              label: Text(
-                _statusBusy ? 'Updating...' : 'Mark as paid',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+        ),
+        PopupMenuItem(
+          value: _PreviewMenuAction.downloadImage,
+          enabled: _fitsSinglePage,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.image_outlined,
+              color: _fitsSinglePage ? null : const Color(0xFF8A9AB3),
+            ),
+            title: Text(
+              _fitsSinglePage
+                  ? 'Download Image'
+                  : 'Download Image (single page)',
             ),
           ),
-        ],
-        if (showDelete) ...[
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: OutlinedButton.icon(
-              onPressed: _isAnyBusy ? null : _handleDelete,
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFD14343),
-                side: const BorderSide(color: Color(0xFFF2B8B8)),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
+        ),
+        const PopupMenuItem(
+          value: _PreviewMenuAction.share,
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.share_outlined),
+            title: Text('Share'),
+          ),
+        ),
+        if (showMarkAsPaid)
+          const PopupMenuItem(
+            value: _PreviewMenuAction.markAsPaid,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.check_circle_outline_rounded),
+              title: Text('Mark as paid'),
+            ),
+          ),
+        if (showDelete)
+          const PopupMenuItem(
+            value: _PreviewMenuAction.deleteInvoice,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                Icons.delete_outline_rounded,
+                color: Color(0xFFD14343),
               ),
-              icon: _deleteBusy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFFD14343),
-                      ),
-                    )
-                  : const Icon(Icons.delete_outline_rounded),
-              label: Text(
-                _deleteBusy ? 'Deleting...' : 'Delete invoice',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
+              title: Text(
+                'Delete invoice',
+                style: TextStyle(color: Color(0xFFD14343)),
               ),
             ),
           ),
-        ],
       ],
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: _isAnyBusy
+            ? const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              )
+            : const Icon(Icons.more_vert_rounded, color: Color(0xFF46566E)),
+      ),
     );
   }
 
@@ -402,11 +443,9 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final timestamp = widget.createdAt ?? DateTime.now();
+    final timestamp = _documentTimestamp;
     final dateText = DateFormat('MMM d, yyyy | HH:mm').format(timestamp);
-    final receiptNo =
-        widget.receiptNumber ??
-        '#${widget.status == SaleStatus.invoice ? 'INV' : 'REC'}-${timestamp.millisecondsSinceEpoch % 1000000}';
+    final receiptNo = _documentNumber;
     final customerName = widget.customerName.trim();
     final customerContact = widget.customerContact.trim();
     final hasCustomerDetails =
@@ -450,7 +489,7 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 44),
+                    _buildOverflowMenu(),
                   ],
                 ),
               ),
@@ -821,49 +860,48 @@ class _SalePreviewScreenState extends State<SalePreviewScreen> {
                   ),
                 ),
               ),
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.fromLTRB(24, 14, 24, 20),
-                child: widget.isCreatedSale
-                    ? _buildCreatedSaleActions()
-                    : SizedBox(
-                        width: double.infinity,
-                        height: 58,
-                        child: ElevatedButton.icon(
-                          onPressed: _isAnyBusy ? null : _handleCreate,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1677E6),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 6,
-                            shadowColor: const Color(0x331677E6),
-                          ),
-                          icon: _statusBusy
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.check_rounded),
-                          label: Text(
-                            _statusBusy
-                                ? 'Creating...'
-                                : (widget.status == SaleStatus.invoice
-                                      ? 'Create Invoice'
-                                      : 'Create Sale & Receipt'),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+              if (!widget.isCreatedSale)
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(24, 14, 24, 20),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 58,
+                    child: ElevatedButton.icon(
+                      onPressed: _isAnyBusy ? null : _handleCreate,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1677E6),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        elevation: 6,
+                        shadowColor: const Color(0x331677E6),
+                      ),
+                      icon: _statusBusy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.check_rounded),
+                      label: Text(
+                        _statusBusy
+                            ? 'Creating...'
+                            : (widget.status == SaleStatus.invoice
+                                  ? 'Create Invoice'
+                                  : 'Create Sale & Receipt'),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-              ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

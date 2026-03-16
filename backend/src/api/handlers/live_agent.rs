@@ -515,7 +515,7 @@ fn tool_properties_for_action(action_name: &str) -> Value {
             );
             properties.insert("label".to_string(), json!({"type": "STRING", "description": "Optional label when charge_type is other."}));
         }
-        "mark_invoice_paid" | "open_sale_preview" => {
+        "mark_invoice_paid" | "open_sale_preview" | "print_sale_document" => {
             properties.insert(
                 "sale_id".to_string(),
                 json!({"type": "STRING", "description": "Sale or invoice id."}),
@@ -776,6 +776,7 @@ fn live_agent_system_instruction(currency_code: &str) -> String {
         - Receipts: use `search_receipts` for receipt, purchase, paid sale, completed sale, sold, or transaction lists and receipt details.
         - Invoices: use `search_invoices` for invoice, bill, unpaid sale, outstanding invoice, or amount owed lists and invoice details.
         - Drafts: use `list_saved_drafts` for draft, prepared, pending receipt, pending invoice, or work-in-progress sale lists and draft item details.
+        - Printing: use `print_sale_document` only when the user explicitly asks to print an already created receipt or invoice and you have a real `sale_id`.
         - Metrics: use `query_sales_metrics` for totals, counts, sales amount, amount made, revenue, turnover, value, worth, and date-range summaries. Prefer dedicated list tools when the user wants names, detailed records, or profiles.
         - Forecasts: use `forecast_sales` for forecasts, predictions, projections, estimates, outlook, expected sales, likely future revenue, customer forecasts, and item forecasts.
 
@@ -785,6 +786,7 @@ fn live_agent_system_instruction(currency_code: &str) -> String {
         - Do not mix customer, item, receipt, invoice, and draft tools unless the user explicitly asks for cross-domain comparison.
         - If the audio is unclear, the user is making noise, or the intent is ambiguous, ask for clarification first and do not call data tools yet.
         - Do not answer list, detail, comparison, count, inspection, or summary requests from memory or conversation context alone.
+        - Do not use `print_sale_document` for drafts, previews that have not been created yet, or when no real `sale_id` is available.
 
         # FORECAST RULES
         - Forecasts are supported for the whole shop, one customer, or one item.
@@ -1003,6 +1005,11 @@ fn live_agent_contract() -> LiveAgentContract {
             LiveAgentAction {
                 name: "open_sale_preview",
                 description: "Open a specific receipt or invoice preview by sale id.",
+                required_fields: vec!["sale_id"],
+            },
+            LiveAgentAction {
+                name: "print_sale_document",
+                description: "Open print for a specific already created receipt or invoice by sale id. Use only when the user explicitly asks to print.",
                 required_fields: vec!["sale_id"],
             },
             LiveAgentAction {

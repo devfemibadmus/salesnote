@@ -50,6 +50,8 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
         return 'Creating current preview';
       case 'mark_invoice_paid':
         return 'Marking invoice as paid';
+      case 'print_sale_document':
+        return 'Opening print preview';
       case 'search_receipts':
         return 'Searching receipts';
       case 'search_invoices':
@@ -338,6 +340,24 @@ extension _LiveCashierOverlayTools on _LiveCashierOverlayState {
             openSaleId: args['sale_id']?.toString(),
             refreshFirst: true,
           );
+          break;
+        case 'print_sale_document':
+          final saleId = (args['sale_id']?.toString() ?? '').trim();
+          if (saleId.isEmpty) {
+            return {
+              'result': 'error',
+              'message': 'Sale id is required before printing.',
+            };
+          }
+          final sale = await _api.getSale(saleId);
+          extra['sale'] = _saleSummary(sale);
+          extra['message'] =
+              'Opening ${sale.isInvoice ? 'invoice' : 'receipt'} print preview.';
+          _pendingRoute = null;
+          _pendingArgs = null;
+          _pendingPostCloseAction = () =>
+              PreviewService.openById(saleId, printOnOpen: true);
+          _closeAfterToolResponse = true;
           break;
         case 'submit_receipt':
           _draftIsInvoice = false;

@@ -72,6 +72,7 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   String? _lastPersistedDraftSnapshot;
   String? _pendingRoute;
   Object? _pendingArgs;
+  Future<void> Function()? _pendingPostCloseAction;
   bool _closeAfterToolResponse = false;
   Future<void> _audioQueue = Future<void>.value();
   int _audioEpoch = 0;

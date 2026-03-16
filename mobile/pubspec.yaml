@@ -28,6 +28,7 @@ dependencies:
     package_info_plus: ^9.0.0
     image_picker: ^1.1.2
     pdf: ^3.11.1
+    printing: ^5.14.2
     path_provider: ^2.1.5
     share_plus: ^10.1.2
     file_saver: ^0.3.1

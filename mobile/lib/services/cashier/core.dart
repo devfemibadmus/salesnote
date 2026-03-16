@@ -22,13 +22,17 @@ import '../api_client.dart';
 import '../cache/loader.dart';
 import '../cache/local.dart';
 import '../currency.dart';
+import '../preview.dart';
 import '../startup/cues.dart';
 import '../token_store.dart';
 import '../validators.dart';
 
 part 'service.dart';
 part 'overlay.dart';
-part 'socket.dart';
+part 'socket/connection.dart';
+part 'socket/replay.dart';
+part 'socket/messages.dart';
+part 'socket/capture.dart';
 part 'tools.dart';
 part 'draft/shared.dart';
 part 'draft/state.dart';
