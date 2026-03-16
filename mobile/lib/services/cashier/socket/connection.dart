@@ -40,6 +40,7 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
     _reconnectAttempt = 0;
     _reconnectSecondsRemaining = 0;
     _reconnecting = false;
+    _suppressCurrentModelOutput = false;
     try {
       final token = await TokenStore().getToken();
 
@@ -96,6 +97,7 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
         _reconnecting = false;
         _reconnectAttempt = 0;
         _reconnectSecondsRemaining = 0;
+        _suppressCurrentModelOutput = false;
         _status = backgroundReconnect
             ? 'Reconnected. Restoring session...'
             : 'Starting live cashier...';
@@ -244,6 +246,7 @@ extension _LiveCashierOverlaySocketConnection on _LiveCashierOverlayState {
       _connected = false;
       _isRecording = false;
       _modelResponding = false;
+      _suppressCurrentModelOutput = false;
       _status = _currentStatus();
     });
     if (_closingOverlay) {

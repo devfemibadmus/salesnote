@@ -63,6 +63,25 @@ extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
     }
   }
 
+  Future<void> _interruptCurrentModelOutput({required String reason}) async {
+    if (_suppressCurrentModelOutput) {
+      return;
+    }
+    _log('audio:barge-in reason=$reason');
+    _suppressCurrentModelOutput = true;
+    await _stopPlayerStream(forceStop: true);
+    if (!mounted) {
+      _currentModelTranscript = null;
+      _modelResponding = false;
+      return;
+    }
+    _safeSetState(() {
+      _currentModelTranscript = null;
+      _modelResponding = false;
+      _status = _currentStatus();
+    });
+  }
+
   void _markTurnPending({String? replayText}) {
     _awaitingTurnCompletion = true;
     final normalizedReplayText = (replayText ?? '').trim();
@@ -73,6 +92,7 @@ extension _LiveCashierOverlaySocketReplay on _LiveCashierOverlayState {
 
   void _clearPendingTurnState() {
     _awaitingTurnCompletion = false;
+    _suppressCurrentModelOutput = false;
     _pendingReplayUserText = null;
     _pendingToolResponsePayload = null;
     _pendingToolIntent = null;

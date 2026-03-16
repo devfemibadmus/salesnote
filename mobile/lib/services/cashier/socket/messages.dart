@@ -25,6 +25,7 @@ extension _LiveCashierOverlaySocketMessages on _LiveCashierOverlayState {
       final serverContent = decoded['serverContent'];
       if (serverContent is Map<String, dynamic>) {
         if (serverContent['interrupted'] == true) {
+          _suppressCurrentModelOutput = false;
           unawaited(_stopPlayerStream(forceStop: true));
           if (mounted) {
             _safeSetState(() {
@@ -40,6 +41,11 @@ extension _LiveCashierOverlaySocketMessages on _LiveCashierOverlayState {
               (inputTranscription['text'] ?? inputTranscription['transcript'])
                   ?.toString();
           if (text != null && text.trim().isNotEmpty && mounted) {
+            if (_modelResponding) {
+              unawaited(
+                _interruptCurrentModelOutput(reason: 'inputTranscription'),
+              );
+            }
             final replayText = _mergeTranscript(_pendingReplayUserText, text);
             _markTurnPending(replayText: replayText);
             final mergedTranscript = _mergeTranscript(
@@ -55,7 +61,8 @@ extension _LiveCashierOverlaySocketMessages on _LiveCashierOverlayState {
         }
 
         final outputTranscription = serverContent['outputTranscription'];
-        if (outputTranscription is Map<String, dynamic>) {
+        if (!_suppressCurrentModelOutput &&
+            outputTranscription is Map<String, dynamic>) {
           final text =
               (outputTranscription['text'] ?? outputTranscription['transcript'])
                   ?.toString();
@@ -78,7 +85,7 @@ extension _LiveCashierOverlaySocketMessages on _LiveCashierOverlayState {
         }
 
         final modelTurn = serverContent['modelTurn'];
-        if (modelTurn is Map<String, dynamic>) {
+        if (!_suppressCurrentModelOutput && modelTurn is Map<String, dynamic>) {
           final parts = modelTurn['parts'];
           if (parts is List) {
             for (final part in parts) {
@@ -112,6 +119,7 @@ extension _LiveCashierOverlaySocketMessages on _LiveCashierOverlayState {
 
         final turnComplete = serverContent['turnComplete'] == true;
         if (turnComplete && mounted) {
+          _suppressCurrentModelOutput = false;
           final shouldUnmute = _openingGreetingPendingUnmute;
           unawaited(_finalizeTurn(shouldUnmute: shouldUnmute));
         }
