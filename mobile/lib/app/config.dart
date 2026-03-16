@@ -1,7 +1,6 @@
 class AppConfig {
-  static const apiBaseUrl =
-      'https://unwrathful-clayton-unplowed.ngrok-free.dev';
-  // static const apiBaseUrl = 'https://api.salesnote.online';
+  // static const apiBaseUrl = 'https://unwrathful-clayton-unplowed.ngrok-free.dev';
+  static const apiBaseUrl = 'https://api.salesnote.online';
   static const privacyPolicyUrl = 'https://salesnote.online';
   static const termsOfServiceUrl = 'https://salesnote.online';
   static const supportUrl = 'https://salesnote.online';
