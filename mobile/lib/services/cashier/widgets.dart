@@ -1,5 +1,15 @@
 part of 'core.dart';
 
+String _actionBubbleSignature(String text, bool busy) {
+  final normalized = text.trim();
+  final reconnectPrefix = 'Disconnected. Reconnecting in ';
+  if (normalized.startsWith(reconnectPrefix) ||
+      normalized == 'Disconnected. Reconnecting...') {
+    return 'action:reconnect:$busy';
+  }
+  return 'action:$normalized:$busy';
+}
+
 class _LoadingBody extends StatelessWidget {
   const _LoadingBody({required this.controller, required this.status});
 
@@ -56,6 +66,9 @@ class _ReadyBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final actionSignature = toolStatus == null || toolStatus!.trim().isEmpty
+        ? null
+        : _actionBubbleSignature(toolStatus!, toolBusy);
     final bubbles = <Widget>[
       for (final entry in transcriptEntries)
         switch (entry.type) {
@@ -78,7 +91,7 @@ class _ReadyBody extends StatelessWidget {
         ),
       if (toolStatus != null && toolStatus!.trim().isNotEmpty)
         _ActionBubble(
-          key: ValueKey<String>('action:${toolStatus!.trim()}:$toolBusy'),
+          key: ValueKey<String>(actionSignature!),
           text: toolStatus!,
           busy: toolBusy,
           controller: controller,
@@ -94,16 +107,14 @@ class _ReadyBody extends StatelessWidget {
     final structureSignature = <String>[
       for (final entry in transcriptEntries) entry.signature,
       if ((currentUserTranscript ?? '').trim().isNotEmpty) 'user_pending',
-      if (toolStatus != null && toolStatus!.trim().isNotEmpty)
-        'action:${toolStatus!.trim()}:$toolBusy',
+      ?actionSignature,
       if ((currentModelTranscript ?? '').trim().isNotEmpty) 'assistant_pending',
     ].join('\n');
     final scrollSignature = <String>[
       for (final entry in transcriptEntries) entry.signature,
       if ((currentUserTranscript ?? '').trim().isNotEmpty)
         'user_pending:${currentUserTranscript!.trim()}',
-      if (toolStatus != null && toolStatus!.trim().isNotEmpty)
-        'action:${toolStatus!.trim()}:$toolBusy',
+      ?actionSignature,
       if ((currentModelTranscript ?? '').trim().isNotEmpty)
         'assistant_pending:${currentModelTranscript!.trim()}',
     ].join('\n');
