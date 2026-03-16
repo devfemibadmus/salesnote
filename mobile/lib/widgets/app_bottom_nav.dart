@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
@@ -187,14 +188,14 @@ class _NavTap extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: borderRadius,
-        onTap: () async {
-          await _triggerTapFeedback(context);
+        onTap: () {
+          unawaited(_triggerTapFeedback(context));
           onTap();
         },
         onLongPress: onLongPress == null
             ? null
-            : () async {
-                await _triggerLongPressFeedback(context);
+            : () {
+                unawaited(_triggerLongPressFeedback(context));
                 onLongPress!();
               },
         child: child,

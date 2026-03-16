@@ -1,6 +1,26 @@
 part of 'core.dart';
 
 extension _LiveCashierOverlaySocket on _LiveCashierOverlayState {
+  Future<void> _retryBootstrap() async {
+    if (_retryingBootstrap) {
+      return;
+    }
+    if (mounted) {
+      _safeSetState(() {
+        _retryingBootstrap = true;
+      });
+    }
+    try {
+      await _bootstrap();
+    } finally {
+      if (mounted) {
+        _safeSetState(() {
+          _retryingBootstrap = false;
+        });
+      }
+    }
+  }
+
   Uri _backendLiveSocketUri() {
     final apiUri = Uri.parse(AppConfig.apiBaseUrl);
     final scheme = apiUri.scheme == 'https' ? 'wss' : 'ws';

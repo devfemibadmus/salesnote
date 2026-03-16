@@ -87,6 +87,7 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
   bool _reconnecting = false;
   bool _closingOverlay = false;
   bool _awaitingTurnCompletion = false;
+  bool _retryingBootstrap = false;
   String? _pendingReplayUserText;
   Map<String, dynamic>? _pendingToolResponsePayload;
   List<Map<String, dynamic>>? _pendingToolIntent;
@@ -226,7 +227,11 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
                             status: _status,
                           )
                         : _error != null
-                        ? _ErrorBody(message: _error!, onRetry: _bootstrap)
+                        ? _ErrorBody(
+                            message: _error!,
+                            retrying: _retryingBootstrap,
+                            onRetry: _retryBootstrap,
+                          )
                         : _ReadyBody(
                             controller: _pulseController,
                             recording: _isRecording,

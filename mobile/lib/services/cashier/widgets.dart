@@ -356,10 +356,15 @@ class _BubbleRevealState extends State<_BubbleReveal>
 }
 
 class _ErrorBody extends StatelessWidget {
-  const _ErrorBody({required this.message, required this.onRetry});
+  const _ErrorBody({
+    required this.message,
+    required this.retrying,
+    required this.onRetry,
+  });
 
   final String message;
-  final VoidCallback onRetry;
+  final bool retrying;
+  final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -402,15 +407,42 @@ class _ErrorBody extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         FilledButton(
-          onPressed: () {
-            unawaited(HapticFeedback.lightImpact());
-            onRetry();
-          },
+          onPressed: retrying
+              ? null
+              : () {
+                  unawaited(HapticFeedback.lightImpact());
+                  unawaited(onRetry());
+                },
           style: FilledButton.styleFrom(
             backgroundColor: const Color(0xFF007AFF),
             minimumSize: const Size(140, 48),
           ),
-          child: const Text('Retry'),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: retrying
+                ? const Row(
+                    key: ValueKey<String>('retrying'),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Text('Retrying...'),
+                    ],
+                  )
+                : const Text(
+                    'Retry',
+                    key: ValueKey<String>('retry'),
+                  ),
+          ),
         ),
       ],
     );
