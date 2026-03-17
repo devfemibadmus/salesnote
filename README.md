@@ -67,7 +67,7 @@ That persistence makes it feel closer to a real cashier assistant than a normal 
 
 ## Architecture
 
-![SalesNote Live Cashier Architecture](videos/architecture/architecture.png)
+![SalesNote Live Cashier Architecture](medias/architecture.png)
 
 ### Architecture Summary
 
