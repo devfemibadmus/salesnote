@@ -4,6 +4,10 @@
 
 Voice-first AI cashier for small businesses that talks, listens, and handles receipts, invoices, and sales actions in real time.
 
+## Demo Video
+
+https://youtu.be/C73J0yez-wg?si=NDFmVF0gQZ0fER_n
+
 ## What It Is
 
 SalesNote Live Cashier is a mobile sales assistant built for real small-business workflows.
