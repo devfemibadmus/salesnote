@@ -6,7 +6,7 @@ Voice-first AI cashier for small businesses that talks, listens, and handles rec
 
 ## Demo Video
 
-https://youtu.be/C73J0yez-wg?si=NDFmVF0gQZ0fER_n
+https://youtu.be/nw8K7Hhl4ng
 
 ## Test The App
 
