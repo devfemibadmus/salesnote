@@ -12,6 +12,11 @@ https://youtu.be/nw8K7Hhl4ng
 
 https://play.google.com/store/apps/details?id=com.blackstackhub.salesnote
 
+Use these demo credentials after installing the app:
+
+- Email: `devfemibadmus@gmail.com`
+- Password: `12345`
+
 ## What It Is
 
 SalesNote Live Cashier is a mobile sales assistant built for real small-business workflows.
