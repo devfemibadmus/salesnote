@@ -1,3 +1,5 @@
+<!-- @format -->
+
 # SalesNote Live Cashier
 
 Voice-first AI cashier for small businesses that talks, listens, and handles receipts, invoices, and sales actions in real time.
@@ -61,7 +63,7 @@ That persistence makes it feel closer to a real cashier assistant than a normal 
 
 ## Architecture
 
-![SalesNote Live Cashier Architecture](architecture.png)
+![SalesNote Live Cashier Architecture](videos/architecture/architecture.png)
 
 ### Architecture Summary
 
@@ -70,6 +72,22 @@ That persistence makes it feel closer to a real cashier assistant than a normal 
 3. Gemini Live handles realtime speech, transcription, interruption-aware responses, and tool calling.
 4. Grounded business actions execute through SalesNote backend logic and data services.
 5. PostgreSQL, Redis, Firebase, and Google Cloud support the full product workflow.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="medias/Screenshot_20260317_091108.jpg.jpeg" alt="SalesNote home page" width="260" />
+    </td>
+    <td align="center">
+      <img src="medias/Screenshot_20260317_091201.jpg.jpeg" alt="SalesNote live cashier" width="260" />
+    </td>
+    <td align="center">
+      <img src="medias/Screenshot_20260317_091221.jpg.jpeg" alt="SalesNote live cashier report" width="260" />
+    </td>
+  </tr>
+</table>
 
 ## Tech Stack
 
@@ -167,7 +185,3 @@ These demonstrate:
 ## Google Cloud
 
 The backend is deployed on Google Cloud infrastructure, and the project uses Gemini models plus Google Cloud-hosted backend services to satisfy the challenge requirement for Gemini + Google Cloud usage.
-
-## Public Repository
-
-https://github.com/devfemibadmus/salesnote
