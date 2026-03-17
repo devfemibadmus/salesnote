@@ -8,6 +8,10 @@ Voice-first AI cashier for small businesses that talks, listens, and handles rec
 
 https://youtu.be/C73J0yez-wg?si=NDFmVF0gQZ0fER_n
 
+## Test The App
+
+https://play.google.com/store/apps/details?id=com.blackstackhub.salesnote
+
 ## What It Is
 
 SalesNote Live Cashier is a mobile sales assistant built for real small-business workflows.
