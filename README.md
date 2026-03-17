@@ -17,6 +17,14 @@ Use these demo credentials after installing the app:
 - Email: `devfemibadmus@gmail.com`
 - Password: `12345`
 
+How to try the Live Cashier:
+
+1. Sign in with the demo account.
+2. Long press the `+` button in the bottom navigation to start Live Cashier.
+3. Speak naturally to the cashier once the floating overlay appears.
+4. Drag the floating overlay anywhere on screen while continuing to use the app.
+5. Tap the floating overlay to expand and view the live conversation.
+
 ## What It Is
 
 SalesNote Live Cashier is a mobile sales assistant built for real small-business workflows.
