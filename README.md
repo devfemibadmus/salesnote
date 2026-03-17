@@ -81,6 +81,12 @@ That persistence makes it feel closer to a real cashier assistant than a normal 
 4. Grounded business actions execute through SalesNote backend logic and data services.
 5. PostgreSQL, Redis, Firebase, and Google Cloud support the full product workflow.
 
+## Google Cloud
+
+The backend is deployed on Google Cloud infrastructure, and the project uses Gemini models plus Google Cloud-hosted backend services to satisfy the challenge requirement for Gemini + Google Cloud usage.
+
+![Google Cloud backend logs](medias/2.png)
+
 ## Screenshots
 
 <table>
@@ -189,7 +195,3 @@ These demonstrate:
 - environment setup
 - service restart
 - nginx/systemd integration
-
-## Google Cloud
-
-The backend is deployed on Google Cloud infrastructure, and the project uses Gemini models plus Google Cloud-hosted backend services to satisfy the challenge requirement for Gemini + Google Cloud usage.
