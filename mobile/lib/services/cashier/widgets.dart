@@ -5,13 +5,29 @@ String _wrapChatText(String text) {
   if (normalized.isEmpty) {
     return normalized;
   }
-  return normalized
+  final punctuated = normalized
       .replaceAll('/', '/\u200B')
       .replaceAll('-', '-\u200B')
       .replaceAll('_', '_\u200B')
       .replaceAll('.', '.\u200B')
       .replaceAll(',', ',\u200B')
       .replaceAll(':', ':\u200B');
+  final tokenPattern = RegExp(r'(\S{18,})');
+  return punctuated.replaceAllMapped(tokenPattern, (match) {
+    final token = match.group(0) ?? '';
+    if (token.isEmpty) {
+      return token;
+    }
+    final buffer = StringBuffer();
+    for (var index = 0; index < token.length; index++) {
+      buffer.write(token[index]);
+      final isBoundary = (index + 1) % 10 == 0 && index != token.length - 1;
+      if (isBoundary) {
+        buffer.write('\u200B');
+      }
+    }
+    return buffer.toString();
+  });
 }
 
 String _actionBubbleSignature(String text, bool busy) {

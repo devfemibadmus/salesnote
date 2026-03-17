@@ -2,8 +2,6 @@ part of 'core.dart';
 
 enum _TranscriptSpeaker { user, assistant }
 
-enum _PanelDockSide { left, right }
-
 class _TranscriptMessage {
   const _TranscriptMessage({required this.speaker, required this.text});
 
@@ -22,6 +20,8 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
     with TickerProviderStateMixin {
   static const double _panelInset = 12;
   static const double _panelOvershoot = 28;
+  static const double _panelMaxHiddenLeftFraction = 0.7;
+  static const double _panelMaxHiddenRightFraction = 0.85;
   final _api = ApiClient(TokenStore());
   final _recorder = AudioRecorder();
   final _player = fs.FlutterSoundPlayer();
@@ -130,7 +130,12 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
 
   void _expandPanel() {
     if (!mounted || _panelExpanded) return;
-    _safeSetState(() => _panelExpanded = true);
+    _stopPanelSpring();
+    _safeSetState(() {
+      _panelExpanded = true;
+      _panelLeft = null;
+      _panelTop = null;
+    });
   }
 
   void _togglePanel() {
@@ -144,8 +149,9 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
     required double panelWidth,
     required double panelHeight,
   }) {
-    final minLeft = _panelInset;
-    final maxLeft = math.max(minLeft, screenSize.width - panelWidth - _panelInset);
+    final minLeft = -(panelWidth * _panelMaxHiddenLeftFraction);
+    final maxLeft =
+        screenSize.width - (panelWidth * (1 - _panelMaxHiddenRightFraction));
     final minTop = padding.top + _panelInset;
     final maxTop = math.max(
       minTop,
@@ -233,6 +239,101 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
     _panelSpringController
       ..reset()
       ..forward();
+  }
+
+  void _animatePanelTo({
+    required double targetLeft,
+    required double targetTop,
+    Curve curve = Curves.easeOutCubic,
+    Duration duration = const Duration(milliseconds: 280),
+  }) {
+    _stopPanelSpring();
+    _panelSpringController.duration = duration;
+    final startLeft = _panelLeft ?? targetLeft;
+    final startTop = _panelTop ?? targetTop;
+    _panelLeftAnimation = Tween<double>(
+      begin: startLeft,
+      end: targetLeft,
+    ).animate(CurvedAnimation(parent: _panelSpringController, curve: curve));
+    _panelTopAnimation = Tween<double>(
+      begin: startTop,
+      end: targetTop,
+    ).animate(CurvedAnimation(parent: _panelSpringController, curve: curve));
+    _panelSpringController
+      ..reset()
+      ..forward();
+  }
+
+  void _dockPanelRight({
+    required Size screenSize,
+    required EdgeInsets padding,
+    required double panelWidth,
+    required double panelHeight,
+  }) {
+    if (_panelExpanded) {
+      return;
+    }
+    final bounds = _panelBounds(
+      screenSize: screenSize,
+      padding: padding,
+      panelWidth: panelWidth,
+      panelHeight: panelHeight,
+    );
+    final currentTop =
+        (_panelTop ??
+                (screenSize.height - panelHeight - padding.bottom - 88))
+            .clamp(bounds.minTop, bounds.maxTop)
+            .toDouble();
+    _animatePanelTo(
+      targetLeft: bounds.maxLeft,
+      targetTop: currentTop,
+    );
+  }
+
+  void _centerCompactPanel({
+    required Size screenSize,
+    required EdgeInsets padding,
+    required double panelWidth,
+    required double panelHeight,
+  }) {
+    if (_panelExpanded) {
+      return;
+    }
+    final targetLeft = (screenSize.width - panelWidth) / 2;
+    final targetTop = (_panelTop ??
+            (screenSize.height - panelHeight - padding.bottom - 88))
+        .clamp(
+          padding.top + _panelInset,
+          math.max(
+            padding.top + _panelInset,
+            screenSize.height - panelHeight - padding.bottom - _panelInset,
+          ),
+        )
+        .toDouble();
+    _animatePanelTo(targetLeft: targetLeft, targetTop: targetTop);
+  }
+
+  bool _isCompactPanelOnRightSide({
+    required Size screenSize,
+    required EdgeInsets padding,
+    required double panelWidth,
+    required double panelHeight,
+  }) {
+    if (_panelExpanded) {
+      return false;
+    }
+    final bounds = _panelBounds(
+      screenSize: screenSize,
+      padding: padding,
+      panelWidth: panelWidth,
+      panelHeight: panelHeight,
+    );
+    final currentLeft = (_panelLeft ?? ((screenSize.width - panelWidth) / 2))
+        .clamp(bounds.minLeft, bounds.maxLeft)
+        .toDouble();
+    final defaultLeft = (screenSize.width - panelWidth) / 2;
+    final toggleThreshold = defaultLeft + ((bounds.maxLeft - defaultLeft) * 0.45);
+    return currentLeft >= toggleThreshold;
   }
 
   void _appendTranscriptMessage(_TranscriptSpeaker speaker, String? text) {
@@ -326,31 +427,8 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
       panelBounds.minTop,
       panelBounds.maxTop,
     ).toDouble();
-    final panelDockSide = rawPanelLeft < defaultPanelLeft
-        ? _PanelDockSide.left
-        : _PanelDockSide.right;
-    final distanceFromCenter = (rawPanelLeft - defaultPanelLeft).abs();
-    final maxTravelToEdge = panelDockSide == _PanelDockSide.left
-        ? (defaultPanelLeft - panelBounds.minLeft)
-        : (panelBounds.maxLeft - defaultPanelLeft);
-    final normalizedTravel = maxTravelToEdge <= 0
-        ? 0.0
-        : (distanceFromCenter / maxTravelToEdge).clamp(0.0, 1.0);
-    const dockStart = 0.55;
-    final dockFraction = _panelExpanded
-        ? 0.0
-        : ((normalizedTravel - dockStart) / (1 - dockStart)).clamp(0.0, 1.0);
-    final collapsedDockWidth = 72.0;
-    final activePanelWidth = _panelExpanded
-        ? expandedPanelWidth
-        : compactPanelWidth -
-            ((compactPanelWidth - collapsedDockWidth) * dockFraction);
-    final targetDockLeft = panelDockSide == _PanelDockSide.left
-        ? panelBounds.minLeft
-        : media.size.width - activePanelWidth - _panelInset;
-    final panelLeft = _panelExpanded
-        ? rawPanelLeft
-        : rawPanelLeft + ((targetDockLeft - rawPanelLeft) * dockFraction);
+    final activePanelWidth = panelWidthBase;
+    final panelLeft = rawPanelLeft;
 
     return Stack(
       clipBehavior: Clip.none,
@@ -358,31 +436,33 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
         Positioned(
           left: panelLeft,
           top: panelTop,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            width: activePanelWidth,
-            height: panelHeight,
-            decoration: BoxDecoration(
-              color: const Color(0xF7FFFFFF),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: const Color(0xFFD6E2F0)),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x220F172A),
-                  blurRadius: 28,
-                  offset: Offset(0, 16),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final showExpandedContent =
-                      _panelExpanded && constraints.maxHeight >= 140;
-                  return showExpandedContent
-                      ? Column(
+          child: Material(
+            type: MaterialType.transparency,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              width: activePanelWidth,
+              height: panelHeight,
+              decoration: BoxDecoration(
+                color: const Color(0xF7FFFFFF),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFFD6E2F0)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x220F172A),
+                    blurRadius: 28,
+                    offset: Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final showExpandedContent =
+                        _panelExpanded && constraints.maxHeight >= 140;
+                    return showExpandedContent
+                        ? Column(
                           children: [
                             GestureDetector(
                               behavior: HitTestBehavior.opaque,
@@ -474,13 +554,50 @@ class _LiveCashierOverlayState extends State<_LiveCashierOverlay>
                             toolBusy: _toolBusy,
                             status: _currentStatus(),
                             toolStatus: _toolStatus,
-                            onExpand: _expandPanel,
+                            onExpand: () {
+                              if (_isCompactPanelOnRightSide(
+                                screenSize: media.size,
+                                padding: media.padding,
+                                panelWidth: compactPanelWidth,
+                                panelHeight: panelHeight,
+                              )) {
+                                _centerCompactPanel(
+                                  screenSize: media.size,
+                                  padding: media.padding,
+                                  panelWidth: compactPanelWidth,
+                                  panelHeight: panelHeight,
+                                );
+                                return;
+                              }
+                              _expandPanel();
+                            },
+                            onDockRight: () {
+                              if (_isCompactPanelOnRightSide(
+                                screenSize: media.size,
+                                padding: media.padding,
+                                panelWidth: compactPanelWidth,
+                                panelHeight: panelHeight,
+                              )) {
+                                _centerCompactPanel(
+                                  screenSize: media.size,
+                                  padding: media.padding,
+                                  panelWidth: compactPanelWidth,
+                                  panelHeight: panelHeight,
+                                );
+                                return;
+                              }
+                              _dockPanelRight(
+                                screenSize: media.size,
+                                padding: media.padding,
+                                panelWidth: compactPanelWidth,
+                                panelHeight: panelHeight,
+                              );
+                            },
                             onClose: _closeOverlay,
-                            dockFraction: dockFraction,
-                            dockSide: panelDockSide,
                           ),
                         );
                 },
+              ),
               ),
             ),
           ),
@@ -562,9 +679,8 @@ class _PersistentCashierCompact extends StatelessWidget {
     required this.status,
     required this.toolStatus,
     required this.onExpand,
+    required this.onDockRight,
     required this.onClose,
-    required this.dockFraction,
-    required this.dockSide,
   });
 
   final bool loading;
@@ -574,9 +690,8 @@ class _PersistentCashierCompact extends StatelessWidget {
   final String status;
   final String? toolStatus;
   final VoidCallback onExpand;
+  final VoidCallback onDockRight;
   final VoidCallback onClose;
-  final double dockFraction;
-  final _PanelDockSide dockSide;
 
   @override
   Widget build(BuildContext context) {
@@ -584,31 +699,18 @@ class _PersistentCashierCompact extends StatelessWidget {
         ? const Color(0xFFDC2626)
         : (responding ? const Color(0xFFDC2626) : const Color(0xFF2563EB));
     final summary = error ?? toolStatus ?? status;
-    final contentVisible = dockFraction < 0.85;
-    final textOpacity = (1 - (dockFraction * 1.6)).clamp(0.0, 1.0);
-    final spinnerOpacity = (1 - (dockFraction * 2)).clamp(0.0, 1.0);
-    final closeOpacity = (1 - (dockFraction * 2.4)).clamp(0.0, 1.0);
-    final horizontalPadding = 14 - (6 * dockFraction);
-    final iconLeftPadding = 0.0;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onExpand,
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: horizontalPadding,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
-            mainAxisAlignment: dockFraction > 0.92
-                ? MainAxisAlignment.center
-                : MainAxisAlignment.start,
             children: [
-              Padding(
-                padding: EdgeInsets.only(
-                  left: dockSide == _PanelDockSide.right ? iconLeftPadding : 0,
-                ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onDockRight,
                 child: Container(
                   width: 42,
                   height: 42,
@@ -626,82 +728,57 @@ class _PersistentCashierCompact extends StatelessWidget {
                   ),
                 ),
               ),
-              if (contentVisible) ...[
-                SizedBox(width: 12 * textOpacity),
-                Expanded(
-                  child: Opacity(
-                    opacity: textOpacity,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Live cashier running',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Color(0xFF0F172A),
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            height: 1.05,
-                          ),
-                        ),
-                        Text(
-                          summary.trim().isEmpty
-                              ? (loading ? 'Starting...' : 'Tap to expand')
-                              : summary,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF64748B),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            height: 1.05,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                if (toolBusy || loading)
-                  Opacity(
-                    opacity: spinnerOpacity,
-                    child: const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2.1),
-                    ),
-                  ),
-                IgnorePointer(
-                  ignoring: closeOpacity == 0,
-                  child: Opacity(
-                    opacity: closeOpacity,
-                    child: IconButton(
-                      onPressed: onClose,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 36,
-                        height: 36,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Live cashier running',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        height: 1.05,
                       ),
-                      visualDensity: VisualDensity.compact,
-                      icon: const Icon(Icons.close_rounded),
-                      color: const Color(0xFF64748B),
                     ),
-                  ),
-                ),
-              ] else if (toolBusy || loading)
-                IgnorePointer(
-                  ignoring: true,
-                  child: Opacity(
-                    opacity: spinnerOpacity,
-                    child: const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2.1),
+                    Text(
+                      summary.trim().isEmpty
+                          ? (loading ? 'Starting...' : 'Tap to expand')
+                          : summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        height: 1.05,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
+              ),
+              if (toolBusy || loading)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2.1),
+                ),
+              IconButton(
+                onPressed: onClose,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 36,
+                  height: 36,
+                ),
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.close_rounded),
+                color: const Color(0xFF64748B),
+              ),
             ],
           ),
         ),

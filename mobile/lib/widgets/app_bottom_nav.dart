@@ -181,11 +181,19 @@ class _VoiceHoldAddButton extends StatefulWidget {
 }
 
 class _VoiceHoldAddButtonState extends State<_VoiceHoldAddButton> {
-  static const double _lockThreshold = 56;
-
   bool _holding = false;
   bool _locked = false;
-  double _dragOffset = 0;
+
+  Future<void> _triggerStrongHaptic() async {
+    try {
+      await HapticFeedback.heavyImpact();
+    } catch (_) {}
+    if (Platform.isAndroid) {
+      try {
+        await HapticFeedback.vibrate();
+      } catch (_) {}
+    }
+  }
 
   Future<void> _triggerVoiceLock() async {
     if (_locked || widget.onVoiceLock == null) {
@@ -194,9 +202,7 @@ class _VoiceHoldAddButtonState extends State<_VoiceHoldAddButton> {
     setState(() {
       _locked = true;
     });
-    try {
-      await HapticFeedback.heavyImpact();
-    } catch (_) {}
+    await _triggerStrongHaptic();
     widget.onVoiceLock!();
   }
 
@@ -205,49 +211,36 @@ class _VoiceHoldAddButtonState extends State<_VoiceHoldAddButton> {
     setState(() {
       _holding = false;
       _locked = false;
-      _dragOffset = 0;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final active = _holding || _locked;
-    final progress = (_dragOffset / _lockThreshold).clamp(0.0, 1.0);
-    final label = _locked
-        ? 'Live'
-        : (_holding ? (progress >= 1 ? 'Release' : 'Drag up') : null);
+    final label = active ? 'Live' : null;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: widget.onTap,
+      onTap: () {
+        unawaited(_triggerStrongHaptic());
+        widget.onTap();
+      },
       onLongPressStart: widget.onVoiceLock == null
           ? null
           : (_) {
               setState(() {
                 _holding = true;
                 _locked = false;
-                _dragOffset = 0;
               });
             },
-      onLongPressMoveUpdate: widget.onVoiceLock == null
+      onLongPress: widget.onVoiceLock == null
           ? null
-          : (details) {
-              if (_locked) return;
-              final dragOffset = (-details.offsetFromOrigin.dy).clamp(0.0, 96.0);
-              setState(() {
-                _dragOffset = dragOffset;
-              });
-              if (dragOffset >= _lockThreshold) {
-                unawaited(_triggerVoiceLock());
-              }
+          : () {
+              unawaited(_triggerVoiceLock());
             },
       onLongPressEnd: widget.onVoiceLock == null
           ? null
           : (_) {
-              final shouldTrigger = !_locked && _dragOffset >= _lockThreshold;
-              if (shouldTrigger) {
-                unawaited(_triggerVoiceLock());
-              }
               _resetState();
             },
       child: AnimatedContainer(
@@ -262,7 +255,7 @@ class _VoiceHoldAddButtonState extends State<_VoiceHoldAddButton> {
               color: active
                   ? const Color(0x29DC2626)
                   : const Color(0x29007AFF),
-              blurRadius: 12 + (progress * 8),
+              blurRadius: active ? 20 : 12,
               offset: const Offset(0, 6),
             ),
           ],
