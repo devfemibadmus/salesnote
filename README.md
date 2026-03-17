@@ -85,6 +85,8 @@ That persistence makes it feel closer to a real cashier assistant than a normal 
 
 The backend is deployed on Google Cloud infrastructure, and the project uses Gemini models plus Google Cloud-hosted backend services to satisfy the challenge requirement for Gemini + Google Cloud usage.
 
+[Google Cloud Deployment Proof Video](gcp.mp4)
+
 ![Google Cloud backend logs](medias/2.png)
 
 ## Screenshots
