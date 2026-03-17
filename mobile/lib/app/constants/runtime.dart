@@ -4,8 +4,8 @@ class PagingConstants {
   static const listPerPage = 20;
   static const filteredListPerPage = 200;
   static const newSaleRefreshPerPage = 20;
-  static const liveCashierSalesWindowPerPage = 100;
-  static const liveCashierSalesWindowMaxPages = 15;
+  static const liveCashierSalesWindowPerPage = 50;
+  static const liveCashierSalesWindowMaxPages = 4;
 }
 
 class TimingConstants {
@@ -27,6 +27,9 @@ class LimitConstants {
   LimitConstants._();
 
   static const liveCashierSalesWindowCacheMaxEntries = 12;
+  static const liveCashierToolResultMaxEntries = 12;
+  static const liveCashierToolBreakdownMaxEntries = 20;
+  static const liveCashierToolHistoricalPointMaxEntries = 31;
   static const newSaleMaxAmount = 9_999_999_999.99;
 }
 

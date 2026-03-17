@@ -4,6 +4,11 @@ const Duration _salesWindowCacheTtl =
     TimingConstants.liveCashierSalesWindowCacheTtl;
 const int _salesWindowCacheMaxEntries =
     LimitConstants.liveCashierSalesWindowCacheMaxEntries;
+const int _toolResultMaxEntries = LimitConstants.liveCashierToolResultMaxEntries;
+const int _toolBreakdownMaxEntries =
+    LimitConstants.liveCashierToolBreakdownMaxEntries;
+const int _toolHistoricalPointMaxEntries =
+    LimitConstants.liveCashierToolHistoricalPointMaxEntries;
 
 class _SalesWindowCacheEntry {
   const _SalesWindowCacheEntry({required this.createdAt, required this.sales});
@@ -13,6 +18,10 @@ class _SalesWindowCacheEntry {
 }
 
 extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
+  int _toolResponseLimit(int? requested, {int fallback = _toolResultMaxEntries}) {
+    return math.min(requested ?? fallback, fallback);
+  }
+
   DateTime _toolDayStart(DateTime value) {
     final local = value.toLocal();
     return DateTime(local.year, local.month, local.day);
@@ -351,6 +360,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     SaleStatus status,
   ) async {
     final limit = _toolOptionalLimit(args['limit']);
+    final cappedLimit = _toolResponseLimit(limit);
     final date = _toolDate(args['date']?.toString());
     final query =
         (args['customer_query']?.toString() ?? args['query']?.toString() ?? '')
@@ -364,7 +374,8 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       startDate: date,
       endDate: date,
     );
-    final matches = (limit == null ? sales : sales.take(limit))
+    final matches = sales
+        .take(cappedLimit)
         .map(_saleSummary)
         .toList(growable: false);
     final sale = matches.length == 1 ? matches.first : null;
@@ -458,6 +469,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     Map<String, dynamic> args,
   ) async {
     final limit = _toolOptionalLimit(args['limit']);
+    final cappedLimit = _toolResponseLimit(limit);
     final startDate = _toolDate(
       args['start_date']?.toString() ?? args['date']?.toString(),
     );
@@ -542,18 +554,21 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     final currencySymbol = _toolCurrencySymbol(currencyCode);
     final customerSummaries = customerQuery.isEmpty
         ? const <Map<String, dynamic>>[]
-        : _customerSummaries(filteredSales, currencyCode: currencyCode);
+        : _customerSummaries(
+            filteredSales,
+            currencyCode: currencyCode,
+          ).take(_toolResultMaxEntries).toList(growable: false);
     final itemSummaries = itemQuery.isEmpty
         ? const <Map<String, dynamic>>[]
         : _itemSummaries(
             filteredSales,
             currencyCode: currencyCode,
             itemQuery: itemQuery,
-          );
-    final saleMatches =
-        (limit == null ? filteredSales : filteredSales.take(limit))
-            .map(_saleSummary)
-            .toList(growable: false);
+          ).take(_toolResultMaxEntries).toList(growable: false);
+    final saleMatches = filteredSales
+        .take(cappedLimit)
+        .map(_saleSummary)
+        .toList(growable: false);
     final singleSale = saleMatches.length == 1 ? saleMatches.first : null;
     return {
       'status_filter': statusRaw.isEmpty ? 'all' : statusRaw,
@@ -589,6 +604,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       if (itemSummaries.isNotEmpty) 'items': itemSummaries,
       if (itemSummaries.length == 1) 'item': itemSummaries.first,
       'item_breakdown': itemBreakdown.values
+          .take(_toolBreakdownMaxEntries)
           .map(
             (item) => {
               ...item,
@@ -606,6 +622,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
     Map<String, dynamic> args,
   ) async {
     final limit = _toolOptionalLimit(args['limit']);
+    final cappedLimit = _toolResponseLimit(limit);
     final startDate = _toolDate(
       args['start_date']?.toString() ?? args['date']?.toString(),
     );
@@ -671,11 +688,13 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       ...?singleCustomer == null ? null : {'customer': singleCustomer},
       'customers': (limit == null ? customers : customers.take(limit)).toList(
         growable: false,
-      ),
-      'matches': (limit == null ? filteredSales : filteredSales.take(limit))
+      ).take(cappedLimit).toList(growable: false),
+      'matches': filteredSales
+          .take(cappedLimit)
           .map(_saleSummary)
           .toList(growable: false),
       'item_breakdown': itemBreakdown.values
+          .take(_toolBreakdownMaxEntries)
           .map(
             (item) => {
               ...item,
@@ -691,6 +710,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
 
   Future<Map<String, dynamic>> _listItemsTool(Map<String, dynamic> args) async {
     final limit = _toolOptionalLimit(args['limit']);
+    final cappedLimit = _toolResponseLimit(limit);
     final startDate = _toolDate(
       args['start_date']?.toString() ?? args['date']?.toString(),
     );
@@ -740,9 +760,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
         currencyCode: currencyCode,
       ),
       'total_quantity': totalQuantity,
-      'items': (limit == null ? items : items.take(limit)).toList(
-        growable: false,
-      ),
+      'items': items.take(cappedLimit).toList(growable: false),
     };
   }
 
@@ -920,6 +938,10 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       };
     }
 
+    final historicalDays = dayRange.length <= _toolHistoricalPointMaxEntries
+        ? dayRange
+        : dayRange.sublist(dayRange.length - _toolHistoricalPointMaxEntries);
+
     return {
       'result': 'ok',
       'forecast_scope': forecastScope,
@@ -966,6 +988,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       'forecast_basis':
           'Estimated for $scopeLabel from $totalDays days of historical sales using recent daily average and trend.',
       'historical_daily_points': dayRange
+          .skip(dayRange.length - historicalDays.length)
           .map((day) {
             final key = _toolDayKey(day);
             final total = dailyRevenue[key] ?? 0;
@@ -1085,7 +1108,7 @@ extension _LiveCashierOverlayDraftReports on _LiveCashierOverlayState {
       }
     }
     return {
-      'matches': totals.values.toList(growable: false),
+      'matches': totals.values.take(_toolResultMaxEntries).toList(growable: false),
       'count': totals.length,
     };
   }
